@@ -1,0 +1,12 @@
+{
+  "dependencies": {
+    "dayjs": "^1.11.13",
+    "pdfkit": "^0.17.1"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  },
+ "scripts": {
+  "start": "concurrently \"npx nodemon server.js\" \"npm run dev --prefix frontend\""
+}
+}

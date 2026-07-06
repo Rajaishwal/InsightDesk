@@ -1,0 +1,100 @@
+.staff-workload-page {
+  padding: 2rem;
+
+  .page-title {
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 1.5rem;
+  }
+
+  .filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+
+    select, input {
+      padding: 0.4rem 0.7rem;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+
+    input {
+      width: 200px;
+    }
+
+    .download-btn {
+      background-color: #4caf50;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 5px;
+      cursor: pointer;
+
+      &:hover {
+        background-color: #3e8e41;
+      }
+    }
+  }
+
+  .card {
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    padding: 1rem;
+    overflow-x: auto;
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+
+      th, td {
+        padding: 12px 15px;
+        text-align: left;
+      }
+
+      th {
+        background: #f4f4f4;
+      }
+
+      tr:nth-child(even) {
+        background: #fafafa;
+      }
+    }
+
+    .progress-bar {
+      background-color: #e5e7eb;
+      border-radius: 5px;
+      overflow: hidden;
+      height: 10px;
+      margin-bottom: 5px;
+
+      .fill {
+        background-color: #3b82f6;
+        height: 100%;
+        transition: width 0.3s ease;
+      }
+    }
+
+    .pagination {
+      display: flex;
+      justify-content: center;
+      margin-top: 1rem;
+
+      button {
+        margin: 0 4px;
+        padding: 6px 12px;
+        border: 1px solid #ccc;
+        background: white;
+        border-radius: 5px;
+        cursor: pointer;
+
+        &.active {
+          background-color: #3b82f6;
+          color: white;
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,24 @@
+# Root node_modules
+node_modules/
+CRM-Dashboard/node_modules/
+
+# Backend
+CRM-Dashboard/backend/node_modules/
+CRM-Dashboard/backend/.env
+CRM-Dashboard/backend/*.env
+
+# Frontend (frontend has its own .gitignore too)
+CRM-Dashboard/frontend/node_modules/
+CRM-Dashboard/frontend/dist/
+CRM-Dashboard/frontend/.env
+CRM-Dashboard/frontend/*.env
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
