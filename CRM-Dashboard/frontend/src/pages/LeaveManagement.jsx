@@ -1,527 +1,384 @@
-﻿import React, { useState, useEffect } from "react";
-import LeaveCard from "../components/LeaveCard";
+import { useState, useEffect } from "react";
+import LeaveDonutChart, { LEAVE_TYPE_KEYS } from "../components/LeaveDonutChart";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/axios";
+import { RefreshCw, X, CalendarDays, FileText, Tag } from "lucide-react";
 
-const LeaveManagement = () => {
+const LEAVE_META = {
+  "Planned Leave":         { color: "#6366f1", light: "#eef2ff", border: "border-indigo-400",  text: "text-indigo-600",  bg: "bg-indigo-50"  },
+  "Wellness Leave":        { color: "#10b981", light: "#ecfdf5", border: "border-emerald-400", text: "text-emerald-600", bg: "bg-emerald-50" },
+  "Polling Leave":         { color: "#f59e0b", light: "#fffbeb", border: "border-amber-400",   text: "text-amber-600",   bg: "bg-amber-50"   },
+  "Unplanned Leave (LOP)": { color: "#ef4444", light: "#fef2f2", border: "border-red-400",     text: "text-red-600",     bg: "bg-red-50"     },
+};
+
+const STATUS_CHIP = {
+  Approved: "bg-emerald-100 text-emerald-700",
+  Pending: "bg-amber-100 text-amber-700",
+  Rejected: "bg-red-100 text-red-700",
+};
+
+
+const isWeekend = (d) => { const day = new Date(d).getDay(); return day === 0 || day === 6; };
+
+const nextWorkingDay = (d) => {
+  const date = new Date(d);
+  while (isWeekend(date.toISOString().split("T")[0])) date.setDate(date.getDate() + 1);
+  return date.toISOString().split("T")[0];
+};
+
+const calcWorkingDays = (start, end) => {
+  if (!start || !end) return 0;
+  let count = 0;
+  for (let d = new Date(start); d <= new Date(end); d.setDate(d.getDate() + 1)) {
+    const day = d.getDay();
+    if (day !== 0 && day !== 6) count++;
+  }
+  return count;
+};
+
+const minDate = () => {
+  const t = new Date();
+  t.setDate(t.getDate() + 1);
+  return nextWorkingDay(t.toISOString().split("T")[0]);
+};
+
+const fmt = (d) => new Date(d).toLocaleDateString();
+
+export default function LeaveManagement() {
   const { user } = useAuth();
   const [leaves, setLeaves] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statsLoading, setStatsLoading] = useState(true);
-  const [_, setLastUpdated] = useState(new Date());
-  const [__, setIsRefreshing] = useState(false);
-  const [leaveStats, setLeaveStats] = useState({
-    taken: 0,
-    pending: 0,
-    remaining: 0,
-    monthlyAllocation: null
-  });
+  const [refreshing, setRefreshing] = useState(false);
+  const [leaveStats, setLeaveStats] = useState({ taken: 0, pending: 0, remaining: 0, monthlyAllocation: null });
+  const [showModal, setShowModal] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [cancellingId, setCancellingId] = useState(null);
+  const [toast, setToast] = useState(null); // { type: 'success'|'error', msg }
+  const [form, setForm] = useState({ startDate: "", endDate: "", leaveType: LEAVE_TYPE_KEYS[0], reason: "" });
+  const [formErr, setFormErr] = useState("");
 
-  const [showLeaveModal, setShowLeaveModal] = useState(false);
-  const [newLeave, setNewLeave] = useState({ 
-    startDate: "", 
-    endDate: "", 
-    leaveType: "Sick Leave", 
-    reason: "" 
-  });
-
-  const leaveTypes = [
-    'Sick Leave',
-    'Casual Leave', 
-    'Annual Leave', 
-    'Maternity Leave',
-    'Paternity Leave',
-    'Emergency Leave',
-    'Other'
-  ];
-
-  // Helper function to check if a date is weekend (Saturday or Sunday)
-  const isWeekend = (dateString) => {
-    const date = new Date(dateString);
-    const dayOfWeek = date.getDay();
-    return dayOfWeek === 0 || dayOfWeek === 6; // Sunday = 0, Saturday = 6
+  const showToast = (type, msg) => {
+    setToast({ type, msg });
+    setTimeout(() => setToast(null), 4000);
   };
 
-  // Helper function to calculate working days (excluding weekends)
-  const calculateWorkingDays = (startDate, endDate) => {
-    if (!startDate || !endDate) return 0;
-    
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    let workingDays = 0;
-    
-    // Iterate through each day between start and end (inclusive)
-    for (let date = new Date(start); date <= end; date.setDate(date.getDate() + 1)) {
-      const dayOfWeek = date.getDay(); // 0 = Sunday, 6 = Saturday
-      if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Exclude Saturday (6) and Sunday (0)
-        workingDays++;
-      }
-    }
-    
-    return workingDays;
-  };
-
-  // Helper function to get next working day (skip weekends)
-  const getNextWorkingDay = (dateString) => {
-    const date = new Date(dateString);
-    while (true) {
-      const dayOfWeek = date.getDay();
-      if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Not Saturday or Sunday
-        break;
-      }
-      date.setDate(date.getDate() + 1);
-    }
-    return date.toISOString().split('T')[0];
-  };
-
-  // Helper function to get the minimum allowed date (next working day)
-  const getMinAllowedDate = () => {
-    const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(today.getDate() + 1);
-    return getNextWorkingDay(tomorrow.toISOString().split('T')[0]);
-  };
-
-  // Handle date change with weekend validation (no alerts)
-  const handleDateChange = (field, value) => {
-    if (!value) {
-      setNewLeave(prev => ({ ...prev, [field]: '' }));
-      return;
-    }
-
-    if (isWeekend(value)) {
-      const nextWorkingDay = getNextWorkingDay(value);
-      setNewLeave(prev => ({ ...prev, [field]: nextWorkingDay }));
-    } else {
-      setNewLeave(prev => ({ ...prev, [field]: value }));
-    }
-  };
-
-  // Fetch user's leaves
-  const fetchUserLeaves = async (showLoading = true) => {
+  const fetchLeaves = async (silent = false) => {
     try {
-      if (showLoading) {
-        setLoading(true);
-      } else {
-        setIsRefreshing(true);
-      }
-      const response = await api.get('http://localhost:5000/api/leaves/my-leaves');
-      setLeaves(response.data.leaves);
-      setLastUpdated(new Date());
-    } catch (error) {
-      console.error('Error fetching leaves:', error);
+      if (!silent) setLoading(true); else setRefreshing(true);
+      const res = await api.get("http://localhost:5000/api/leaves/my-leaves");
+      setLeaves(res.data.leaves || []);
+    } catch {
+      if (!silent) showToast("error", "Failed to load leave requests.");
     } finally {
-      if (showLoading) {
-        setLoading(false);
-      } else {
-        setIsRefreshing(false);
-      }
+      if (!silent) setLoading(false); else setRefreshing(false);
     }
   };
 
-  // Fetch leave statistics
-  const fetchLeaveStats = async () => {
+  const fetchStats = async () => {
     try {
       setStatsLoading(true);
-      const response = await api.get('http://localhost:5000/api/leaves/stats');
-      const monthlyAllocation = response.data.monthlyAllocation;
-      const remaining = monthlyAllocation ? monthlyAllocation.remainingLeaves : 0;
-      
+      const res = await api.get("http://localhost:5000/api/leaves/stats");
+      const ma = res.data.monthlyAllocation;
       setLeaveStats({
-        taken: response.data.totalDaysTaken || 0,
-        pending: response.data.totalDaysPending || 0,
-        remaining: Math.max(0, remaining), // Ensure it never goes below 0
-        monthlyAllocation: monthlyAllocation
+        taken: res.data.totalDaysTaken || 0,
+        pending: res.data.totalDaysPending || 0,
+        remaining: Math.max(0, ma ? ma.remainingLeaves : 0),
+        monthlyAllocation: ma,
       });
-      
-    } catch (error) {
-      console.error('Error fetching leave stats:', error);
+    } catch {
+      /* silent */
     } finally {
       setStatsLoading(false);
     }
   };
 
-  // Apply for leave
-  const handleAddLeave = async () => {
-    try {
-      if (!newLeave.startDate || !newLeave.endDate || !newLeave.leaveType) {
-        alert('Please fill in all required fields');
-        return;
-      }
-
-      // Double check for weekends (additional validation - silent)
-      if (isWeekend(newLeave.startDate)) {
-        setNewLeave(prev => ({ ...prev, startDate: getNextWorkingDay(newLeave.startDate) }));
-        return;
-      }
-
-      if (isWeekend(newLeave.endDate)) {
-        setNewLeave(prev => ({ ...prev, endDate: getNextWorkingDay(newLeave.endDate) }));
-        return;
-      }
-
-      const response = await api.post('http://localhost:5000/api/leaves/apply', {
-        startDate: newLeave.startDate,
-        endDate: newLeave.endDate,
-        leaveType: newLeave.leaveType,
-        reason: newLeave.reason
-      });
-
-      if (response.status === 201) {
-        alert('Leave application submitted successfully!');
-        setShowLeaveModal(false);
-        setNewLeave({ startDate: "", endDate: "", leaveType: "Sick Leave", reason: "" });
-        
-        // Refresh data
-        await fetchUserLeaves();
-        await fetchLeaveStats();
-      }
-    } catch (error) {
-      console.error('Error applying for leave:', error);
-      alert(error.response?.data?.message || 'Error submitting leave application');
-    }
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([fetchLeaves(true), fetchStats()]);
+    setRefreshing(false);
   };
 
   useEffect(() => {
-    if (user) {
-      fetchUserLeaves();
-      fetchLeaveStats();
-      
-      // Set up polling to check for real-time updates every 30 seconds
-      const pollInterval = setInterval(() => {
-        fetchUserLeaves(false); // Don't show loading on auto-refresh
-        fetchLeaveStats();
-      }, 30000);
-
-      return () => clearInterval(pollInterval);
-    }
+    if (user) { fetchLeaves(); fetchStats(); }
   }, [user]);
 
-  // Add effect to handle weekend date styling in calendar
-  useEffect(() => {
-    const styleWeekendDates = () => {
-      // Add event listeners to date inputs for calendar styling
-      const dateInputs = document.querySelectorAll('input[type="date"].weekend-disabled');
-      
-      dateInputs.forEach(input => {
-        // Create weekend hint element
-        const container = input.parentElement;
-        let hintElement = container.querySelector('.weekend-hint');
-        if (!hintElement) {
-          hintElement = document.createElement('div');
-          hintElement.className = 'weekend-hint hide';
-          hintElement.textContent = 'Weekends auto-adjust to next working day';
-          container.appendChild(hintElement);
-        }
-
-        // Override the default date picker behavior
-        input.addEventListener('input', (e) => {
-          const selectedDate = e.target.value;
-          if (selectedDate && isWeekend(selectedDate)) {
-            // Add visual indication that weekend was selected
-            e.target.classList.add('weekend-selected');
-            hintElement.classList.remove('hide');
-            hintElement.classList.add('show');
-            
-            // Auto-adjust to next working day after a short delay
-            setTimeout(() => {
-              const nextWorkingDay = getNextWorkingDay(selectedDate);
-              if (e.target.value !== nextWorkingDay) {
-                e.target.value = nextWorkingDay;
-                // Trigger change event for React state update
-                const changeEvent = new Event('change', { bubbles: true });
-                e.target.dispatchEvent(changeEvent);
-              }
-              
-              // Remove weekend styling after adjustment
-              setTimeout(() => {
-                e.target.classList.remove('weekend-selected');
-                hintElement.classList.remove('show');
-                hintElement.classList.add('hide');
-              }, 1500);
-            }, 500);
-            
-          } else {
-            // Reset to normal styling
-            e.target.classList.remove('weekend-selected');
-            hintElement.classList.remove('show');
-            hintElement.classList.add('hide');
-          }
-        });
-
-        // Add styling on focus to show weekend restriction
-        input.addEventListener('focus', (e) => {
-          e.target.setAttribute('title', 'Weekend dates (Saturday & Sunday) will be automatically adjusted to the next working day');
-          const container = e.target.parentElement;
-          const hintElement = container.querySelector('.weekend-hint');
-          if (hintElement) {
-            hintElement.classList.remove('hide');
-            hintElement.classList.add('show');
-          }
-        });
-
-        // Hide hint on blur
-        input.addEventListener('blur', (e) => {
-          const container = e.target.parentElement;
-          const hintElement = container.querySelector('.weekend-hint');
-          if (hintElement && !e.target.classList.contains('weekend-selected')) {
-            setTimeout(() => {
-              hintElement.classList.remove('show');
-              hintElement.classList.add('hide');
-            }, 500);
-          }
-        });
-      });
-    };
-
-    // Apply styling when modal is shown
-    if (showLeaveModal) {
-      setTimeout(styleWeekendDates, 100); // Small delay to ensure DOM is updated
-    }
-
-    // Cleanup function
-    return () => {
-      const dateInputs = document.querySelectorAll('input[type="date"].weekend-disabled');
-      dateInputs.forEach(input => {
-        // Remove event listeners to prevent memory leaks
-        input.removeEventListener('input', () => {});
-        input.removeEventListener('focus', () => {});
-        input.removeEventListener('blur', () => {});
-      });
-    };
-  }, [showLeaveModal]);
-
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString();
+  const handleDateChange = (field, val) => {
+    if (!val) { setForm(p => ({ ...p, [field]: "" })); return; }
+    setForm(p => ({ ...p, [field]: isWeekend(val) ? nextWorkingDay(val) : val }));
   };
 
-  const getStatusColor = (status) => {
-    switch (status.toLowerCase()) {
-      case 'approved': return 'approved';
-      case 'pending': return 'pending';
-      case 'rejected': return 'rejected';
-      default: return '';
+  const handleSubmit = async () => {
+    if (!form.startDate || !form.endDate || !form.leaveType) {
+      setFormErr("Please fill in Start Date, End Date and Leave Type.");
+      return;
+    }
+    if (new Date(form.endDate) < new Date(form.startDate)) {
+      setFormErr("End Date cannot be before Start Date.");
+      return;
+    }
+    setFormErr("");
+    try {
+      setSubmitting(true);
+      await api.post("http://localhost:5000/api/leaves/apply", {
+        startDate: form.startDate,
+        endDate: form.endDate,
+        leaveType: form.leaveType,
+        reason: form.reason,
+      });
+      setShowModal(false);
+      setForm({ startDate: "", endDate: "", leaveType: LEAVE_TYPE_KEYS[0], reason: "" });
+      showToast("success", "Leave application submitted successfully!");
+      await fetchLeaves();
+      await fetchStats();
+    } catch (err) {
+      setFormErr(err.response?.data?.message || "Failed to submit leave application.");
+    } finally {
+      setSubmitting(false);
     }
   };
+
+  const handleCancel = async (leaveId) => {
+    try {
+      setCancellingId(leaveId);
+      await api.delete(`http://localhost:5000/api/leaves/cancel/${leaveId}`);
+      showToast("success", "Leave request cancelled.");
+      await fetchLeaves();
+      await fetchStats();
+    } catch (err) {
+      showToast("error", err.response?.data?.message || "Failed to cancel leave.");
+    } finally {
+      setCancellingId(null);
+    }
+  };
+
+  const workingDays = calcWorkingDays(form.startDate, form.endDate);
 
   return (
-  <div className="page-container p-6 font-sans">
-    {/* Title */}
-    <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-      <h1 className="text-gray-500 text-1xl font-bold mb-4 uppercase pl-5">
-        Leave Management
-      </h1>
-    </div>
-
-    {/* Leave Stats */}
-    {statsLoading ? (
-      <div className="flex justify-center items-center py-8">
-        <div className="animate-pulse text-gray-500 text-lg">
-          Loading leave statistics...
+    <div className="page-container p-6 font-sans">
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed top-5 right-5 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium transition-all
+          ${toast.type === "success" ? "bg-emerald-500 text-white" : "bg-red-500 text-white"}`}>
+          {toast.msg}
+          <button onClick={() => setToast(null)}><X size={14} /></button>
         </div>
-      </div>
-    ) : (
-      <LeaveCard
-        taken={leaveStats.taken}
-        pending={leaveStats.pending}
-        left={leaveStats.remaining}
-        monthlyAllocation={leaveStats.monthlyAllocation}
-      />
-    )}
+      )}
 
-    {/* Leave Requests Section */}
-    <div className="bg-white rounded-2xl shadow-lg mt-8 ml-6 mr-6 p-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-6 gap-3">
-        <h3 className="text-xl font-semibold text-gray-800">
-          My Leave Requests
-        </h3>
+      <div className="flex items-center justify-between pl-5 mb-2">
+        <h1 className="text-gray-500 text-sm font-bold uppercase">Leave Management</h1>
         <button
-          onClick={() => setShowLeaveModal(true)}
-          disabled={statsLoading || leaveStats.remaining <= 0}
-          className={`px-5 py-2 rounded-lg text-white font-medium shadow transition-all ${
-            statsLoading || leaveStats.remaining <= 0
-              ? "bg-gray-400 cursor-not-allowed opacity-70"
-              : "bg-emerald-500 hover:bg-emerald-600"
-          }`}
-          title={
-            statsLoading
-              ? "Loading..."
-              : leaveStats.remaining <= 0
-              ? "No leaves available this month"
-              : ""
-          }
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="flex items-center gap-1.5 text-xs text-indigo-500 hover:text-indigo-700 transition mr-6"
         >
-          + Request Leave
+          <RefreshCw size={13} className={refreshing ? "animate-spin" : ""} />
+          {refreshing ? "Refreshing..." : "Refresh"}
         </button>
       </div>
 
-      {/* Table */}
-      {loading ? (
-        <div className="text-center py-8 text-gray-500 text-lg">
-          Loading...
+      {/* Yearly leave breakdown chart */}
+      <LeaveDonutChart leaves={leaves} />
+
+      {/* Leave requests table */}
+      <div className="bg-white rounded-2xl shadow-lg mt-6 mx-6 p-6">
+        <div className="flex justify-between items-center mb-5">
+          <h3 className="text-base font-semibold text-gray-700">My Leave Requests</h3>
+          <button
+            onClick={() => setShowModal(true)}
+            disabled={statsLoading || leaveStats.remaining <= 0}
+            title={leaveStats.remaining <= 0 ? "No leaves remaining this month" : ""}
+            className={`px-4 py-2 rounded-lg text-sm font-medium shadow transition-all
+              ${statsLoading || leaveStats.remaining <= 0
+                ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                : "bg-indigo-500 hover:bg-indigo-600 text-white"}`}
+          >
+            + Request Leave
+          </button>
         </div>
-      ) : (
-        <div className="overflow-x-auto bg-gray-200 border border-gray-200 pb-2">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-300">
-              <tr>
-                {[
-                  "Start Date",
-                  "End Date",
-                  "Leave Type",
-                  "Working Days",
-                  "Reason",
-                  "Status",
-                  "Applied Date",
-                ].map((header) => (
-                  <th
-                    key={header}
-                    className="px-4 py-3 text-left font-semibold text-gray-700"
-                  >
-                    {header}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="bg-white">
-              {leaves.length === 0 ? (
+
+        {loading ? (
+          <div className="py-10 text-center text-gray-400 text-sm">Loading...</div>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border border-gray-100">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <td
-                    colSpan="7"
-                    className="text-center py-8 text-gray-500 text-base"
-                  >
-                    No leave requests found
-                  </td>
+                  {["Start Date", "End Date", "Type", "Days", "Reason", "Status", "Applied", ""].map(h => (
+                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
+                  ))}
                 </tr>
-              ) : (
-                leaves.map((leave, idx) => (
-                  <tr
-                    key={leave._id || idx}
-                    className=" shadow-md hover:bg-blue-50 transition rounded-lg"
-                  >
-                    <td className="px-4 py-3">{formatDate(leave.startDate)}</td>
-                    <td className="px-4 py-3">{formatDate(leave.endDate)}</td>
-                    <td className="px-4 py-3">{leave.leaveType}</td>
-                    <td className="px-4 py-3">{leave.totalDays}</td>
-                    <td className="px-4 py-3">{leave.reason || "N/A"}</td>
-                    <td
-                      className={`px-4 py-3 font-semibold ${
-                        leave.status === "Approved"
-                          ? "text-green-600"
-                          : leave.status === "Pending"
-                          ? "text-yellow-600"
-                          : "text-red-600"
-                      }`}
-                    >
-                      {leave.status}
-                    </td>
-                    <td className="px-4 py-3">{formatDate(leave.appliedAt)}</td>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {leaves.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="text-center py-10 text-gray-400">No leave requests yet</td>
                   </tr>
-                ))
+                ) : leaves.map((leave) => (
+                  <tr key={leave._id} className="hover:bg-indigo-50/40 transition">
+                    <td className="px-4 py-3 text-gray-700">{fmt(leave.startDate)}</td>
+                    <td className="px-4 py-3 text-gray-700">{fmt(leave.endDate)}</td>
+                    <td className="px-4 py-3 text-gray-700">{leave.leaveType}</td>
+                    <td className="px-4 py-3 font-medium text-gray-700">{leave.totalDays}</td>
+                    <td className="px-4 py-3 text-gray-500 max-w-[180px] truncate">{leave.reason || "—"}</td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${STATUS_CHIP[leave.status] || "bg-gray-100 text-gray-600"}`}>
+                        {leave.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-400 text-xs">{fmt(leave.appliedAt)}</td>
+                    <td className="px-4 py-3">
+                      {leave.status === "Pending" && (
+                        <button
+                          onClick={() => handleCancel(leave._id)}
+                          disabled={cancellingId === leave._id}
+                          className="text-xs text-red-500 hover:text-red-700 font-medium transition disabled:opacity-50"
+                        >
+                          {cancellingId === leave._id ? "Cancelling..." : "Cancel"}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+
+            {/* Colored header */}
+            <div className="bg-gradient-to-r from-indigo-500 to-indigo-600 px-6 py-5 flex items-center justify-between">
+              <div>
+                <h3 className="text-white font-semibold text-lg">Request Leave</h3>
+                <p className="text-indigo-200 text-xs mt-0.5">Fill in the details below to apply</p>
+              </div>
+              <button
+                onClick={() => { setShowModal(false); setFormErr(""); }}
+                className="text-indigo-200 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5">
+
+              {/* Error */}
+              {formErr && (
+                <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl px-4 py-3">
+                  {formErr}
+                </div>
               )}
-            </tbody>
-          </table>
+
+              {/* Date row */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                    <CalendarDays size={12} /> Start Date
+                  </label>
+                  <input
+                    type="date"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 focus:ring-2 focus:ring-indigo-400 focus:outline-none focus:border-transparent"
+                    value={form.startDate}
+                    min={minDate()}
+                    onChange={(e) => handleDateChange("startDate", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                    <CalendarDays size={12} /> End Date
+                  </label>
+                  <input
+                    type="date"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 focus:ring-2 focus:ring-indigo-400 focus:outline-none focus:border-transparent"
+                    value={form.endDate}
+                    min={form.startDate || minDate()}
+                    onChange={(e) => handleDateChange("endDate", e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Working days pill */}
+              {form.startDate && form.endDate && (
+                <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-2.5">
+                  <span className="text-2xl font-bold text-indigo-600">{workingDays}</span>
+                  <span className="text-sm text-indigo-500">working {workingDays === 1 ? "day" : "days"} requested
+                    <span className="text-indigo-300 text-xs ml-1">(weekends excluded)</span>
+                  </span>
+                </div>
+              )}
+
+              {/* Leave type cards */}
+              <div>
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                  <Tag size={12} /> Leave Type
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {LEAVE_TYPE_KEYS.map(t => {
+                    const m = LEAVE_META[t];
+                    const active = form.leaveType === t;
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setForm(p => ({ ...p, leaveType: t }))}
+                        className={`text-left px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all
+                          ${active
+                            ? `${m.border} ${m.bg} ${m.text}`
+                            : "border-gray-100 bg-gray-50 text-gray-500 hover:border-gray-200 hover:bg-gray-100"
+                          }`}
+                      >
+                        <span className={`inline-block w-2 h-2 rounded-full mr-2`}
+                          style={{ backgroundColor: active ? m.color : "#d1d5db" }} />
+                        {t.replace(" (LOP)", "")}
+                        {t.includes("LOP") && <span className="text-[10px] ml-1 opacity-60">(LOP)</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Reason */}
+              <div>
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                  <FileText size={12} /> Reason
+                  <span className="normal-case font-normal text-gray-400 ml-1">— optional</span>
+                </label>
+                <textarea
+                  rows={3}
+                  value={form.reason}
+                  onChange={(e) => setForm(p => ({ ...p, reason: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 focus:ring-2 focus:ring-indigo-400 focus:outline-none focus:border-transparent resize-none placeholder-gray-300"
+                  placeholder="Briefly describe the reason for your leave..."
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-1">
+                <button
+                  onClick={handleSubmit}
+                  disabled={submitting}
+                  className="flex-1 bg-indigo-500 hover:bg-indigo-600 disabled:bg-indigo-300 text-white font-semibold py-2.5 rounded-xl text-sm transition shadow-sm shadow-indigo-200"
+                >
+                  {submitting ? "Submitting..." : "Submit Request"}
+                </button>
+                <button
+                  onClick={() => { setShowModal(false); setFormErr(""); }}
+                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 font-semibold py-2.5 rounded-xl text-sm transition"
+                >
+                  Cancel
+                </button>
+              </div>
+
+            </div>
+          </div>
         </div>
       )}
     </div>
-
-    {/* Modal */}
-    {showLeaveModal && (
-      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex justify-center items-center z-50">
-        <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-lg animate-fadeIn">
-          <h3 className="text-xl font-semibold text-center text-gray-800 mb-4">
-            Request Leave
-          </h3>
-          <hr className="border-gray-200 mb-4" />
-
-          {/* Start Date */}
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Start Date:
-          </label>
-          <input
-            type="date"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 mb-3 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-            value={newLeave.startDate}
-            onChange={(e) => handleDateChange("startDate", e.target.value)}
-            min={getMinAllowedDate()}
-          />
-
-          {/* End Date */}
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            End Date:
-          </label>
-          <input
-            type="date"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 mb-3 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-            value={newLeave.endDate}
-            onChange={(e) => handleDateChange("endDate", e.target.value)}
-            min={newLeave.startDate || getMinAllowedDate()}
-          />
-
-          {/* Working Days Info */}
-          {newLeave.startDate && newLeave.endDate && (
-            <div className="bg-blue-50 border border-blue-200 text-blue-800 text-sm rounded-md p-3 mb-4">
-              Working days:{" "}
-              <span className="font-semibold">
-                {calculateWorkingDays(newLeave.startDate, newLeave.endDate)}
-              </span>{" "}
-              {calculateWorkingDays(newLeave.startDate, newLeave.endDate) === 1
-                ? "day"
-                : "days"}{" "}
-              <span className="text-gray-500 font-normal">(weekends excluded)</span>
-            </div>
-          )}
-
-          {/* Leave Type */}
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Leave Type:
-          </label>
-          <select
-            value={newLeave.leaveType}
-            onChange={(e) =>
-              setNewLeave({ ...newLeave, leaveType: e.target.value })
-            }
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 mb-3 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-          >
-            {leaveTypes.map((type) => (
-              <option key={type} value={type}>
-                {type}
-              </option>
-            ))}
-          </select>
-
-          {/* Reason */}
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Reason (Optional):
-          </label>
-          <textarea
-            value={newLeave.reason}
-            onChange={(e) => setNewLeave({ ...newLeave, reason: e.target.value })}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 mb-4 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-            placeholder="Reason for leave..."
-            rows="3"
-          />
-
-          {/* Buttons */}
-          <div className="flex gap-3">
-            <button
-              onClick={handleAddLeave}
-              className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 rounded-lg shadow transition"
-            >
-              Submit
-            </button>
-            <button
-              onClick={() => setShowLeaveModal(false)}
-              className="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 rounded-lg shadow transition"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      </div>
-    )}
-  </div>
-);
+  );
 }
-export default LeaveManagement;

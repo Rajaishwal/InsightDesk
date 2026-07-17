@@ -8,7 +8,8 @@ import {
   getAllLeaveRequests,
   getHRLeaveStats,
   processMonthlyCarryForward,
-  getMonthlyAllocation
+  getMonthlyAllocation,
+  cancelLeave
 } from '../controllers/leaveController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
@@ -36,6 +37,9 @@ router.put('/hr/status/:leaveId', protect, updateLeaveStatus);
 
 // Admin routes for monthly processing
 router.post('/admin/process-carry-forward', protect, processMonthlyCarryForward);
+
+// Cancel a pending leave (employee)
+router.delete('/cancel/:leaveId', protect, cancelLeave);
 
 // Update leave status (HR/Admin only)
 router.put('/status/:leaveId', protect, updateLeaveStatus);

@@ -95,6 +95,7 @@ export const applyLeave = async (req, res) => {
       userId: new mongoose.Types.ObjectId(userId),
       userName: user.name,
       userEmail: user.email,
+      userEmployeeId: user.employeeId || '',
       leaveType,
       startDate: start,
       endDate: end,
@@ -288,11 +289,18 @@ export const getAllLeaveRequests = async (req, res) => {
 
     const skip = (page - 1) * limit;
     
-    const leaves = await Leave.find(filter)
+    const rawLeaves = await Leave.find(filter)
       .sort({ appliedAt: -1 })
       .skip(skip)
       .limit(parseInt(limit))
-      .populate('userId', 'name email');
+      .populate('userId', 'name email employeeId');
+
+    // Merge populated employeeId into each leave object
+    const leaves = rawLeaves.map(l => {
+      const obj = l.toObject();
+      obj.userEmployeeId = obj.userEmployeeId || l.userId?.employeeId || '';
+      return obj;
+    });
 
     const totalRecords = await Leave.countDocuments(filter);
     const totalPages = Math.ceil(totalRecords / limit);
@@ -497,6 +505,35 @@ export const processMonthlyCarryForward = async (req, res) => {
   } catch (error) {
     console.error('Process monthly carry forward error:', error);
     res.status(500).json({ message: 'Server error while processing monthly carry forward' });
+  }
+};
+
+// Cancel a pending leave (employee only)
+export const cancelLeave = async (req, res) => {
+  try {
+    const { leaveId } = req.params;
+    const userId = req.user._id || req.user.id;
+
+    const leave = await Leave.findById(leaveId);
+    if (!leave) return res.status(404).json({ message: 'Leave request not found' });
+
+    if (leave.userId.toString() !== userId.toString())
+      return res.status(403).json({ message: 'Not authorized to cancel this leave' });
+
+    if (leave.status !== 'Pending')
+      return res.status(400).json({ message: 'Only pending leaves can be cancelled' });
+
+    const leaveYear  = leave.startDate.getFullYear();
+    const leaveMonth = leave.startDate.getMonth() + 1;
+    const leaveDays  = leave.totalDays;
+
+    await Leave.findByIdAndDelete(leaveId);
+    await MonthlyLeaveAllocation.updateLeaveCount(userId, leaveYear, leaveMonth, 0, -leaveDays);
+
+    res.json({ message: 'Leave request cancelled successfully' });
+  } catch (error) {
+    console.error('Cancel leave error:', error);
+    res.status(500).json({ message: 'Server error while cancelling leave' });
   }
 };
 

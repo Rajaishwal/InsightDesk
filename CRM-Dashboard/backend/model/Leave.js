@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+﻿import mongoose from 'mongoose';
 
 const leaveSchema = new mongoose.Schema({
   userId: {
@@ -14,10 +14,13 @@ const leaveSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  userEmployeeId: {
+    type: String
+  },
   leaveType: {
     type: String,
     required: true,
-    enum: ['Sick Leave', 'Casual Leave', 'Annual Leave', 'Maternity Leave', 'Paternity Leave', 'Emergency Leave', 'Other']
+    enum: ['Planned Leave', 'Wellness Leave', 'Polling Leave', 'Unplanned Leave (LOP)', 'Sick Leave', 'Casual Leave', 'Annual Leave', 'Maternity Leave', 'Paternity Leave', 'Emergency Leave', 'Other']
   },
   startDate: {
     type: Date,
@@ -121,3 +124,4 @@ leaveSchema.index({ startDate: 1, endDate: 1 });
 leaveSchema.index({ appliedAt: -1 });
 
 export default mongoose.model('Leave', leaveSchema);
+
