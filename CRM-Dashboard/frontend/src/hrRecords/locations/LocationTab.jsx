@@ -300,12 +300,27 @@ const LocationTab = () => {
                               {locationStatus.text}
                             </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-mono text-gray-700">
-                              {emp.currentLocation
-                                ? `${emp.currentLocation.latitude.toFixed(4)}, ${emp.currentLocation.longitude.toFixed(4)}`
-                                : "No location available"}
-                            </div>
+                          <td className="px-6 py-4 max-w-[260px]">
+                            {emp.currentLocation ? (
+                              <div className="space-y-0.5">
+                                <div className="text-xs font-mono text-gray-500">
+                                  {emp.currentLocation.latitude.toFixed(6)}, {emp.currentLocation.longitude.toFixed(6)}
+                                </div>
+                                {emp.latestLocationData?.address ? (
+                                  <div className="text-xs text-gray-700 leading-snug line-clamp-2" title={emp.latestLocationData.address}>
+                                    {emp.latestLocationData.address}
+                                  </div>
+                                ) : emp.latestLocationData?.city ? (
+                                  <div className="text-xs text-gray-600">
+                                    {[emp.latestLocationData.city, emp.latestLocationData.state, emp.latestLocationData.country].filter(Boolean).join(", ")}
+                                  </div>
+                                ) : (
+                                  <div className="text-xs text-gray-400 italic">Address unavailable</div>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-sm text-gray-400">No location available</span>
+                            )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-700">
@@ -344,28 +359,29 @@ const LocationTab = () => {
                                   <p className="text-center text-gray-500">Loading history...</p>
                                 ) : locationHistoryData[emp._id]?.length > 0 ? (
                                   <div className="space-y-1 max-h-32 overflow-y-auto">
-                                    {locationHistoryData[emp._id].map((loc, index) => (
-                                      <div key={index} className="text-xs border-b border-gray-200 pb-1">
-                                        <div className="flex items-center justify-between">
-                                          <span className="font-medium text-gray-600">
-                                            {new Date(loc.timestamp).toLocaleString()}
-                                          </span>
-                                          <span className="text-gray-500 font-mono mx-2">
-                                            {loc.coordinates ? 
-                                              `${loc.coordinates.latitude?.toFixed(4) || 'N/A'}, ${loc.coordinates.longitude?.toFixed(4) || 'N/A'}` :
-                                              loc.latitude && loc.longitude ? 
-                                                `${loc.latitude.toFixed(4)}, ${loc.longitude.toFixed(4)}` : 
-                                                'No coordinates'
-                                            }
-                                          </span>
-                                          {loc.address && (
-                                            <span className="text-gray-400 flex-1 truncate">
-                                              {loc.address}
+                                    {locationHistoryData[emp._id].map((loc, index) => {
+                                      const lat = loc.coordinates?.latitude ?? loc.latitude;
+                                      const lng = loc.coordinates?.longitude ?? loc.longitude;
+                                      return (
+                                        <div key={index} className="pb-2 mb-2 border-b border-gray-100 last:border-0 last:mb-0">
+                                          <div className="flex items-center justify-between gap-2">
+                                            <span className="text-gray-500 font-mono text-[11px] flex-shrink-0">
+                                              {lat != null && lng != null
+                                                ? `${Number(lat).toFixed(6)}, ${Number(lng).toFixed(6)}`
+                                                : "No coordinates"}
                                             </span>
+                                            <span className="text-[11px] text-gray-400 flex-shrink-0">
+                                              {new Date(loc.timestamp).toLocaleString()}
+                                            </span>
+                                          </div>
+                                          {loc.address && (
+                                            <p className="text-[11px] text-gray-600 mt-0.5 leading-snug">
+                                              {loc.address}
+                                            </p>
                                           )}
                                         </div>
-                                      </div>
-                                    ))}
+                                      );
+                                    })}
                                   </div>
                                 ) : (
                                   <p className="text-center text-gray-500">No history available</p>

@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { MapPin, RefreshCw, AlertCircle, CheckCircle } from "lucide-react";
+import { MapPin, RefreshCw, AlertCircle } from "lucide-react";
 
 const LocationStatus = () => {
   const { locationTracker, user } = useAuth();
@@ -12,103 +12,115 @@ const LocationStatus = () => {
     setIsRetrying(true);
     try {
       if (!navigator.geolocation) throw new Error("Geolocation not supported");
-      const position = await new Promise((resolve, reject) =>
+      await new Promise((resolve, reject) =>
         navigator.geolocation.getCurrentPosition(resolve, reject, {
           enableHighAccuracy: true,
           timeout: 15000,
-          maximumAge: 0
+          maximumAge: 0,
         })
       );
       if (startTracking) startTracking();
     } catch (error) {
-      console.error("Error enabling location:", error);
-      let errorMessage = "Failed to enable location";
-      switch (error.code) {
-        case 1:
-          errorMessage = "Location access denied. Enable location permissions.";
-          break;
-        case 2:
-          errorMessage = "Location unavailable. Check your device settings.";
-          break;
-        case 3:
-          errorMessage = "Location request timed out.";
-          break;
-        default:
-          errorMessage = error.message || "Unknown error accessing location";
-      }
-      alert(errorMessage);
+      let msg = "Failed to enable location";
+      if (error.code === 1) msg = "Location access denied. Enable location permissions in your browser.";
+      else if (error.code === 2) msg = "Location unavailable. Check your device settings.";
+      else if (error.code === 3) msg = "Location request timed out.";
+      else msg = error.message || "Unknown error accessing location";
+      alert(msg);
     } finally {
       setIsRetrying(false);
     }
   };
 
-  const getStatusColor = () => {
-    if (locationError) return "bg-red-500";
-    if (isTracking && currentLocation) return "bg-green-500";
-    if (isTracking) return "bg-yellow-400 animate-pulse";
-    return "bg-gray-400";
-  };
+  const dotColor = locationError
+    ? "bg-red-500"
+    : isTracking && currentLocation
+    ? "bg-green-500"
+    : isTracking
+    ? "bg-yellow-400 animate-pulse"
+    : "bg-gray-400";
 
-  const getStatusText = () => {
-    if (locationError && locationError.includes("check-in")) return "Requires Check-in";
-    if (locationError) return "Location Error";
-    if (isTracking && currentLocation) return "Active";
-    if (isTracking) return "Getting Location...";
-    return "Inactive";
-  };
+  const statusText = locationError && locationError.includes("check-in")
+    ? "Requires Check-in"
+    : locationError
+    ? "Location Error"
+    : isTracking && currentLocation
+    ? "Active"
+    : isTracking
+    ? "Getting Location..."
+    : "Inactive";
 
   if (!user) return null;
 
   return (
-    <div className="p-4 mb-4 mr-7 ">
-      <div className="flex gap-5">
-        <div className="flex items-center gap-3">
-          <div className={`w-3 h-3 rounded-full ${getStatusColor()}`}></div>
-          <span className="font-medium text-gray-700">{getStatusText()}</span>
+    <div className="p-4 mb-4 mr-7 space-y-3">
+
+      {/* Status row */}
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2.5">
+          <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${dotColor}`} />
+          <span className="text-sm font-medium text-gray-700">{statusText}</span>
         </div>
 
         {!isTracking && (
-         <button
+          <button
             onClick={retryLocationAccess}
             disabled={isRetrying || (locationError && locationError.includes("check-in"))}
-            className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium text-white 
-                        bg-gradient-to-r from-blue-600 to-blue-400 
-                        hover:from-blue-700 hover:to-blue-500 
-                        disabled:opacity-60 disabled:cursor-not-allowed 
-                        transition-all duration-200 ease-in-out shadow-md`}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium text-white
+              bg-gradient-to-r from-blue-600 to-blue-400 hover:from-blue-700 hover:to-blue-500
+              disabled:opacity-60 disabled:cursor-not-allowed transition shadow-sm"
             title={
-              locationError && locationError.includes("check-in")
-                ? "Please check in first to enable location"
+              locationError?.includes("check-in")
+                ? "Please check in first"
                 : "Enable location tracking"
             }
           >
-            {isRetrying ? (
-              <RefreshCw className="animate-spin w-5 h-5" />
-            ) : (
-              <MapPin className="w-5 h-5" />
-            )}
-            <span className="text-sm">
-              {isRetrying
-                ? "Enabling..."
-                : locationError && locationError.includes("check-in")
-                ? "Check-in Required"
-                : "Enable"}
-            </span>
+            {isRetrying ? <RefreshCw className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
+            {isRetrying ? "Enabling..." : locationError?.includes("check-in") ? "Check-in Required" : "Enable"}
           </button>
-
         )}
       </div>
 
+      {/* Coordinates + address — shown when tracking is active */}
+      {isTracking && currentLocation && (
+        <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 space-y-1.5">
+          {/* Coordinates */}
+          <div className="flex items-center gap-2">
+            <MapPin className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+            <span className="font-mono text-xs font-semibold text-gray-700">
+              {currentLocation.latitude.toFixed(6)}, {currentLocation.longitude.toFixed(6)}
+            </span>
+          </div>
+
+          {/* Address */}
+          {currentLocation.address ? (
+            <p className="text-xs text-gray-500 leading-relaxed pl-5">
+              {currentLocation.address}
+            </p>
+          ) : (
+            <p className="text-xs text-gray-400 pl-5 italic">Resolving address...</p>
+          )}
+
+          {/* Last updated */}
+          {currentLocation.timestamp && (
+            <p className="text-[10px] text-gray-400 pl-5">
+              Updated {new Date(currentLocation.timestamp).toLocaleTimeString()}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Error banner */}
       {locationError && (
-        <div className="mt-3 p-3 rounded bg-red-50 border border-red-200 text-red-700 flex items-start gap-2 text-sm">
+        <div className="p-3 rounded-lg bg-red-50 border border-red-100 text-red-700 flex items-start gap-2 text-xs">
           <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
           <div>
             <p className="font-medium">{locationError}</p>
-            {locationError.includes('blocked') || locationError.includes('denied') ? (
-              <p className="mt-1 text-xs text-red-500">
-                To fix: click the <strong>lock icon</strong> in your browser address bar → <strong>Site settings</strong> → set Location to <strong>Allow</strong> → reload the page.
+            {(locationError.includes("blocked") || locationError.includes("denied")) && (
+              <p className="mt-1 text-red-500">
+                Click the <strong>lock icon</strong> in the address bar → <strong>Site settings</strong> → Location → <strong>Allow</strong> → reload.
               </p>
-            ) : null}
+            )}
           </div>
         </div>
       )}

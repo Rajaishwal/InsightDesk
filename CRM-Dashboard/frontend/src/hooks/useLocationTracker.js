@@ -95,7 +95,10 @@ export const useLocationTracker = (user) => {
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
         timestamp: new Date(),
-        accuracy: position.coords.accuracy
+        accuracy: position.coords.accuracy,
+        address: addressData?.address || null,
+        city: addressData?.city || null,
+        state: addressData?.state || null,
       });
       
       setLastUpdate(new Date());
