@@ -1,7 +1,8 @@
 ﻿import { useState, useEffect } from "react";
-import { Eye, Search, Users2 } from "lucide-react";
+import { Eye, Search, Users2, ListChecks } from "lucide-react";
 import PrjModle from "../components/PrjModle";
 import PrjTeamModle from "../components/PrjTeamModle";
+import ProjectTracklist from "../components/ProjectTracklist";
 import api from "../services/axios";
 import { useAuth } from "../context/AuthContext";
 
@@ -16,6 +17,7 @@ const Projects = () => {
   const [teamMembers, setTeamMembers] = useState([]);
   const [teamModalTitle, setTeamModalTitle] = useState("");
   const [selectedProject, setSelectedProject] = useState(null);
+  const [tracklistProject, setTracklistProject] = useState(null);
 
   const handleTeamView = async (projectId, projectTitle) => {
     setTeamMembers([]);
@@ -117,6 +119,9 @@ const Projects = () => {
                   Action
                 </th>
                 <th className="py-3 px-6 text-left text-sm font-semibold">
+                  Tracklist
+                </th>
+                <th className="py-3 px-6 text-left text-sm font-semibold">
                   Team Members
                 </th>
               </tr>
@@ -185,6 +190,16 @@ const Projects = () => {
                     </td>
                     <td className="py-3 px-6 text-sm">
                       <button
+                        onClick={() => setTracklistProject(project)}
+                        className="flex items-center gap-2 bg-indigo-50 text-indigo-700 px-3 py-2 rounded-lg shadow-sm hover:bg-indigo-600 hover:text-white cursor-pointer transition-all duration-200 ease-in-out transform hover:scale-105"
+                        title="View Task Tracklist"
+                      >
+                        <ListChecks className="w-5 h-5" />
+                        <span className="font-medium">Tasks</span>
+                      </button>
+                    </td>
+                    <td className="py-3 px-6 text-sm">
+                      <button
                         onClick={() => handleTeamView(project.projectId, project.title)}
                         className="flex items-center gap-2 bg-gray-100 text-gray-700 px-3 py-2 rounded-lg shadow-sm hover:bg-gray-800 hover:text-white cursor-pointer transition-all duration-200 ease-in-out transform hover:scale-105"
                         title="View Team Members"
@@ -208,6 +223,14 @@ const Projects = () => {
             </tbody>
           </table>
         </div>
+        {tracklistProject && (
+          <ProjectTracklist
+            project={tracklistProject}
+            onClose={() => setTracklistProject(null)}
+            isManager={user?.role !== "employee"}
+          />
+        )}
+
         {showTeamModal && (
           <PrjTeamModle
             teamMembers={teamMembers}

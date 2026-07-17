@@ -1,6 +1,7 @@
 ﻿import React, { useState, useEffect, useRef } from "react";
-import { Eye, Search, X } from "lucide-react";
+import { Eye, Search, X, ListChecks } from "lucide-react";
 import PrjModle from "../components/PrjModle";
+import ProjectTracklist from "../components/ProjectTracklist";
 import AddProject from "./AddProject";
 import axios from "../services/axios";
 
@@ -9,6 +10,7 @@ const HrProject = () => {
   const [showModal, setShowModal] = useState(false);
   const [selectedEmp, setSelectedEmp] = useState(null);
   const [showProjectAdd, setShowProjectAdd] = useState(false);
+  const [tracklistProject, setTracklistProject] = useState(null);
   const [hrData, setHrData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -183,17 +185,18 @@ const HrProject = () => {
                 <th className="py-3 px-6 text-left text-sm font-semibold">Description</th>
                 <th className="py-3 px-6 text-left text-sm font-semibold">Project Manager</th>
                 <th className="py-3 px-6 text-left text-sm font-semibold">Status</th>
+                <th className="py-3 px-6 text-left text-sm font-semibold">Tracklist</th>
                 <th className="py-3 px-6 text-left text-sm font-semibold">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan="6" className="py-6 text-center text-gray-500 text-sm">Loading...</td>
+                  <td colSpan="7" className="py-6 text-center text-gray-500 text-sm">Loading...</td>
                 </tr>
               ) : error ? (
                 <tr>
-                  <td colSpan="6" className="py-6 text-center text-red-500 text-sm">{error}</td>
+                  <td colSpan="7" className="py-6 text-center text-red-500 text-sm">{error}</td>
                 </tr>
               ) : filteredData.length > 0 ? (
                 filteredData.map((emp) => (
@@ -235,6 +238,16 @@ const HrProject = () => {
                     </td>
                     <td className="py-3 px-6 text-sm">
                       <button
+                        onClick={() => setTracklistProject(emp)}
+                        className="flex items-center gap-1.5 bg-indigo-50 text-indigo-700 px-3 py-2 rounded-lg hover:bg-indigo-600 hover:text-white cursor-pointer transition-all"
+                        title="View Task Tracklist"
+                      >
+                        <ListChecks className="w-4 h-4" />
+                        <span className="text-xs font-medium">Tasks</span>
+                      </button>
+                    </td>
+                    <td className="py-3 px-6 text-sm">
+                      <button
                         onClick={() => handleView(emp)}
                         className="text-blue-600 hover:text-blue-800 cursor-pointer transition transform hover:scale-110 p-2 rounded-full"
                         title="View Employee"
@@ -246,7 +259,7 @@ const HrProject = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="6" className="py-6 text-center text-gray-500 text-sm">
+                  <td colSpan="7" className="py-6 text-center text-gray-500 text-sm">
                     No matching records found.
                   </td>
                 </tr>
@@ -254,6 +267,15 @@ const HrProject = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Tracklist drawer */}
+        {tracklistProject && (
+          <ProjectTracklist
+            project={tracklistProject}
+            onClose={() => setTracklistProject(null)}
+            isManager={true}
+          />
+        )}
 
         {/* Modal */}
         {showModal && (
@@ -269,3 +291,5 @@ const HrProject = () => {
 };
 
 export default HrProject;
+
+

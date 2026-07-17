@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/axios";
-import { Calendar, Clock, Layers, CheckSquare, User, TrendingUp, Pencil } from "lucide-react";
+import { Calendar, Clock, Layers, CheckSquare, User, TrendingUp, Pencil, ListChecks } from "lucide-react";
 import EditProfileModal from "../components/EditProfileModal";
 import TaskBoard from "../components/TaskBoard";
+import ProjectTracklist from "../components/ProjectTracklist";
 
 /* ── SVG Performance Ring ── */
 const Ring = ({ percent, color, label, sub }) => {
@@ -52,6 +53,7 @@ export default function EmployeeDashboard() {
   const [loading, setLoading]       = useState(true);
   const [hoveredDay, setHoveredDay] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [tracklistProject, setTracklistProject] = useState(null);
 
   useEffect(() => {
     api.get("/users/employee-dashboard")
@@ -122,6 +124,13 @@ export default function EmployeeDashboard() {
   return (
     <div className="p-5 bg-gray-50 min-h-screen space-y-5">
       {showEditModal && <EditProfileModal onClose={() => setShowEditModal(false)} />}
+      {tracklistProject && (
+        <ProjectTracklist
+          project={tracklistProject}
+          onClose={() => setTracklistProject(null)}
+          isManager={user?.role !== "employee"}
+        />
+      )}
 
       {/* ── Profile header ── */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
@@ -344,7 +353,11 @@ export default function EmployeeDashboard() {
             ) : (
               <div className="space-y-2">
                 {projects.map((proj) => (
-                  <div key={proj._id} className="p-3 rounded-lg border border-gray-100 hover:border-violet-200 hover:bg-violet-50/30 transition">
+                  <button
+                    key={proj._id}
+                    onClick={() => setTracklistProject(proj)}
+                    className="w-full text-left p-3 rounded-lg border border-gray-100 hover:border-indigo-300 hover:bg-indigo-50/40 transition group"
+                  >
                     <div className="flex items-center justify-between gap-2 mb-1">
                       <span className="text-[10px] font-bold text-gray-400 font-mono tracking-widest">{proj.projectId}</span>
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${PROJ_CHIP[proj.status] || "bg-gray-100 text-gray-500"}`}>
@@ -352,12 +365,17 @@ export default function EmployeeDashboard() {
                       </span>
                     </div>
                     <p className="text-sm font-semibold text-gray-800 leading-tight">{proj.title}</p>
-                    {proj.manager && (
-                      <p className="text-[11px] text-gray-400 mt-1 flex items-center gap-1">
-                        <User className="w-3 h-3" />{proj.manager}
-                      </p>
-                    )}
-                  </div>
+                    <div className="flex items-center justify-between mt-1.5">
+                      {proj.manager && (
+                        <p className="text-[11px] text-gray-400 flex items-center gap-1">
+                          <User className="w-3 h-3" />{proj.manager}
+                        </p>
+                      )}
+                      <span className="text-[10px] text-indigo-400 font-semibold flex items-center gap-1 opacity-0 group-hover:opacity-100 transition ml-auto">
+                        <ListChecks className="w-3 h-3" />View tasks
+                      </span>
+                    </div>
+                  </button>
                 ))}
               </div>
             )}
