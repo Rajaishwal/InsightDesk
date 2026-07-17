@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useSocket } from "../context/SocketContext.jsx";
-import { UserCheck, LogOut, TimerIcon, Coffee, MessageSquare } from "lucide-react";
+import { UserCheck, LogOut, Coffee, MessageSquare } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Attendance from "../pages/Attendance.jsx";
 import ChatPanel from "./ChatPanel.jsx";
 import axios from "axios";
 import api from "../services/axios.js";
 
-const Navbar = ({ onOpenTimer }) => {
+const Navbar = () => {
   const { user, logout } = useAuth();
   const { unreadCount } = useSocket();
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
@@ -206,27 +206,6 @@ const Navbar = ({ onOpenTimer }) => {
                 </span>
               </button>
             </div>
-
-            {/* Timer */}
-            <button
-              onClick={isCheckedIn ? onOpenTimer : undefined}
-              disabled={!isCheckedIn}
-              title={
-                isCheckedOut
-                  ? "Timer disabled after check-out"
-                  : !isCheckedIn
-                  ? "Check in first to use Timer"
-                  : "Task Timer"
-              }
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl transition ${
-                !isCheckedIn
-                  ? "bg-gray-100 text-gray-400 cursor-not-allowed opacity-60"
-                  : "bg-green-50 text-green-600 hover:bg-green-100"
-              }`}
-            >
-              <TimerIcon className="w-5 h-5" />
-              <span className="hidden sm:inline">Timer</span>
-            </button>
 
             {/* Messages */}
             <button

@@ -11,7 +11,6 @@ import Projects from './pages/Projects';
 import Report from './pages/Report';
 import HrRecord from './pages/HrRecord';
 import StaffWorkload from './pages/StaffWorkload';
-import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import Signup from './pages/Signup';
 import Profile from './pages/Profile';
@@ -22,19 +21,7 @@ import PaySlips from './pages/PaySlips';
 
 
 function App() {
-  const [tasks, setTasks] = useState([]);
-  const [showTimerModal, setShowTimerModal] = useState(false);
   const location = useLocation();
-
-  // Called when saving a task from the timer modal
-  const handleSaveTask = (taskTitle, desc, time) => {
-    const newTask = {
-      title: taskTitle,
-      description: desc,
-      timeTaken: time,
-    };
-    setTasks(prev => [...prev, newTask]);
-  };
 
   return (
     <>
@@ -48,12 +35,7 @@ function App() {
         <div className="flex-1 flex flex-col">
           {/* Hide Navbar on login, signup, and register-employee routes using useLocation */}
           {!["/login", "/signup", "/register-employee"].includes(location.pathname) && (
-            <Navbar
-              onOpenTimer={() => {
-                setShowTimerModal(true);
-                window.dispatchEvent(new CustomEvent("openTaskTimer"));
-              }}
-            />
+            <Navbar />
           )}
 
           <main className="flex-1 bg-gray-50">
@@ -61,13 +43,7 @@ function App() {
               <Route path="/register-employee" element={<RegisterEmployee />} />
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
-              <Route path="/" element={<ProtectedRoute><Dashboard 
-                tasks={tasks}
-                handleSaveTask={handleSaveTask}
-                showTimerModal={showTimerModal}
-                onOpenTimer={() => setShowTimerModal(true)}
-                onCloseTimer={() => setShowTimerModal(false)}
-              /></ProtectedRoute>} />
+              <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
               <Route path="/support" element={<ProtectedRoute><Report /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
