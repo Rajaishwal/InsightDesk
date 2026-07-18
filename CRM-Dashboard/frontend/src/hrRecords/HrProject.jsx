@@ -1,9 +1,43 @@
-﻿import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Eye, Search, X, ListChecks } from "lucide-react";
 import PrjModle from "../components/PrjModle";
 import ProjectTracklist from "../components/ProjectTracklist";
+import ProjectActivityFeed from "../components/ProjectActivityFeed";
 import AddProject from "./AddProject";
 import axios from "../services/axios";
+
+// Mini segmented progress bar for task stats
+function TaskProgressBar({ stats }) {
+  if (!stats || stats.total === 0) {
+    return <span className="text-xs text-gray-400">No tasks</span>;
+  }
+  const { total, completed, ongoing, pending } = stats;
+  const pct = (n) => Math.round((n / total) * 100);
+
+  return (
+    <div className="min-w-[120px]">
+      {/* Counts row */}
+      <div className="flex items-center gap-2 mb-1.5 text-[11px] font-medium">
+        <span className="text-emerald-600">{completed} done</span>
+        {ongoing > 0  && <span className="text-indigo-500">{ongoing} active</span>}
+        {pending > 0  && <span className="text-amber-500">{pending} pending</span>}
+        <span className="text-gray-400 ml-auto">{total} total</span>
+      </div>
+      {/* Segmented bar */}
+      <div className="flex h-1.5 rounded-full overflow-hidden bg-gray-100 w-full">
+        {completed > 0 && (
+          <div className="bg-emerald-500 transition-all" style={{ width: `${pct(completed)}%` }} />
+        )}
+        {ongoing > 0 && (
+          <div className="bg-indigo-400 transition-all" style={{ width: `${pct(ongoing)}%` }} />
+        )}
+        {pending > 0 && (
+          <div className="bg-amber-300 transition-all" style={{ width: `${pct(pending)}%` }} />
+        )}
+      </div>
+    </div>
+  );
+}
 
 const HrProject = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -12,6 +46,7 @@ const HrProject = () => {
   const [showProjectAdd, setShowProjectAdd] = useState(false);
   const [tracklistProject, setTracklistProject] = useState(null);
   const [hrData, setHrData] = useState([]);
+  const [taskStats, setTaskStats] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [suggestions, setSuggestions] = useState([]);
@@ -59,13 +94,15 @@ const HrProject = () => {
     );
   };
 
-  // Fetch HR project data from backend
-  // Refetch logic
   const fetchData = async () => {
     try {
       setLoading(true);
-      const res = await axios.get("http://localhost:5000/api/hr-projects");
-      setHrData(res.data);
+      const [projectsRes, statsRes] = await Promise.all([
+        axios.get("http://localhost:5000/api/hr-projects"),
+        axios.get("http://localhost:5000/api/project-tasks/stats/all"),
+      ]);
+      setHrData(projectsRes.data);
+      setTaskStats(statsRes.data || {});
     } catch (err) {
       setError("Failed to load HR projects");
     } finally {
@@ -73,11 +110,8 @@ const HrProject = () => {
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
-  // Group by projectId to avoid duplicate rows
   const uniqueProjectsMap = {};
   hrData.forEach((emp) => {
     if (!uniqueProjectsMap[emp.projectId]) {
@@ -86,17 +120,14 @@ const HrProject = () => {
   });
   const uniqueProjects = Object.values(uniqueProjectsMap);
 
-  // Filter projects based on search
-  const filteredData = uniqueProjects.filter((emp) => {    
-    return (
-      (emp.title || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (emp.description || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      emp.projectId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (emp.manager || "").toLowerCase().includes(searchTerm.toLowerCase())||
-      (emp.status || "").toLowerCase().includes(searchTerm.toLowerCase())
-  )})
+  const filteredData = uniqueProjects.filter((emp) =>
+    (emp.title || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (emp.description || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    emp.projectId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (emp.manager || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (emp.status || "").toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-  // Fetch full project details when viewing
   const handleView = async (emp) => {
     try {
       setLoading(true);
@@ -115,14 +146,9 @@ const HrProject = () => {
       <div className="bg-white rounded-xl shadow-lg p-6">
         {/* Header + Search + Button */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
-          {/* Title */}
-          <h1 className="text-2xl font-bold text-gray-900">
-            HR Employee Projects
-          </h1>
+          <h1 className="text-2xl font-bold text-gray-900">HR Employee Projects</h1>
 
-          {/* Search + Button Wrapper */}
           <div className="flex flex-col md:flex-row md:items-center gap-3 w-full md:w-auto">
-            {/* Search Bar */}
             <div className="relative w-full md:w-72" ref={wrapperRef}>
               <div className="flex items-center bg-white border border-gray-300 rounded-lg shadow-sm px-3">
                 <Search className="text-gray-400 h-5 w-5 mr-2 shrink-0" />
@@ -163,14 +189,11 @@ const HrProject = () => {
               )}
             </div>
 
-            {/* Add Project Button */}
             <button onClick={() => setShowProjectAdd(true)} className="bg-gray-700 cursor-pointer text-white px-5 py-2 hover:shadow-lg transition">
               + Project
             </button>
             {showProjectAdd && (
-              <AddProject
-                onClose={() => setShowProjectAdd(false)}
-              />
+              <AddProject onClose={() => setShowProjectAdd(false)} />
             )}
           </div>
         </div>
@@ -185,6 +208,7 @@ const HrProject = () => {
                 <th className="py-3 px-6 text-left text-sm font-semibold">Description</th>
                 <th className="py-3 px-6 text-left text-sm font-semibold">Project Manager</th>
                 <th className="py-3 px-6 text-left text-sm font-semibold">Status</th>
+                <th className="py-3 px-6 text-left text-sm font-semibold">Task Progress</th>
                 <th className="py-3 px-6 text-left text-sm font-semibold">Tracklist</th>
                 <th className="py-3 px-6 text-left text-sm font-semibold">Action</th>
               </tr>
@@ -192,18 +216,18 @@ const HrProject = () => {
             <tbody className="divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan="7" className="py-6 text-center text-gray-500 text-sm">Loading...</td>
+                  <td colSpan="8" className="py-6 text-center text-gray-500 text-sm">Loading...</td>
                 </tr>
               ) : error ? (
                 <tr>
-                  <td colSpan="7" className="py-6 text-center text-red-500 text-sm">{error}</td>
+                  <td colSpan="8" className="py-6 text-center text-red-500 text-sm">{error}</td>
                 </tr>
               ) : filteredData.length > 0 ? (
                 filteredData.map((emp) => (
                   <tr key={emp.empId + emp.projectId} className="hover:bg-gray-50 transition">
                     <td className="py-3 px-6 text-sm text-gray-700">{emp.projectId}</td>
                     <td className="py-3 px-6 text-sm text-gray-700 font-medium">{emp.title}</td>
-                    <td className="py-3 px-6 text-sm text-gray-700">{emp.description}</td>                    
+                    <td className="py-3 px-6 text-sm text-gray-700">{emp.description}</td>
                     <td className="py-3 px-6 text-sm text-gray-700">{emp.manager || "-"}</td>
                     <td className="py-3 px-6 text-sm">
                       <select
@@ -211,15 +235,9 @@ const HrProject = () => {
                         onChange={async (e) => {
                           const newStatus = e.target.value;
                           try {
-                            console.log('PUT /projects/', emp.projectId, 'status:', newStatus);
-                            const res = await axios.put(`http://localhost:5000/projects/${emp.projectId}`, {
-                              status: newStatus,
-                            });
-                            console.log('Update response:', res);
-                            // Refetch data after update to reflect changes
+                            await axios.put(`http://localhost:5000/projects/${emp.projectId}`, { status: newStatus });
                             fetchData();
-                          } catch (err) {
-                            console.error('Status update error:', err);
+                          } catch {
                             alert("Failed to update status");
                           }
                         }}
@@ -235,6 +253,9 @@ const HrProject = () => {
                         <option value="Ongoing">Ongoing</option>
                         <option value="Completed">Completed</option>
                       </select>
+                    </td>
+                    <td className="py-3 px-6">
+                      <TaskProgressBar stats={taskStats[emp.projectId]} />
                     </td>
                     <td className="py-3 px-6 text-sm">
                       <button
@@ -259,7 +280,7 @@ const HrProject = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="7" className="py-6 text-center text-gray-500 text-sm">
+                  <td colSpan="8" className="py-6 text-center text-gray-500 text-sm">
                     No matching records found.
                   </td>
                 </tr>
@@ -267,6 +288,9 @@ const HrProject = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Activity Feed */}
+        <ProjectActivityFeed />
 
         {/* Tracklist drawer */}
         {tracklistProject && (
@@ -291,5 +315,3 @@ const HrProject = () => {
 };
 
 export default HrProject;
-
-

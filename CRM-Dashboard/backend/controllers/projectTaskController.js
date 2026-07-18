@@ -1,5 +1,42 @@
 import ProjectTask from '../model/ProjectTask.js';
 import Project from '../model/Project.js';
+import ProjectActivity from '../model/ProjectActivity.js';
+
+const logActivity = async (data) => {
+  try {
+    await ProjectActivity.create(data);
+  } catch (e) {
+    console.error('Activity log error:', e.message);
+  }
+};
+
+// GET /api/project-tasks/stats/all
+export const getProjectStats = async (req, res) => {
+  try {
+    const stats = await ProjectTask.aggregate([
+      {
+        $group: {
+          _id:       '$projectId',
+          total:     { $sum: 1 },
+          pending:   { $sum: { $cond: [{ $eq: ['$status', 'Pending'] },   1, 0] } },
+          ongoing:   { $sum: { $cond: [{ $eq: ['$status', 'Ongoing'] },   1, 0] } },
+          completed: { $sum: { $cond: [{ $eq: ['$status', 'Completed'] }, 1, 0] } },
+          revisions: { $sum: { $cond: ['$isRevision', 1, 0] } },
+        },
+      },
+    ]);
+    const result = {};
+    stats.forEach(s => {
+      result[s._id] = {
+        total: s.total, pending: s.pending,
+        ongoing: s.ongoing, completed: s.completed, revisions: s.revisions,
+      };
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error fetching stats' });
+  }
+};
 
 // GET /api/project-tasks/:projectId
 export const getProjectTasks = async (req, res) => {
@@ -26,7 +63,6 @@ export const addProjectTask = async (req, res) => {
 
     if (!title?.trim()) return res.status(400).json({ message: 'Task title is required' });
 
-    // Only HR/Admin can create revision tasks
     if (isRevision && user.role === 'employee') {
       return res.status(403).json({ message: 'Only managers can add revision tasks' });
     }
@@ -44,9 +80,60 @@ export const addProjectTask = async (req, res) => {
       createdByRole: user.role,
     });
 
+    await logActivity({
+      projectId:   task.projectId,
+      projectName: project.title,
+      taskId:      task._id,
+      taskTitle:   task.title,
+      userId:      user._id || user.id,
+      userName:    user.name,
+      action:      isRevision ? 'revision_added' : 'task_created',
+      toStatus:    'Pending',
+    });
+
     res.status(201).json({ task });
   } catch (err) {
     res.status(500).json({ message: 'Server error creating task' });
+  }
+};
+
+// PUT /api/project-tasks/:taskId/status
+export const updateTaskStatus = async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const { status } = req.body;
+    const user = req.user;
+
+    if (!['Pending', 'Ongoing', 'Completed'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status' });
+    }
+
+    const task = await ProjectTask.findById(taskId);
+    if (!task) return res.status(404).json({ message: 'Task not found' });
+
+    const fromStatus = task.status;
+    task.status = status;
+    if (status === 'Completed') task.completedAt = new Date();
+    else task.completedAt = undefined;
+
+    await task.save();
+
+    const project = await Project.findOne({ projectId: task.projectId });
+    await logActivity({
+      projectId:   task.projectId,
+      projectName: project?.title || task.projectId,
+      taskId:      task._id,
+      taskTitle:   task.title,
+      userId:      user._id || user.id,
+      userName:    user.name,
+      action:      'status_changed',
+      fromStatus,
+      toStatus:    status,
+    });
+
+    res.json({ task });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error updating task status' });
   }
 };
 
@@ -68,10 +155,23 @@ export const startTimer = async (req, res) => {
       entry.timerStartedAt = new Date();
     }
 
-    // Auto-set status to Ongoing when timer starts
+    const prevStatus = task.status;
     if (task.status === 'Pending') task.status = 'Ongoing';
-
     await task.save();
+
+    const project = await Project.findOne({ projectId: task.projectId });
+    await logActivity({
+      projectId:   task.projectId,
+      projectName: project?.title || task.projectId,
+      taskId:      task._id,
+      taskTitle:   task.title,
+      userId,
+      userName,
+      action:      'timer_started',
+      fromStatus:  prevStatus,
+      toStatus:    task.status,
+    });
+
     res.json({ task });
   } catch (err) {
     res.status(500).json({ message: 'Server error starting timer' });
@@ -82,7 +182,8 @@ export const startTimer = async (req, res) => {
 export const stopTimer = async (req, res) => {
   try {
     const { taskId } = req.params;
-    const userId = req.user._id || req.user.id;
+    const userId   = req.user._id || req.user.id;
+    const userName = req.user.name;
 
     const task = await ProjectTask.findById(taskId);
     if (!task) return res.status(404).json({ message: 'Task not found' });
@@ -97,33 +198,20 @@ export const stopTimer = async (req, res) => {
     entry.timerStartedAt  = null;
 
     await task.save();
+
+    const project = await Project.findOne({ projectId: task.projectId });
+    await logActivity({
+      projectId:   task.projectId,
+      projectName: project?.title || task.projectId,
+      taskId:      task._id,
+      taskTitle:   task.title,
+      userId,
+      userName,
+      action:      'timer_stopped',
+    });
+
     res.json({ task });
   } catch (err) {
     res.status(500).json({ message: 'Server error stopping timer' });
-  }
-};
-
-// PUT /api/project-tasks/:taskId/status
-export const updateTaskStatus = async (req, res) => {
-  try {
-    const { taskId } = req.params;
-    const { status } = req.body;
-
-    if (!['Pending', 'Ongoing', 'Completed'].includes(status)) {
-      return res.status(400).json({ message: 'Invalid status' });
-    }
-
-    const task = await ProjectTask.findById(taskId);
-    if (!task) return res.status(404).json({ message: 'Task not found' });
-
-    task.status = status;
-    if (status === 'Completed') task.completedAt = new Date();
-    else task.completedAt = undefined;
-
-    await task.save();
-
-    res.json({ task });
-  } catch (err) {
-    res.status(500).json({ message: 'Server error updating task status' });
   }
 };
