@@ -15,8 +15,7 @@ export default function Login() {
   // redirect if already logged in
   useEffect(() => {
     if (user) {
-      if (user.role === "admin") navigate("/hr");
-      else navigate("/");
+      navigate("/");
     }
   }, [user, navigate]);
 

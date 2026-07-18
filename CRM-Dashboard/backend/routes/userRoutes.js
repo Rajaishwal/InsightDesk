@@ -369,6 +369,7 @@ router.get('/search', protect, async (req, res) => {
 });
 
 router.get('/:id', protect, getUserById);
+router.put('/:id/profile', protect, updateUserProfile);
 router.put('/:id', protect, hrOrAdmin, updateUser);
 router.delete('/:id', protect, hrOrAdmin, deleteUser);
 

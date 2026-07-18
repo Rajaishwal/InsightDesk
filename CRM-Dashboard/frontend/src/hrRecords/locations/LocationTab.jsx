@@ -175,18 +175,10 @@ const LocationTab = () => {
 
   // Get location status
   const getLocationStatus = (currentLocation, attendanceStatus) => {
-    // Check if employee is checked in and has recent location data
+    // Active = employee is checked in AND we have a location on record
     if (attendanceStatus === 'checked-in' && currentLocation) {
-      const lastUpdated = new Date(currentLocation.lastUpdated);
-      const now = new Date();
-      const diffInMinutes = (now - lastUpdated) / (1000 * 60);
-      
-      if (diffInMinutes <= 30) {
-        return { status: 'active', color: 'bg-white text-green-500 border-green-500 border-2 border-solid', text: 'Active' };
-      }
+      return { status: 'active', color: 'bg-white text-green-500 border-green-500 border-2 border-solid', text: 'Active' };
     }
-    
-    // All other cases are inactive
     return { status: 'inactive', color: 'bg-white text-red-500 border-red-500 border-2 border-solid', text: 'Inactive' };
   };
 

@@ -298,7 +298,8 @@ export const getAllEmployeeLocations = async (req, res) => {
                 $expr: {
                   $and: [
                     { $eq: ['$userId', '$$userId'] },
-                    { $eq: ['$date', today] }
+                    { $eq: ['$date', today] },
+                    { $eq: ['$status', 'checked-in'] }
                   ]
                 }
               }
