@@ -164,11 +164,11 @@ export default function Profile() {
   const memberSince = user?.createdAt ? new Date(user.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "—";
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <form onSubmit={handleSubmit}>
+    <div className="min-h-screen bg-gray-50 p-8">
+      <form onSubmit={handleSubmit} className="space-y-6">
 
         {/* ── BANNER ───────────────────────────────────────────── */}
-        <div className="relative bg-gradient-to-br from-indigo-50 via-violet-50 to-blue-50 overflow-hidden border-b border-indigo-100 mb-8">
+        <div className="relative bg-gradient-to-br from-indigo-50 via-violet-50 to-blue-50 overflow-hidden border border-indigo-100 rounded-2xl shadow-sm">
           {/* Subtle dot pattern */}
           <div className="absolute inset-0 opacity-[0.4]"
             style={{ backgroundImage: "radial-gradient(circle, #c7d2fe 1px, transparent 1px)", backgroundSize: "28px 28px" }} />
@@ -256,14 +256,21 @@ export default function Profile() {
           </div>
         </div>
 
-        {/* ── Form sections ───────────────────────────────────── */}
-        <div className="px-8 bg-white shadow-sm border-b border-gray-100">
-
-          {/* ── Grid layout: left col (2/3) + right col (1/3) ─── */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-10">
+        {/* ── Grid layout: left col (2/3) + right col (1/3) ─── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
             {/* LEFT — 2 columns wide */}
             <div className="lg:col-span-2 space-y-6">
+
+              {/* Bio */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <SectionHeader icon={faFileAlt} label="Bio / About Me" color="text-indigo-500" />
+                <Field label="" icon={null}>
+                  <textarea name="bio" value={form.bio} onChange={handleChange}
+                    disabled={!editing} rows={3} placeholder="Write a short introduction about yourself..."
+                    className={`${inputCls(!editing)} resize-none`} />
+                </Field>
+              </div>
 
               {/* Basic Information */}
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
@@ -318,11 +325,6 @@ export default function Profile() {
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                 <SectionHeader icon={faCode} label="Professional Information" color="text-indigo-500" />
                 <div className="space-y-5">
-                  <Field label="Bio / About Me" icon={faFileAlt}>
-                    <textarea name="bio" value={form.bio} onChange={handleChange}
-                      disabled={!editing} rows={3} placeholder="Write a short introduction about yourself..."
-                      className={`${inputCls(!editing)} resize-none`} />
-                  </Field>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <Field label="Experience Level" icon={faLayerGroup}>
                       <select name="experience" value={form.experience} onChange={handleChange}
@@ -437,7 +439,6 @@ export default function Profile() {
 
             </div>
           </div>
-        </div>
       </form>
     </div>
   );

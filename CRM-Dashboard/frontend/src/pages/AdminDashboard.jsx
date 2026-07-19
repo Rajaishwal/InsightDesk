@@ -6,7 +6,7 @@ import {
 } from "recharts";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/axios";
-import { Users, UserPlus, Briefcase, CheckCircle2, AlertCircle, XCircle, X, Clock, Coffee, Pencil } from "lucide-react";
+import { Users, UserPlus, Briefcase, CheckCircle2, AlertCircle, XCircle, X, Clock, Coffee, Pencil, MapPin } from "lucide-react";
 
 const PIE_COLORS = ["#7c3aed", "#06b6d4", "#f59e0b"];
 
@@ -16,6 +16,7 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState(null); // 'present'|'late'|'onLeave'|'absent'
   const [showEditModal, setShowEditModal] = useState(false);
+  const [locationStatus, setLocationStatus] = useState("checked-out");
 
   useEffect(() => {
     api.get("/users/admin-stats")
@@ -24,9 +25,12 @@ const AdminDashboard = () => {
       .finally(() => setLoading(false));
   }, []);
 
-  const todayStr = new Date().toLocaleDateString("en-US", {
-    weekday: "long", year: "numeric", month: "long", day: "numeric",
-  });
+  useEffect(() => {
+    if (!user?._id) return;
+    api.get(`/attendance/status/${user._id}`)
+      .then(r => setLocationStatus(r.data?.attendance?.status || "checked-out"))
+      .catch(() => {});
+  }, [user?._id]);
 
   const pieData = [
     { name: "Ongoing",   value: stats?.ongoingProjects   || 0 },
@@ -90,9 +94,24 @@ const AdminDashboard = () => {
             </div>
           </div>
 
-          {/* Right: date */}
-          <div className="text-right hidden sm:block">
-            <p className="text-xs text-gray-400 font-medium">{todayStr}</p>
+          {/* Right: location badge */}
+          <div className="hidden sm:flex flex-col items-center gap-1">
+            {locationStatus === "checked-in" ? (
+              <>
+                <div className="relative flex items-center justify-center w-10 h-10 rounded-full bg-emerald-50">
+                  <MapPin className="w-5 h-5 text-emerald-500" />
+                  <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-white animate-pulse" />
+                </div>
+                <span className="text-[10px] font-semibold text-emerald-600 uppercase tracking-wide">Active</span>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-100">
+                  <MapPin className="w-5 h-5 text-gray-400" />
+                </div>
+                <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Inactive</span>
+              </>
+            )}
           </div>
 
         </div>

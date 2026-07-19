@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/axios";
-import { Calendar, Clock, Layers, CheckSquare, User, TrendingUp, Pencil, ListChecks } from "lucide-react";
+import { Calendar, Clock, Layers, CheckSquare, User, TrendingUp, Pencil, ListChecks, MapPin } from "lucide-react";
 import EditProfileModal from "../components/EditProfileModal";
 import TaskBoard from "../components/TaskBoard";
 import ProjectTracklist from "../components/ProjectTracklist";
@@ -54,12 +54,20 @@ export default function EmployeeDashboard() {
   const [hoveredDay, setHoveredDay] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [tracklistProject, setTracklistProject] = useState(null);
+  const [locationStatus, setLocationStatus] = useState(null);
 
   useEffect(() => {
     api.get("/users/employee-dashboard")
       .then(r => { setData(r.data); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (!user?._id) return;
+    api.get(`/attendance/status/${user._id}`)
+      .then(r => setLocationStatus(r.data?.attendance?.status || "checked-out"))
+      .catch(() => setLocationStatus("checked-out"));
+  }, [user?._id]);
 
   if (loading) return (
     <div className="flex items-center justify-center h-screen bg-gray-50">
@@ -175,14 +183,26 @@ export default function EmployeeDashboard() {
             </div>
           </div>
 
-          {/* Attendance rate pill */}
-          <div className="text-right flex-shrink-0">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{monthYear}</p>
-            <p className={`text-3xl font-black mt-0.5 ${attendanceRate >= 75 ? "text-emerald-600" : attendanceRate >= 50 ? "text-amber-500" : "text-red-500"}`}>
-              {attendanceRate}%
-            </p>
-            <p className="text-[10px] text-gray-400">attendance rate</p>
+          {/* Location status badge */}
+          <div className="flex-shrink-0 text-center">
+            {locationStatus === "checked-in" ? (
+              <div className="flex flex-col items-center gap-1">
+                <div className="relative flex items-center justify-center w-10 h-10 rounded-full bg-emerald-50">
+                  <MapPin className="w-5 h-5 text-emerald-500" />
+                  <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-white animate-pulse" />
+                </div>
+                <span className="text-[10px] font-semibold text-emerald-600 uppercase tracking-wide">Active</span>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-1">
+                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-100">
+                  <MapPin className="w-5 h-5 text-gray-400" />
+                </div>
+                <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Inactive</span>
+              </div>
+            )}
           </div>
+
         </div>
       </div>
 
