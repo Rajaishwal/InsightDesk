@@ -78,29 +78,21 @@ export const updateUserProfile = async (req, res) => {
     console.log("Profile update request received for user:", req.params.id);
     console.log("Request body:", req.body);
     
-    const { 
-      name, 
-      email, 
-      employeeId, 
-      gender, 
-      photo, 
-      shiftTiming, 
-      address, 
-      designation, 
-      domain 
+    const {
+      name, email, employeeId, gender, photo, shiftTiming, address,
+      designation, domain,
+      phone, dateOfBirth, bloodGroup,
+      emergencyContact,
+      bio, skills, experience,
     } = req.body;
 
     const update = {
-      name,
-      email,
-      employeeId,
-      gender,
-      photo,
-      shiftTiming,
-      address,
-      designation,
-      domain,
-      profileCompleted: true
+      name, email, employeeId, gender, photo, shiftTiming, address,
+      designation, domain,
+      phone, dateOfBirth, bloodGroup,
+      emergencyContact,
+      bio, skills, experience,
+      profileCompleted: true,
     };
 
     console.log("Update data:", update);

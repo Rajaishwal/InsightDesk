@@ -22,7 +22,24 @@ const userSchema = new mongoose.Schema(
     },
     designation: { type: String },
     domain: { type: String },
-    
+
+    // Contact info
+    phone:       { type: String },
+    dateOfBirth: { type: Date },
+    bloodGroup:  { type: String, enum: ['A+','A-','B+','B-','AB+','AB-','O+','O-'] },
+
+    // Emergency contact
+    emergencyContact: {
+      name:         { type: String },
+      phone:        { type: String },
+      relationship: { type: String },
+    },
+
+    // Professional info
+    bio:        { type: String },
+    skills:     { type: [String], default: [] },
+    experience: { type: String },
+
     // Location tracking
     currentLocation: {
       latitude: { type: Number },

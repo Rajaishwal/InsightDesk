@@ -1,367 +1,444 @@
-﻿import { faUser, faSave, faIdBadge, faHome, faBriefcase, faEdit, faInfoCircle, faVenusMars, faBuilding, faClock, faCamera, faTimes } from "@fortawesome/free-solid-svg-icons";
+import {
+  faUser, faSave, faIdBadge, faHome, faBriefcase, faEdit,
+  faVenusMars, faBuilding, faClock, faCamera,
+  faTimes, faPhone, faBirthdayCake, faTint, faHeartbeat,
+  faCode, faLayerGroup, faFileAlt,
+} from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import React, { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import axios from "../services/axios";
 
-const Profile = () => {
+const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+const EXPERIENCE_OPTS = ["0-1 years (Fresher)", "1-3 years (Junior)", "3-5 years (Mid-Level)", "5-8 years (Senior)", "8+ years (Lead/Expert)"];
+const RELATIONSHIPS = ["Spouse", "Parent", "Sibling", "Friend", "Other"];
+
+const SectionHeader = ({ icon, label, color = "text-blue-500" }) => (
+  <h3 className="flex items-center gap-2 text-base font-semibold text-gray-700 mb-4 pb-2 border-b border-gray-100">
+    <FontAwesomeIcon icon={icon} className={color} />
+    {label}
+  </h3>
+);
+
+const Field = ({ label, icon, children, span2 }) => (
+  <div className={span2 ? "md:col-span-2" : ""}>
+    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
+      {icon && <FontAwesomeIcon icon={icon} className="text-gray-400" />}
+      {label}
+    </label>
+    {children}
+  </div>
+);
+
+const inputCls = (disabled) =>
+  `w-full border border-gray-200 rounded-lg px-3 py-2 text-sm transition ${disabled ? "bg-gray-50 text-gray-500 cursor-not-allowed" : "bg-white focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400"
+  }`;
+
+export default function Profile() {
   const { user } = useAuth();
-  const [profilePhoto, setProfilePhoto] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [isEditingAddress, setIsEditingAddress] = useState(false);
-  const [isProfileSavedBefore, setIsProfileSavedBefore] = useState(false);
-  const [profileData, setProfileData] = useState({
-    name: "",
-    email: "",
-    employeeId: "",
-    gender: "",
-    shiftTiming: "",
-    designation: "",
-    domain: "",
-    address: {
-      street: "",
-      city: "",
-      state: "",
-      zipCode: "",
-      country: "",
-    },
+  const [photoUrl, setPhotoUrl] = useState(null);
+  const [editing, setEditing] = useState(false);
+  const [editingAddress, setEditingAddress] = useState(false);
+  const [savedBefore, setSavedBefore] = useState(false);
+  const [skillInput, setSkillInput] = useState("");
+  const skillRef = useRef(null);
+  const photoInputRef = useRef(null);
+
+  const [form, setForm] = useState({
+    name: "", email: "", employeeId: "",
+    gender: "", shiftTiming: "", designation: "", domain: "",
+    phone: "", dateOfBirth: "", bloodGroup: "",
+    emergencyContact: { name: "", phone: "", relationship: "" },
+    bio: "", skills: [], experience: "",
+    address: { street: "", city: "", state: "", zipCode: "", country: "" },
   });
 
   useEffect(() => {
-    if (user) {
-      const userData = {
-        name: user.name || "",
-        email: user.email || "",
-        employeeId: user.employeeId || "",
-        gender: user.gender || "",
-        shiftTiming: user.shiftTiming || "",
-        designation: user.designation || "",
-        domain: user.domain || "",
-        address: {
-          street: user.address?.street || "",
-          city: user.address?.city || "",
-          state: user.address?.state || "",
-          zipCode: user.address?.zipCode || "",
-          country: user.address?.country || "",
-        },
-      };
-      setProfileData(userData);
-
-      const hasBeenSaved =
-        userData.gender ||
-        userData.designation ||
-        userData.domain ||
-        userData.shiftTiming ||
-        userData.address.street ||
-        userData.address.city;
-
-      setIsProfileSavedBefore(hasBeenSaved);
-    }
+    if (!user) return;
+    const d = {
+      name: user.name || "",
+      email: user.email || "",
+      employeeId: user.employeeId || "",
+      gender: user.gender || "",
+      shiftTiming: user.shiftTiming || "",
+      designation: user.designation || "",
+      domain: user.domain || "",
+      phone: user.phone || "",
+      dateOfBirth: user.dateOfBirth ? user.dateOfBirth.split("T")[0] : "",
+      bloodGroup: user.bloodGroup || "",
+      emergencyContact: {
+        name: user.emergencyContact?.name || "",
+        phone: user.emergencyContact?.phone || "",
+        relationship: user.emergencyContact?.relationship || "",
+      },
+      bio: user.bio || "",
+      skills: user.skills || [],
+      experience: user.experience || "",
+      address: {
+        street: user.address?.street || "",
+        city: user.address?.city || "",
+        state: user.address?.state || "",
+        zipCode: user.address?.zipCode || "",
+        country: user.address?.country || "",
+      },
+    };
+    setForm(d);
+    setPhotoUrl(user.photo || null);
+    setSavedBefore(!!(d.gender || d.designation || d.domain || d.shiftTiming || d.address.city));
   }, [user]);
 
+  // ── Photo upload ──────────────────────────────────────────────
   const handlePhotoChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    setProfilePhoto(file);
-
-    // Upload immediately on selection
     try {
       setLoading(true);
-      const formData = new FormData();
-      formData.append("file", file);
-      const uploadResponse = await axios.post("http://localhost:5000/api/upload", formData);
-      const photoUrl = uploadResponse.data.fileUrl;
-      await axios.put(`http://localhost:5000/api/users/${user._id}/profile`, { photo: photoUrl });
+      const fd = new FormData();
+      fd.append("file", file);
+      const { data } = await axios.post("http://localhost:5000/api/upload", fd);
+      await axios.put(`http://localhost:5000/api/users/${user._id}/profile`, { photo: data.fileUrl });
+      setPhotoUrl(data.fileUrl);
       alert("Profile photo updated!");
-    } catch (error) {
-      alert(error.response?.data?.message || "Photo upload failed");
+    } catch (err) {
+      alert(err.response?.data?.message || "Photo upload failed");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleInputChange = (e) => {
+  // ── Field change ──────────────────────────────────────────────
+  const handleChange = (e) => {
     const { name, value } = e.target;
-
     if (["name", "email", "employeeId"].includes(name)) return;
-
-    if (isProfileSavedBefore) {
-      const allowedFields = ["designation", "domain", "shiftTiming"];
-      const isAddressField = name.startsWith("address.");
-      if (!allowedFields.includes(name) && !isAddressField) return;
-    }
-
-    if (name === "gender" && profileData.gender && !isEditingProfile) return;
-
-    if (name.startsWith("address.")) {
-      const addressField = name.split(".")[1];
-      setProfileData((prev) => ({
-        ...prev,
-        address: {
-          ...prev.address,
-          [addressField]: value,
-        },
-      }));
+    if (name.startsWith("emergencyContact.")) {
+      const f = name.split(".")[1];
+      setForm(p => ({ ...p, emergencyContact: { ...p.emergencyContact, [f]: value } }));
+    } else if (name.startsWith("address.")) {
+      const f = name.split(".")[1];
+      setForm(p => ({ ...p, address: { ...p.address, [f]: value } }));
     } else {
-      setProfileData((prev) => ({ ...prev, [name]: value }));
+      setForm(p => ({ ...p, [name]: value }));
     }
   };
 
-  const handleProfileSubmit = async (e) => {
+  // ── Skills tags ───────────────────────────────────────────────
+  const addSkill = () => {
+    const s = skillInput.trim();
+    if (!s || form.skills.includes(s)) return;
+    setForm(p => ({ ...p, skills: [...p.skills, s] }));
+    setSkillInput("");
+    skillRef.current?.focus();
+  };
+  const removeSkill = (s) => setForm(p => ({ ...p, skills: p.skills.filter(x => x !== s) }));
+
+  // ── Submit ────────────────────────────────────────────────────
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-
     try {
-      const { name, email, employeeId, ...updateableData } = profileData;
-      const updateData = { ...updateableData };
-
-      await axios.put(`http://localhost:5000/api/users/${user._id}/profile`, updateData);
-
+      const { name, email, employeeId, ...rest } = form;
+      await axios.put(`http://localhost:5000/api/users/${user._id}/profile`, rest);
       alert("Profile updated successfully!");
-
-      setIsProfileSavedBefore(true);
-      setIsEditingProfile(false);
-      setIsEditingAddress(false);
-    } catch (error) {
-      let errorMessage =
-        error.response?.data?.message || error.message || "Error updating profile";
-      alert(`Error: ${errorMessage}`);
+      setSavedBefore(true);
+      setEditing(false);
+      setEditingAddress(false);
+    } catch (err) {
+      alert(err.response?.data?.message || err.message || "Error updating profile");
     } finally {
       setLoading(false);
     }
   };
 
+  const initials = (name = "") => name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+  const roleBadge = user?.role === "admin" ? "bg-purple-100 text-purple-700" : "bg-indigo-100 text-indigo-700";
+
+  // Profile completion
+  const completionFields = [
+    form.phone, form.dateOfBirth, form.bloodGroup, form.gender,
+    form.designation, form.domain, form.shiftTiming,
+    form.emergencyContact.name, form.bio, form.experience,
+    form.skills.length > 0 ? "x" : "", form.address.city,
+  ];
+  const completionPct = Math.round((completionFields.filter(Boolean).length / completionFields.length) * 100);
+  const memberSince = user?.createdAt ? new Date(user.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "—";
+
   return (
-  <div className="max-w-7xl mx-auto p-6">
-    {/* Profile Section */}
-    <div className="bg-white rounded-2xl shadow-lg p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="flex items-center gap-2 text-2xl font-semibold text-gray-800">
-          <FontAwesomeIcon icon={faUser} className="text-blue-600" />
-          Employee Profile
-        </h2>
-        <button
-          type="button"
-          onClick={() => setIsEditingProfile(!isEditingProfile)}
-          className={`px-4 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 transition ${
-            isEditingProfile
-              ? "bg-red-100 text-red-600 hover:bg-red-200"
-              : "bg-blue-100 text-blue-600 hover:bg-blue-200"
-          }`}
-        >
-          <FontAwesomeIcon icon={isEditingProfile ? faTimes : faEdit} />
-          {isEditingProfile ? "Cancel" : "Edit"}
-        </button>
-      </div>
+    <div className="min-h-screen bg-gray-50">
+      <form onSubmit={handleSubmit}>
 
-      <p className="text-sm text-yellow-600 mb-6 leading-relaxed">
-        <FontAwesomeIcon icon={faInfoCircle} className="mr-2 text-gray-400" />
-        Name, Email, and Employee ID are system-generated and cannot be modified.
-        {isProfileSavedBefore &&
-          " After first save, only Designation, Domain/Department, Shift Timing, Profile Photo, and Address can be edited."}
-      </p>
+        {/* ── BANNER ───────────────────────────────────────────── */}
+        <div className="relative bg-gradient-to-br from-indigo-50 via-violet-50 to-blue-50 overflow-hidden border-b border-indigo-100 mb-8">
+          {/* Subtle dot pattern */}
+          <div className="absolute inset-0 opacity-[0.4]"
+            style={{ backgroundImage: "radial-gradient(circle, #c7d2fe 1px, transparent 1px)", backgroundSize: "28px 28px" }} />
 
-      <form onSubmit={handleProfileSubmit} className="space-y-8">
-        {/* Basic Info */}
-        <div>
-          <h3 className="flex items-center gap-2 text-lg font-semibold text-gray-700 mb-4">
-            <FontAwesomeIcon icon={faIdBadge} className="text-blue-500" />
-            Basic Information
-          </h3>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {[
-              { label: "Full Name", name: "name", type: "text" },
-              { label: "Email", name: "email", type: "email" },
-              { label: "Employee ID", name: "employeeId", type: "text" },
-            ].map((field) => (
-              <div key={field.name}>
-                <label className="block text-sm font-medium text-gray-600 mb-1 flex items-center gap-1">
-                  <FontAwesomeIcon icon={faUser} className="text-gray-400" />
-                  {field.label}
-                </label>
-                <input
-                  type={field.type}
-                  name={field.name}
-                  value={profileData[field.name]}
-                  onChange={handleInputChange}
-                  disabled
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-100 cursor-not-allowed"
-                />
+          {/* Top row */}
+          <div className="relative flex items-start justify-between px-8 pt-6 pb-0">
+            <div className="flex items-center gap-5">
+              {/* Profile photo inside banner */}
+              <div className="relative flex-shrink-0">
+                {photoUrl ? (
+                  <img src={photoUrl} alt={form.name}
+                    className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg" />
+                ) : (
+                  <div className="w-24 h-24 rounded-full border-4 border-white shadow-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-3xl font-bold">
+                    {initials(form.name)}
+                  </div>
+                )}
+                <button type="button" onClick={() => photoInputRef.current?.click()}
+                  disabled={loading}
+                  className="absolute bottom-1 right-1 w-7 h-7 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full flex items-center justify-center shadow-md transition disabled:opacity-60"
+                  title="Change photo">
+                  <FontAwesomeIcon icon={faCamera} className="text-xs" />
+                </button>
+                <input ref={photoInputRef} type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
               </div>
-            ))}
-
-            {/* Gender */}
-            <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1 flex items-center gap-1">
-                <FontAwesomeIcon icon={faVenusMars} className="text-gray-400" />
-                Gender
-              </label>
-              <select
-                name="gender"
-                value={profileData.gender}
-                onChange={handleInputChange}
-                disabled={
-                  isProfileSavedBefore ||
-                  (profileData.gender && !isEditingProfile)
-                }
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 disabled:bg-gray-100"
-              >
-                <option value="">Select Gender</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-                <option value="other">Other</option>
-              </select>
+              <div>
+                <h2 className="text-gray-900 text-2xl font-bold leading-tight">{form.name || "Employee"}</h2>
+                <p className="text-gray-500 text-sm mt-0.5">
+                  {form.designation || "No designation"}{form.domain ? ` · ${form.domain}` : ""}
+                </p>
+                <span className={`mt-1.5 inline-block text-xs font-semibold px-2.5 py-0.5 rounded-full ${user?.role === "admin" ? "bg-purple-100 text-purple-700" : "bg-indigo-100 text-indigo-700"}`}>
+                  {user?.role?.charAt(0).toUpperCase() + user?.role?.slice(1)}
+                </span>
+              </div>
             </div>
 
-            {/* Designation */}
-            <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1 flex items-center gap-1">
-                <FontAwesomeIcon icon={faBriefcase} className="text-gray-400" />
-                Designation
-              </label>
-              <input
-                type="text"
-                name="designation"
-                value={profileData.designation}
-                onChange={handleInputChange}
-                placeholder="e.g., Software Developer"
-                disabled={!isEditingProfile}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 disabled:bg-gray-100"
-              />
-            </div>
-
-            {/* Domain */}
-            <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1 flex items-center gap-1">
-                <FontAwesomeIcon icon={faBuilding} className="text-gray-400" />
-                Domain/Department
-              </label>
-              <select
-                name="domain"
-                value={profileData.domain}
-                onChange={handleInputChange}
-                disabled={
-                  isProfileSavedBefore ||
-                  (profileData.domain && !isEditingProfile)
-                }
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 disabled:bg-gray-100"
-              >
-                <option value="">Select Domain</option>
-                <option value="IT">IT</option>
-                <option value="HR">HR</option>
-                <option value="Finance">Finance</option>
-              </select>
-            </div>
-
-            {/* Shift Timing */}
-            <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1 flex items-center gap-1">
-                <FontAwesomeIcon icon={faClock} className="text-gray-400" />
-                Shift Timing
-              </label>
-              <select
-                name="shiftTiming"
-                value={profileData.shiftTiming}
-                onChange={handleInputChange}
-                disabled={profileData.shiftTiming && !isEditingProfile}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 disabled:bg-gray-100"
-              >
-                <option value="">Select Shift Timing</option>
-                <option value="07:00 AM - 02:00 PM">07:00 AM - 02:00 PM</option>
-                <option value="02:00 PM - 09:00 PM">02:00 PM - 09:00 PM</option>
-              </select>
-            </div>
-
-            {/* Profile Photo */}
-            <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1 flex items-center gap-1">
-                <FontAwesomeIcon icon={faCamera} className="text-gray-400" />
-                Profile Photo
-              </label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handlePhotoChange}
-                disabled={loading}
-                className="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4
-                           file:rounded-full file:border-0 file:text-sm file:font-semibold
-                           file:bg-blue-50 file:text-blue-600 hover:file:bg-blue-100 disabled:cursor-not-allowed"
-              />
-              {loading && <p className="text-xs text-blue-500 mt-1">Uploading photo...</p>}
-            </div>
-          </div>
-        </div>
-
-        {/* Address Section */}
-        <div className="border-t border-gray-400 pt-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="flex items-center gap-2 text-lg font-semibold text-gray-700">
-              <FontAwesomeIcon icon={faHome} className="text-green-500" />
-              Address Information
-            </h3>
-            <button
-              type="button"
-              onClick={() => setIsEditingAddress(!isEditingAddress)}
-              className={`px-4 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 transition ${
-                isEditingAddress
-                  ? "bg-red-100 text-red-600 hover:bg-red-200"
-                  : "bg-blue-100 text-blue-600 hover:bg-blue-200"
-              }`}
-            >
-              <FontAwesomeIcon icon={isEditingAddress ? faTimes : faEdit} />
-              {isEditingAddress ? "Cancel" : "Edit"}
+            {/* Edit button */}
+            <button type="button" onClick={() => setEditing(v => !v)}
+              className={`mt-1 px-4 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 border transition ${editing
+                ? "bg-red-500 border-red-500 text-white hover:bg-red-600"
+                : "bg-white border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                }`}>
+              <FontAwesomeIcon icon={editing ? faTimes : faEdit} />
+              {editing ? "Cancel" : "Edit Profile"}
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {[
-              { label: "Street Address", name: "address.street", full: true },
-              { label: "City", name: "address.city" },
-              { label: "State", name: "address.state" },
-              { label: "ZIP Code", name: "address.zipCode" },
-              { label: "Country", name: "address.country" },
-            ].map((field) => (
-              <div key={field.name} className={field.full ? "md:col-span-2" : ""}>
-                <label className="block text-sm font-medium text-gray-600 mb-1">
-                  {field.label}
-                </label>
-                <input
-                  type="text"
-                  name={field.name}
-                  value={
-                    field.name.startsWith("address.")
-                      ? profileData.address[field.name.split(".")[1]]
-                      : profileData[field.name]
-                  }
-                  onChange={handleInputChange}
-                  disabled={!isEditingAddress}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 disabled:bg-gray-100"
-                />
+          {/* Bottom stats bar */}
+          <div className="relative mt-5 border-t border-indigo-100 flex divide-x divide-indigo-100">
+            {/* Profile completion */}
+            <div className="flex-1 px-6 py-3">
+              <p className="text-gray-400 text-[10px] uppercase tracking-wider mb-1.5">Profile Completion</p>
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-1.5 bg-indigo-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: `${completionPct}%` }} />
+                </div>
+                <span className="text-indigo-700 font-bold text-sm">{completionPct}%</span>
               </div>
-            ))}
+            </div>
+            {/* Employee ID */}
+            <div className="px-6 py-3 text-center">
+              <p className="text-gray-400 text-[10px] uppercase tracking-wider mb-1">Employee ID</p>
+              <p className="text-gray-800 font-mono font-semibold text-sm">{form.employeeId || "—"}</p>
+            </div>
+            {/* Shift */}
+            <div className="px-6 py-3 text-center">
+              <p className="text-gray-400 text-[10px] uppercase tracking-wider mb-1">Shift</p>
+              <p className="text-gray-800 font-semibold text-sm">{form.shiftTiming || "—"}</p>
+            </div>
+            {/* Member since */}
+            <div className="px-6 py-3 text-center">
+              <p className="text-gray-400 text-[10px] uppercase tracking-wider mb-1">Member Since</p>
+              <p className="text-gray-800 font-semibold text-sm">{memberSince}</p>
+            </div>
+            {/* Save — appears when editing */}
+            {(editing || editingAddress) && (
+              <div className="px-6 py-2 flex items-center">
+                <button type="submit" disabled={loading}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-5 py-1.5 rounded-lg flex items-center gap-2 shadow transition disabled:opacity-70 text-sm">
+                  <FontAwesomeIcon icon={faSave} />
+                  {loading ? "Saving…" : "Save Changes"}
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Submit */}
-        {(isEditingProfile || isEditingAddress) && (
-          <div className="mt-6">
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2 disabled:opacity-70"
-            >
-              <FontAwesomeIcon icon={faSave} />
-              {loading ? "Saving..." : "Save Profile"}
-            </button>
+        {/* ── Form sections ───────────────────────────────────── */}
+        <div className="px-8 bg-white shadow-sm border-b border-gray-100">
+
+          {/* ── Grid layout: left col (2/3) + right col (1/3) ─── */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-10">
+
+            {/* LEFT — 2 columns wide */}
+            <div className="lg:col-span-2 space-y-6">
+
+              {/* Basic Information */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <SectionHeader icon={faIdBadge} label="Basic Information" color="text-blue-500" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {[{ label: "Full Name", name: "name" }, { label: "Email", name: "email" }, { label: "Employee ID", name: "employeeId" }].map(f => (
+                    <Field key={f.name} label={f.label} icon={faUser}>
+                      <input type="text" value={form[f.name]} disabled className={inputCls(true)} />
+                    </Field>
+                  ))}
+
+                  <Field label="Gender" icon={faVenusMars}>
+                    <select name="gender" value={form.gender} onChange={handleChange}
+                      disabled={savedBefore || (!editing && !!form.gender)}
+                      className={inputCls(savedBefore || (!editing && !!form.gender))}>
+                      <option value="">Select Gender</option>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </Field>
+
+                  <Field label="Designation" icon={faBriefcase}>
+                    <input type="text" name="designation" value={form.designation} onChange={handleChange}
+                      disabled={!editing} placeholder="e.g., Software Developer" className={inputCls(!editing)} />
+                  </Field>
+
+                  <Field label="Domain / Department" icon={faBuilding}>
+                    <select name="domain" value={form.domain} onChange={handleChange}
+                      disabled={savedBefore || (!editing && !!form.domain)}
+                      className={inputCls(savedBefore || (!editing && !!form.domain))}>
+                      <option value="">Select Domain</option>
+                      <option value="IT">IT</option>
+                      <option value="HR">HR</option>
+                      <option value="Finance">Finance</option>
+                    </select>
+                  </Field>
+
+                  <Field label="Shift Timing" icon={faClock}>
+                    <select name="shiftTiming" value={form.shiftTiming} onChange={handleChange}
+                      disabled={!editing && !!form.shiftTiming}
+                      className={inputCls(!editing && !!form.shiftTiming)}>
+                      <option value="">Select Shift</option>
+                      <option value="07:00 AM - 02:00 PM">07:00 AM – 02:00 PM</option>
+                      <option value="02:00 PM - 09:00 PM">02:00 PM – 09:00 PM</option>
+                    </select>
+                  </Field>
+                </div>
+              </div>
+
+              {/* Professional Information */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <SectionHeader icon={faCode} label="Professional Information" color="text-indigo-500" />
+                <div className="space-y-5">
+                  <Field label="Bio / About Me" icon={faFileAlt}>
+                    <textarea name="bio" value={form.bio} onChange={handleChange}
+                      disabled={!editing} rows={3} placeholder="Write a short introduction about yourself..."
+                      className={`${inputCls(!editing)} resize-none`} />
+                  </Field>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <Field label="Experience Level" icon={faLayerGroup}>
+                      <select name="experience" value={form.experience} onChange={handleChange}
+                        disabled={!editing} className={inputCls(!editing)}>
+                        <option value="">Select Experience</option>
+                        {EXPERIENCE_OPTS.map(o => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                    </Field>
+
+                    <Field label="Skills (press Enter to add)" icon={faCode}>
+                      <div className={`border border-gray-200 rounded-lg px-3 py-2 min-h-[42px] flex flex-wrap gap-1.5 items-center transition ${!editing ? "bg-gray-50" : "focus-within:ring-2 focus-within:ring-indigo-200 focus-within:border-indigo-400 bg-white"
+                        }`}>
+                        {form.skills.map(s => (
+                          <span key={s} className="inline-flex items-center gap-1 bg-indigo-100 text-indigo-700 text-xs font-medium px-2.5 py-0.5 rounded-full">
+                            {s}
+                            {editing && (
+                              <button type="button" onClick={() => removeSkill(s)} className="hover:text-red-500 ml-0.5">
+                                <FontAwesomeIcon icon={faTimes} className="w-2.5 h-2.5" />
+                              </button>
+                            )}
+                          </span>
+                        ))}
+                        {editing && (
+                          <input ref={skillRef} type="text" value={skillInput}
+                            onChange={e => setSkillInput(e.target.value)}
+                            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addSkill(); } }}
+                            placeholder={form.skills.length === 0 ? "e.g. React, Node.js…" : "Add more…"}
+                            className="flex-1 min-w-[120px] outline-none text-sm bg-transparent" />
+                        )}
+                      </div>
+                    </Field>
+                  </div>
+                </div>
+              </div>
+
+              {/* Address */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <SectionHeader icon={faHome} label="Address Information" color="text-green-500" />
+                  <button type="button" onClick={() => setEditingAddress(v => !v)}
+                    className={`-mt-4 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition ${editingAddress ? "bg-red-100 text-red-600 hover:bg-red-200" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}>
+                    <FontAwesomeIcon icon={editingAddress ? faTimes : faEdit} />
+                    {editingAddress ? "Cancel" : "Edit"}
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {[
+                    { label: "Street Address", name: "address.street", full: true },
+                    { label: "City", name: "address.city" },
+                    { label: "State", name: "address.state" },
+                    { label: "ZIP Code", name: "address.zipCode" },
+                    { label: "Country", name: "address.country" },
+                  ].map(f => (
+                    <div key={f.name} className={f.full ? "md:col-span-2" : ""}>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">{f.label}</label>
+                      <input type="text" name={f.name}
+                        value={f.name.startsWith("address.") ? form.address[f.name.split(".")[1]] : form[f.name]}
+                        onChange={handleChange} disabled={!editingAddress} className={inputCls(!editingAddress)} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT — 1 column wide */}
+            <div className="space-y-6">
+
+              {/* Contact Information */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <SectionHeader icon={faPhone} label="Contact Information" color="text-green-500" />
+                <div className="space-y-4">
+                  <Field label="Phone Number" icon={faPhone}>
+                    <input type="tel" name="phone" value={form.phone} onChange={handleChange}
+                      disabled={!editing} placeholder="+91 98765 43210" className={inputCls(!editing)} />
+                  </Field>
+                  <Field label="Date of Birth" icon={faBirthdayCake}>
+                    <input type="date" name="dateOfBirth" value={form.dateOfBirth} onChange={handleChange}
+                      disabled={!editing} className={inputCls(!editing)} />
+                  </Field>
+                  <Field label="Blood Group" icon={faTint}>
+                    <select name="bloodGroup" value={form.bloodGroup} onChange={handleChange}
+                      disabled={!editing} className={inputCls(!editing)}>
+                      <option value="">Select Blood Group</option>
+                      {BLOOD_GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
+                    </select>
+                  </Field>
+                </div>
+              </div>
+
+              {/* Emergency Contact */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <SectionHeader icon={faHeartbeat} label="Emergency Contact" color="text-red-500" />
+                <div className="space-y-4">
+                  <Field label="Contact Name">
+                    <input type="text" name="emergencyContact.name" value={form.emergencyContact.name}
+                      onChange={handleChange} disabled={!editing} placeholder="Full name" className={inputCls(!editing)} />
+                  </Field>
+                  <Field label="Contact Phone">
+                    <input type="tel" name="emergencyContact.phone" value={form.emergencyContact.phone}
+                      onChange={handleChange} disabled={!editing} placeholder="+91 98765 43210" className={inputCls(!editing)} />
+                  </Field>
+                  <Field label="Relationship">
+                    <select name="emergencyContact.relationship" value={form.emergencyContact.relationship}
+                      onChange={handleChange} disabled={!editing} className={inputCls(!editing)}>
+                      <option value="">Select Relationship</option>
+                      {RELATIONSHIPS.map(r => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                  </Field>
+                </div>
+              </div>
+
+            </div>
           </div>
-        )}
+        </div>
       </form>
     </div>
-  </div>
-);
-};
-
-export default Profile;
+  );
+}
