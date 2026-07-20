@@ -32,7 +32,7 @@ const Navbar = () => {
     try {
       const res = await api.get(`/attendance/status/${user._id}`);
       setAttendanceStatus(res.data);
-    } catch {}
+    } catch { }
   };
 
   useEffect(() => {
@@ -150,7 +150,7 @@ const Navbar = () => {
     }
   };
 
-  const breakOverLimit = breakElapsed > 5 * 60;
+  const breakOverLimit = breakElapsed > 60 * 60;
 
   return (
     <nav className="w-full bg-white shadow-md border-b border-gray-200 p-2 shadow-lg">
@@ -160,7 +160,7 @@ const Navbar = () => {
           {/* InsightDesk logo — square box, D with I through its center */}
           <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
             {/* Square box, border-radius 3 */}
-            <rect width="36" height="36" rx="3" fill="#1d4ed8"/>
+            <rect width="36" height="36" rx="3" fill="#1d4ed8" />
             {/* D — white, stem + semicircle with hollow bowl (evenodd) */}
             <path
               fillRule="evenodd"
@@ -168,9 +168,9 @@ const Navbar = () => {
               d="M4,4 L4,32 L10,32 A14,14 0 0,0 10,4 Z M10,9 A9,9 0 0,1 10,27 Z"
             />
             {/* I — yellow, bold serif, centered inside D bowl */}
-            <rect x="11"  y="9"    width="7" height="2.5" rx="0.5" fill="#facc15"/>
-            <rect x="13"  y="11.5" width="3" height="13"  rx="0.5" fill="#facc15"/>
-            <rect x="11"  y="24.5" width="7" height="2.5" rx="0.5" fill="#facc15"/>
+            <rect x="11" y="9" width="7" height="2.5" rx="0.5" fill="#facc15" />
+            <rect x="13" y="11.5" width="3" height="13" rx="0.5" fill="#facc15" />
+            <rect x="11" y="24.5" width="7" height="2.5" rx="0.5" fill="#facc15" />
           </svg>
           <div className="text-[1.45rem] font-extrabold tracking-tight leading-none">
             <span className="text-blue-600">Insight</span><span className="text-yellow-400">Desk</span>
@@ -185,11 +185,10 @@ const Navbar = () => {
             <div className="relative group">
               <button
                 onClick={() => setShowAttendanceModal(true)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl transition ${
-                  isCheckedIn
-                    ? "bg-blue-50 text-blue-600 group-hover:bg-red-100 group-hover:text-red-700"
-                    : "bg-blue-50 text-blue-600 group-hover:bg-green-100 group-hover:text-green-700"
-                }`}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl transition ${isCheckedIn
+                  ? "bg-blue-50 text-blue-600 group-hover:bg-red-100 group-hover:text-red-700"
+                  : "bg-blue-50 text-blue-600 group-hover:bg-green-100 group-hover:text-green-700"
+                  }`}
               >
                 <UserCheck className="w-5 h-5" />
                 <span className="hidden sm:inline">
@@ -235,11 +234,10 @@ const Navbar = () => {
               ) : isOnBreak ? (
                 <button
                   onClick={handleBreakEnd}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl transition animate-pulse ${
-                    breakOverLimit
-                      ? "bg-red-100 text-red-700 hover:bg-red-200"
-                      : "bg-orange-100 text-orange-700 hover:bg-orange-200"
-                  }`}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl transition animate-pulse ${breakOverLimit
+                    ? "bg-red-100 text-red-700 hover:bg-red-200"
+                    : "bg-orange-100 text-orange-700 hover:bg-orange-200"
+                    }`}
                 >
                   <Coffee className="w-5 h-5" />
                   <span className="hidden sm:inline font-medium">
@@ -262,10 +260,10 @@ const Navbar = () => {
                     <div className="absolute -top-1 right-4 w-2 h-2 rotate-45 bg-white border-l border-t border-red-500" />
                     <div className="bg-white text-red-600 text-xs font-semibold border border-red-500 rounded-xl px-4 py-2.5 shadow-lg whitespace-nowrap">
                       {breakOverLimit
-                        ? `Work extended  ${formatBreakTime(breakElapsed - 5 * 60)} min`
+                        ? `Work extended  ${formatBreakTime(breakElapsed - 60 * 60)} min`
                         : isOnBreak
-                        ? `${formatBreakTime(5 * 60 - breakElapsed)} min remaining`
-                        : "Max break allowed: 5 min"}
+                          ? `${formatBreakTime(60 * 60 - breakElapsed)} min remaining`
+                          : "Max break allowed: 60 min"}
                     </div>
                   </div>
                 </div>
@@ -278,11 +276,10 @@ const Navbar = () => {
                 onClick={isCheckedIn ? undefined : logout}
                 disabled={isCheckedIn}
                 title={isCheckedIn ? "Please check out before logging out" : "Logout"}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl transition ${
-                  isCheckedIn
-                    ? "bg-gray-100 text-gray-400 cursor-not-allowed opacity-60"
-                    : "bg-red-50 text-red-600 hover:bg-red-100"
-                }`}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl transition ${isCheckedIn
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed opacity-60"
+                  : "bg-red-50 text-red-600 hover:bg-red-100"
+                  }`}
               >
                 <LogOut className="w-5 h-5" />
                 <span className="hidden sm:inline">Logout</span>
