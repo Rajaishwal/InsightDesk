@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import EditProfileModal from "../components/EditProfileModal";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -6,7 +6,7 @@ import {
 } from "recharts";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/axios";
-import { Users, UserPlus, Briefcase, CheckCircle2, AlertCircle, XCircle, X, Clock, Coffee, Pencil, MapPin } from "lucide-react";
+import { Users, UserPlus, Briefcase, CheckCircle2, AlertCircle, XCircle, X, Clock, Coffee, Pencil, MapPin, RefreshCw } from "lucide-react";
 
 const PIE_COLORS = ["#7c3aed", "#06b6d4", "#f59e0b"];
 
@@ -17,6 +17,9 @@ const AdminDashboard = () => {
   const [activeFilter, setActiveFilter] = useState(null); // 'present'|'late'|'onLeave'|'absent'
   const [showEditModal, setShowEditModal] = useState(false);
   const [locationStatus, setLocationStatus] = useState("checked-out");
+  const [expandedBreakEmp, setExpandedBreakEmp] = useState(null);
+  const [breakLogs, setBreakLogs] = useState({});
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     api.get("/users/admin-stats")
@@ -31,6 +34,34 @@ const AdminDashboard = () => {
       .then(r => setLocationStatus(r.data?.attendance?.status || "checked-out"))
       .catch(() => {});
   }, [user?._id]);
+
+  const refreshStats = async () => {
+    setRefreshing(true);
+    setBreakLogs({});
+    setExpandedBreakEmp(null);
+    try {
+      const r = await api.get("/users/admin-stats");
+      setStats(r.data);
+    } catch {}
+    finally { setRefreshing(false); }
+  };
+
+  const toggleBreakExpand = async (userId) => {
+    if (expandedBreakEmp === userId) { setExpandedBreakEmp(null); return; }
+    setExpandedBreakEmp(userId);
+    if (breakLogs[userId]) return;
+    try {
+      const r = await api.get(`/breaks/logs/${userId}`);
+      setBreakLogs(prev => ({ ...prev, [userId]: r.data }));
+    } catch { setBreakLogs(prev => ({ ...prev, [userId]: [] })); }
+  };
+
+  const fmtDuration = (secs) => {
+    if (!secs) return "0m 0s";
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return m > 0 ? `${m}m ${s}s` : `${s}s`;
+  };
 
   const pieData = [
     { name: "Ongoing",   value: stats?.ongoingProjects   || 0 },
@@ -242,14 +273,24 @@ const AdminDashboard = () => {
                       </span>
                     )}
                   </div>
-                  {activeFilter && (
+                  <div className="flex items-center gap-2">
                     <button
-                      onClick={() => setActiveFilter(null)}
-                      className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 transition"
+                      onClick={refreshStats}
+                      className="text-xs text-gray-400 hover:text-indigo-600 flex items-center gap-1 transition"
+                      title="Refresh"
                     >
-                      <X className="w-3.5 h-3.5" /> Clear
+                      <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
+                      Refresh
                     </button>
-                  )}
+                    {activeFilter && (
+                      <button
+                        onClick={() => setActiveFilter(null)}
+                        className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 transition"
+                      >
+                        <X className="w-3.5 h-3.5" /> Clear
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Table */}
@@ -285,59 +326,140 @@ const AdminDashboard = () => {
                             </tr>
                           ))
                         ) : rows.length > 0 ? (
-                          rows.map((emp, i) => (
-                            <tr key={emp._id || i} className="hover:bg-gray-50 transition-colors">
-                              {/* Name */}
-                              <td className="py-3 pr-4">
-                                <div className="flex items-center gap-2.5">
-                                  <div className="w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 font-bold text-xs flex-shrink-0 overflow-hidden">
-                                    {emp.photo
-                                      ? <img src={emp.photo} alt={emp.name} className="w-full h-full object-cover" />
-                                      : emp.name?.charAt(0)?.toUpperCase()
+                          rows.map((emp, i) => {
+                            const isExpanded = cfg?.showBreak && expandedBreakEmp === emp._id;
+                            const logs = breakLogs[emp._id] || null;
+                            const totalSecs = logs
+                              ? logs.reduce((sum, b) => sum + (b.durationInSeconds || 0), 0)
+                              : 0;
+                            const isOverLimit = totalSecs > 60 * 60;
+                            const colSpan = 5 + (cfg?.showCheckOut ? 1 : 0) + (cfg?.showBreak ? 1 : 0);
+                            return (
+                              <React.Fragment key={emp._id || i}>
+                                <tr
+                                  onClick={cfg?.showBreak ? () => toggleBreakExpand(emp._id) : undefined}
+                                  className={`transition-colors ${cfg?.showBreak ? "cursor-pointer" : ""} ${isExpanded ? "bg-amber-50" : "hover:bg-gray-50"}`}
+                                >
+                                  {/* Name */}
+                                  <td className="py-3 pr-4">
+                                    <div className="flex items-center gap-2.5">
+                                      <div className="w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 font-bold text-xs flex-shrink-0 overflow-hidden">
+                                        {emp.photo
+                                          ? <img src={emp.photo} alt={emp.name} className="w-full h-full object-cover" />
+                                          : emp.name?.charAt(0)?.toUpperCase()
+                                        }
+                                      </div>
+                                      <span className="font-medium text-gray-700 truncate max-w-[130px]">{emp.name}</span>
+                                    </div>
+                                  </td>
+                                  {/* Designation */}
+                                  <td className="py-3 pr-4 text-gray-500 text-xs">{emp.designation || "—"}</td>
+                                  {/* Domain */}
+                                  <td className="py-3 pr-4">
+                                    {emp.domain
+                                      ? <span className="px-2 py-0.5 bg-violet-50 text-violet-700 rounded-full text-xs font-medium">{emp.domain}</span>
+                                      : <span className="text-gray-400">—</span>
                                     }
-                                  </div>
-                                  <span className="font-medium text-gray-700 truncate max-w-[130px]">{emp.name}</span>
-                                </div>
-                              </td>
-                              {/* Designation */}
-                              <td className="py-3 pr-4 text-gray-500 text-xs">{emp.designation || "—"}</td>
-                              {/* Domain */}
-                              <td className="py-3 pr-4">
-                                {emp.domain
-                                  ? <span className="px-2 py-0.5 bg-violet-50 text-violet-700 rounded-full text-xs font-medium">{emp.domain}</span>
-                                  : <span className="text-gray-400">—</span>
-                                }
-                              </td>
-                              {/* Emp ID */}
-                              <td className="py-3 pr-4 text-gray-400 font-mono text-xs">{emp.employeeId || "—"}</td>
-                              {/* Last col: Joined / Check-In / Leave Type */}
-                              <td className="py-3 pr-4 text-gray-400 text-xs">
-                                {!activeFilter || activeFilter === "absent"
-                                  ? (emp.createdAt ? new Date(emp.createdAt).toLocaleDateString("en-GB") : "—")
-                                  : activeFilter === "onLeave"
-                                  ? <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full text-xs font-medium">{emp.leaveType || "—"}</span>
-                                  : <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{fmtTime(emp.checkInTime)}</span>
-                                }
-                              </td>
-                              {/* Check-Out col (present / late only) */}
-                              {cfg?.showCheckOut && (
-                                <td className="py-3 text-gray-400 text-xs">
-                                  {emp.checkOutTime
-                                    ? <span className="flex items-center gap-1 text-red-400"><Clock className="w-3 h-3" />{fmtTime(emp.checkOutTime)}</span>
-                                    : <span className="px-2 py-0.5 bg-green-50 text-green-600 rounded-full text-xs font-medium">Active</span>
-                                  }
-                                </td>
-                              )}
-                              {/* Break Since col (onBreak only) */}
-                              {cfg?.showBreak && (
-                                <td className="py-3 text-amber-500 text-xs">
-                                  <span className="flex items-center gap-1">
-                                    <Coffee className="w-3 h-3" />{fmtTime(emp.breakStartTime)}
-                                  </span>
-                                </td>
-                              )}
-                            </tr>
-                          ))
+                                  </td>
+                                  {/* Emp ID */}
+                                  <td className="py-3 pr-4 text-gray-400 font-mono text-xs">{emp.employeeId || "—"}</td>
+                                  {/* Last col */}
+                                  <td className="py-3 pr-4 text-gray-400 text-xs">
+                                    {!activeFilter || activeFilter === "absent"
+                                      ? (emp.createdAt ? new Date(emp.createdAt).toLocaleDateString("en-GB") : "—")
+                                      : activeFilter === "onLeave"
+                                      ? <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full text-xs font-medium">{emp.leaveType || "—"}</span>
+                                      : <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{fmtTime(emp.checkInTime)}</span>
+                                    }
+                                  </td>
+                                  {/* Check-Out col */}
+                                  {cfg?.showCheckOut && (
+                                    <td className="py-3 text-gray-400 text-xs">
+                                      {emp.checkOutTime
+                                        ? <span className="flex items-center gap-1 text-red-400"><Clock className="w-3 h-3" />{fmtTime(emp.checkOutTime)}</span>
+                                        : <span className="px-2 py-0.5 bg-green-50 text-green-600 rounded-full text-xs font-medium">Active</span>
+                                      }
+                                    </td>
+                                  )}
+                                  {/* Break Since col */}
+                                  {cfg?.showBreak && (
+                                    <td className="py-3 text-amber-500 text-xs">
+                                      <span className="flex items-center gap-1">
+                                        <Coffee className="w-3 h-3" />{fmtTime(emp.breakStartTime)}
+                                        <span className="ml-1 text-amber-400">▾</span>
+                                      </span>
+                                    </td>
+                                  )}
+                                </tr>
+
+                                {/* ── Break history accordion ── */}
+                                {isExpanded && (
+                                  <tr key={`${emp._id}-expand`}>
+                                    <td colSpan={colSpan} className="px-0 pb-3 pt-0">
+                                      <div className={`mx-2 rounded-xl border ${isOverLimit ? "border-red-200 bg-red-50" : "border-amber-100 bg-amber-50"} px-4 py-3`}>
+                                        <p className={`text-[11px] font-bold uppercase tracking-wide mb-2 ${isOverLimit ? "text-red-500" : "text-amber-600"}`}>
+                                          <Coffee className="w-3 h-3 inline mr-1" />
+                                          Break History Today — {emp.name}
+                                        </p>
+
+                                        {logs === null ? (
+                                          <p className="text-xs text-gray-400 animate-pulse">Loading...</p>
+                                        ) : logs.length === 0 ? (
+                                          <p className="text-xs text-gray-400">No break records found for today.</p>
+                                        ) : (
+                                          <>
+                                            <table className="w-full text-xs">
+                                              <thead>
+                                                <tr className="text-left text-[10px] uppercase tracking-wide text-gray-400 border-b border-amber-100">
+                                                  <th className="pb-1.5 pr-4">#</th>
+                                                  <th className="pb-1.5 pr-4">Start Time</th>
+                                                  <th className="pb-1.5 pr-4">End Time</th>
+                                                  <th className="pb-1.5">Duration</th>
+                                                </tr>
+                                              </thead>
+                                              <tbody className="divide-y divide-amber-100">
+                                                {logs.map((b, idx) => {
+                                                  const ongoing = !b.endTime;
+                                                  return (
+                                                    <tr key={b._id} className={ongoing ? "text-amber-600 font-semibold" : "text-gray-600"}>
+                                                      <td className="py-1.5 pr-4">{idx + 1}</td>
+                                                      <td className="py-1.5 pr-4">{fmtTime(b.startTime)}</td>
+                                                      <td className="py-1.5 pr-4">
+                                                        {ongoing
+                                                          ? <span className="px-1.5 py-0.5 bg-amber-100 text-amber-600 rounded text-[10px] font-bold">Ongoing</span>
+                                                          : fmtTime(b.endTime)
+                                                        }
+                                                      </td>
+                                                      <td className="py-1.5">
+                                                        {ongoing
+                                                          ? <span className="text-amber-500">{fmtTime(b.startTime)} →</span>
+                                                          : fmtDuration(b.durationInSeconds)
+                                                        }
+                                                      </td>
+                                                    </tr>
+                                                  );
+                                                })}
+                                              </tbody>
+                                            </table>
+                                            <div className={`mt-2 pt-2 border-t flex items-center justify-between ${isOverLimit ? "border-red-200" : "border-amber-100"}`}>
+                                              <span className={`text-[11px] font-bold ${isOverLimit ? "text-red-600" : "text-amber-700"}`}>
+                                                Total break today: {fmtDuration(totalSecs)}
+                                              </span>
+                                              {isOverLimit && (
+                                                <span className="px-2 py-0.5 bg-red-100 text-red-600 text-[10px] font-bold rounded-full">
+                                                  Over 60 min limit
+                                                </span>
+                                              )}
+                                            </div>
+                                          </>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                              </React.Fragment>
+                            );
+                          })
                         ) : (
                           <tr>
                             <td colSpan={5} className="py-10 text-center text-gray-400 text-sm">No employees found</td>

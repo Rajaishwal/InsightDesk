@@ -97,6 +97,7 @@ router.get('/admin-stats', protect, admin, async (req, res) => {
       const u = breakUsersMap[b.userId?.toString()] || {};
       const att = breakAttMap[b.userId?.toString()] || {};
       return {
+        _id: u._id,
         name: u.name || '',
         employeeId: u.employeeId || '',
         designation: u.designation || '',

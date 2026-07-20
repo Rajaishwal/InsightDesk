@@ -97,8 +97,8 @@ const AttendanceTable = ({ data, loading }) => {
               breakMins === 0
                 ? "text-gray-400"
                 : breakMins <= 5
-                ? "text-green-600"
-                : "text-red-600";
+                  ? "text-green-600"
+                  : "text-red-600";
 
             return (
               <tr key={record._id} className="hover:bg-gray-50 transition shadow-sm">
@@ -133,13 +133,12 @@ const AttendanceTable = ({ data, loading }) => {
 
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span
-                    className={`px-2 py-1 rounded-full text-sm font-semibold ${
-                      record.status === "checked-in"
-                        ? "bg-green-100 text-green-700"
-                        : record.status === "checked-out"
-                        ? "bg-red-100 text-red-700"
-                        : "bg-gray-100 text-gray-700"
-                    }`}
+                    className={`px-3 py-0.5 rounded-full text-sx font-medium border ${record.status === "checked-in"
+                      ? "border-green-500 text-green-600"
+                      : record.status === "checked-out"
+                        ? "border-red-500 text-red-600"
+                        : "border-gray-400 text-gray-600"
+                      }`}
                   >
                     {record.status}
                   </span>

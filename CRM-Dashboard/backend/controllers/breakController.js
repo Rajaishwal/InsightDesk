@@ -90,7 +90,12 @@ export const getBreakStatus = async (req, res) => {
 export const getBreakLogs = async (req, res) => {
   try {
     const { userId } = req.params;
-    const logs = await Break.find({ userId }).sort({ startTime: -1 });
+    const { date } = req.query;
+
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const logs = await Break.find({ userId, startTime: { $gte: startOfDay } }).sort({ startTime: 1 });
     res.json(logs);
   } catch (error) {
     res.status(500).json({ message: error.message });
