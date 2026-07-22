@@ -30,12 +30,12 @@ const Ring = ({ percent, color, label, sub }) => {
 
 /* ── Calendar day status styles ── */
 const DAY_STYLE = {
-  present: "bg-emerald-100 text-emerald-700 font-semibold",
-  late:    "bg-amber-100  text-amber-700   font-semibold",
-  leave:   "bg-blue-100   text-blue-700    font-semibold",
-  absent:  "bg-red-100    text-red-600     font-semibold",
-  weekend: "bg-gray-50    text-gray-300",
-  future:  "text-gray-200",
+  present: ["bg-emerald-100 hover:bg-emerald-200", "text-emerald-700"],
+  late:    ["bg-amber-100   hover:bg-amber-200",   "text-amber-700"],
+  leave:   ["bg-blue-100    hover:bg-blue-200",    "text-blue-700"],
+  absent:  ["bg-red-100     hover:bg-red-200",     "text-red-600"],
+  weekend: ["bg-gray-50",                          "text-gray-300 cursor-default"],
+  future:  ["bg-white",                            "text-gray-200 cursor-default"],
 };
 const STATUS_LABEL = { present:"Present", late:"Late (after 9:30)", leave:"On Leave", absent:"Absent", weekend:"Weekend", future:"—" };
 
@@ -232,6 +232,7 @@ export default function EmployeeDashboard() {
 
           {/* Monthly Attendance Calendar */}
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -240,10 +241,10 @@ export default function EmployeeDashboard() {
               </div>
               <div className="flex items-center gap-3 flex-wrap justify-end">
                 {[
-                  ["bg-emerald-400", "Present"],
-                  ["bg-amber-400",   "Late"],
-                  ["bg-blue-400",    "On Leave"],
-                  ["bg-red-400",     "Absent"],
+                  ["bg-emerald-400","Present"],
+                  ["bg-amber-400",  "Late"],
+                  ["bg-blue-400",   "On Leave"],
+                  ["bg-red-400",    "Absent"],
                 ].map(([cls, lbl]) => (
                   <div key={lbl} className="flex items-center gap-1">
                     <div className={`w-2 h-2 rounded-full ${cls}`} />
@@ -253,38 +254,52 @@ export default function EmployeeDashboard() {
               </div>
             </div>
 
-            {/* Day name row */}
-            <div className="grid grid-cols-7 mb-1">
-              {["M","T","W","T","F","S","S"].map((d, i) => (
-                <div key={i} className={`text-center text-[11px] font-bold py-1 ${i >= 5 ? "text-gray-300" : "text-gray-400"}`}>{d}</div>
+            {/* Day header row */}
+            <div className="grid grid-cols-7 gap-px bg-gray-200 rounded-t-lg overflow-hidden">
+              {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((d, i) => (
+                <div key={i} className={`text-center text-[10px] font-bold py-1.5 tracking-wide
+                  ${i === 6 ? "text-rose-500 bg-rose-50" : "text-gray-500 bg-gray-50"}`}>
+                  {d}
+                </div>
               ))}
             </div>
 
-            {/* Calendar grid */}
-            <div className="space-y-1">
-              {calRows.map((row, ri) => (
-                <div key={ri} className="grid grid-cols-7 gap-1">
-                  {Array.from({ length: 7 }).map((_, ci) => {
-                    const cell = row[ci];
-                    if (!cell) return <div key={ci} />;
-                    return (
-                      <div
-                        key={ci}
-                        onMouseEnter={() => setHoveredDay(cell)}
-                        onMouseLeave={() => setHoveredDay(null)}
-                        className={`
-                          h-9 rounded-lg flex items-center justify-center text-[13px]
-                          cursor-default select-none transition-opacity
-                          ${DAY_STYLE[cell.status] || "text-gray-200"}
-                          ${cell.isToday ? "ring-2 ring-indigo-500 ring-offset-1" : ""}
-                        `}
-                      >
-                        {cell.day}
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
+            {/* Calendar flat grid */}
+            <div className="grid grid-cols-7 gap-px bg-gray-200 rounded-b-lg overflow-hidden">
+              {calRows.flat().map((cell, idx) => {
+                const ci = idx % 7;
+                const isSunday = ci === 6;
+
+                if (!cell) {
+                  return (
+                    <div key={idx} className={`h-9 ${isSunday ? "bg-rose-50" : "bg-white"}`} />
+                  );
+                }
+
+                const isInactive = cell.status === "weekend" || cell.status === "future";
+                const [bg, text] = isSunday && isInactive
+                  ? ["bg-rose-50", "text-rose-200 cursor-default"]
+                  : (DAY_STYLE[cell.status] || ["bg-white", "text-gray-200 cursor-default"]);
+
+                return (
+                  <button
+                    key={idx}
+                    onMouseEnter={() => setHoveredDay(cell)}
+                    onMouseLeave={() => setHoveredDay(null)}
+                    className={`
+                      relative h-9 flex items-center justify-center
+                      text-[11px] font-bold select-none transition-colors duration-150
+                      ${bg} ${text}
+                      ${cell.isToday ? "ring-2 ring-inset ring-indigo-400" : ""}
+                    `}
+                  >
+                    {cell.day}
+                    {isSunday && (
+                      <span className="absolute top-0.5 right-0.5 text-[6px] text-rose-300 leading-none">☀</span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
 
             {/* Hover info strip */}
@@ -293,7 +308,7 @@ export default function EmployeeDashboard() {
                 <div className="px-3 py-2.5 bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-between">
                   <div>
                     <p className="text-xs font-bold text-gray-700">
-                      {new Date(hoveredDay.date).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+                      {new Date(hoveredDay.date).toLocaleDateString("en-US", { weekday:"long", month:"long", day:"numeric" })}
                     </p>
                     <p className="text-[11px] text-gray-400 mt-0.5">{STATUS_LABEL[hoveredDay.status]}</p>
                   </div>
