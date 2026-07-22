@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import api from "../services/axios";
 import {
   Plus, Trash2, X, Loader2, User, Mail,
-  FolderPlus, FileText, Briefcase, Wrench, ClipboardList, ChevronDown
+  FolderPlus, FileText, Briefcase, Wrench, ClipboardList
 } from "lucide-react";
 
 // Roles considered eligible as project manager
@@ -105,10 +105,14 @@ const AddProject = ({ onClose, onSave }) => {
   const [error, setError] = useState("");
   const [allUsers, setAllUsers] = useState([]);
 
-  // Fetch all users once
+  // Fetch all users + next project ID on mount
   useEffect(() => {
-    api.get("/users/hr/all")
+    api.get("/users")
       .then((r) => setAllUsers(Array.isArray(r.data) ? r.data : []))
+      .catch(() => {});
+
+    api.get("/projects/next-id")
+      .then((r) => setFormData((p) => ({ ...p, projectId: r.data.nextId })))
       .catch(() => {});
   }, []);
 
@@ -235,8 +239,10 @@ const AddProject = ({ onClose, onSave }) => {
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><ClipboardList size={18} /></span>
             <input
-              type="text" value="Auto-generated" readOnly disabled
-              className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg bg-gray-100 text-gray-400 cursor-not-allowed text-sm"
+              type="text"
+              value={formData.projectId || "Loading..."}
+              readOnly disabled
+              className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed text-sm font-mono"
             />
           </div>
           <div className="relative">

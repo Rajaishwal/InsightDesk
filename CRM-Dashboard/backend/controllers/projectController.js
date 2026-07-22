@@ -4,9 +4,9 @@ import User from "../model/User.js";
 // Utility: Generate Project ID
 const generateProjectId = async () => {
   const lastProject = await Project.findOne().sort({ createdAt: -1 });
-  const lastId = lastProject ? lastProject.projectId : "PRJ000";
-  const num = parseInt(lastId.replace("PRJ", ""), 10) + 1;
-  return `PRJ${num.toString().padStart(3, "0")}`;
+  const lastId = lastProject ? lastProject.projectId : "PRJ-000";
+  const num = parseInt(lastId.replace("PRJ-", ""), 10) + 1;
+  return `PRJ-${num.toString().padStart(3, "0")}`;
 };
 
 // Create a new project

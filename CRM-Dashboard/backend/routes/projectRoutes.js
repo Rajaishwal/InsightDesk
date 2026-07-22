@@ -30,6 +30,18 @@ router.get('/:projectId/team', async (req, res) => {
   }
 });
 
+// Next auto-generated project ID preview
+router.get("/next-id", protect, async (req, res) => {
+  try {
+    const last = await Project.findOne().sort({ createdAt: -1 }).select("projectId");
+    const lastId = last ? last.projectId : "PRJ-000";
+    const num = parseInt(lastId.replace("PRJ-", ""), 10) + 1;
+    res.json({ nextId: `PRJ-${num.toString().padStart(3, "0")}` });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // Public routes (require authentication)
 router.post("/", protect, createProject);                    // Create project
 router.get("/my-projects", protect, getMyProjects);          // Get user's projects
