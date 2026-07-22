@@ -133,7 +133,7 @@ const AttendanceTable = ({ data, loading }) => {
 
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span
-                    className={`px-3 py-0.5 rounded-full text-sx font-medium border ${record.status === "checked-in"
+                    className={`px-3 py-0.5 rounded-full text-xs font-medium border ${record.status === "checked-in"
                       ? "border-green-500 text-green-600"
                       : record.status === "checked-out"
                         ? "border-red-500 text-red-600"

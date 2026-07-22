@@ -5,16 +5,17 @@ import api from "../services/axios";
 import { RefreshCw, X, CalendarDays, FileText, Tag } from "lucide-react";
 
 const LEAVE_META = {
-  "Planned Leave":         { color: "#6366f1", light: "#eef2ff", border: "border-indigo-400",  text: "text-indigo-600",  bg: "bg-indigo-50"  },
-  "Wellness Leave":        { color: "#10b981", light: "#ecfdf5", border: "border-emerald-400", text: "text-emerald-600", bg: "bg-emerald-50" },
-  "Polling Leave":         { color: "#f59e0b", light: "#fffbeb", border: "border-amber-400",   text: "text-amber-600",   bg: "bg-amber-50"   },
-  "Unplanned Leave (LOP)": { color: "#ef4444", light: "#fef2f2", border: "border-red-400",     text: "text-red-600",     bg: "bg-red-50"     },
+  "Planned Leave": { color: "#6366f1", light: "#eef2ff", border: "border-indigo-400", text: "text-indigo-600", bg: "bg-indigo-50" },
+  "Wellness Leave": { color: "#10b981", light: "#ecfdf5", border: "border-emerald-400", text: "text-emerald-600", bg: "bg-emerald-50" },
+  "Polling Leave": { color: "#f59e0b", light: "#fffbeb", border: "border-amber-400", text: "text-amber-600", bg: "bg-amber-50" },
+  "Unplanned Leave (LOP)": { color: "#ef4444", light: "#fef2f2", border: "border-red-400", text: "text-red-600", bg: "bg-red-50" },
 };
 
+const CODE_BASE = 'px-3 py-0.5 rounded-full text-xs font-medium border';
 const STATUS_CHIP = {
-  Approved: "bg-emerald-100 text-emerald-700",
-  Pending: "bg-amber-100 text-amber-700",
-  Rejected: "bg-red-100 text-red-700",
+  Approved: "border-emerald-500 text-emerald-600",
+  Pending: "border-amber-500 text-amber-600",
+  Rejected: "border-red-500 text-red-600",
 };
 
 
@@ -223,7 +224,7 @@ export default function LeaveManagement() {
                     <td className="px-4 py-3 font-medium text-gray-700">{leave.totalDays}</td>
                     <td className="px-4 py-3 text-gray-500 max-w-[180px] truncate">{leave.reason || "—"}</td>
                     <td className="px-4 py-3">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${STATUS_CHIP[leave.status] || "bg-gray-100 text-gray-600"}`}>
+                      <span className={`${CODE_BASE} ${STATUS_CHIP[leave.status] || "border-gray-300 text-gray-600"}`}>
                         {leave.status}
                       </span>
                     </td>
