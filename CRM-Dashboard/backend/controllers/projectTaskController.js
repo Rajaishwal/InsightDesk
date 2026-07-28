@@ -193,9 +193,13 @@ export const stopTimer = async (req, res) => {
       return res.status(400).json({ message: 'No running timer found' });
     }
 
-    const elapsed = Math.floor((Date.now() - new Date(entry.timerStartedAt).getTime()) / 1000);
+    const startTime = new Date(entry.timerStartedAt);
+    const endTime   = new Date();
+    const elapsed   = Math.floor((endTime - startTime) / 1000);
     entry.totalTimeLogged += elapsed;
     entry.timerStartedAt  = null;
+    if (!entry.sessions) entry.sessions = [];
+    entry.sessions.push({ startTime, endTime, duration: elapsed });
 
     await task.save();
 
@@ -213,5 +217,40 @@ export const stopTimer = async (req, res) => {
     res.json({ task });
   } catch (err) {
     res.status(500).json({ message: 'Server error stopping timer' });
+  }
+};
+
+// GET /api/project-tasks/my-time-today
+export const getMyTodayTime = async (req, res) => {
+  try {
+    const userId = (req.user._id || req.user.id).toString();
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const tasks = await ProjectTask.find({ 'timers.userId': userId });
+
+    let completedSeconds = 0;
+    let isRunning = false;
+    let runningStartedAt = null;
+
+    for (const task of tasks) {
+      const entry = task.timers.find(t => t.userId.toString() === userId);
+      if (!entry) continue;
+
+      for (const s of (entry.sessions || [])) {
+        if (new Date(s.startTime) >= startOfDay) {
+          completedSeconds += s.duration || 0;
+        }
+      }
+
+      if (entry.timerStartedAt && new Date(entry.timerStartedAt) >= startOfDay) {
+        isRunning = true;
+        runningStartedAt = entry.timerStartedAt;
+      }
+    }
+
+    res.json({ completedSeconds, isRunning, runningStartedAt });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
 };

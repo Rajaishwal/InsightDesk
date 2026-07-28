@@ -1,14 +1,15 @@
 import express from 'express';
 import {
   getProjectTasks, addProjectTask, updateTaskStatus,
-  startTimer, stopTimer, getProjectStats,
+  startTimer, stopTimer, getProjectStats, getMyTodayTime,
 } from '../controllers/projectTaskController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Must be before /:projectId so "stats" isn't treated as a projectId
-router.get('/stats/all', protect, getProjectStats);
+// Must be before /:projectId so literals aren't treated as a projectId
+router.get('/stats/all',      protect, getProjectStats);
+router.get('/my-time-today',  protect, getMyTodayTime);
 
 router.get('/:projectId', protect, getProjectTasks);
 router.post('/:projectId', protect, addProjectTask);
