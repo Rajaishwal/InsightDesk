@@ -245,13 +245,16 @@ export const getMyTodayTime = async (req, res) => {
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
 
-    const tasks = await ProjectTask.find({ 'timers.userId': userId });
+    const [projTasks, hrTasks] = await Promise.all([
+      ProjectTask.find({ 'timers.userId': userId }),
+      HRTask.find({      'timers.userId': userId }),
+    ]);
 
     let completedSeconds = 0;
     let isRunning = false;
     let runningStartedAt = null;
 
-    for (const task of tasks) {
+    for (const task of [...projTasks, ...hrTasks]) {
       const entry = task.timers.find(t => t.userId.toString() === userId);
       if (!entry) continue;
 
@@ -261,7 +264,7 @@ export const getMyTodayTime = async (req, res) => {
         }
       }
 
-      if (entry.timerStartedAt && new Date(entry.timerStartedAt) >= startOfDay) {
+      if (entry.timerStartedAt) {
         isRunning = true;
         runningStartedAt = entry.timerStartedAt;
       }
