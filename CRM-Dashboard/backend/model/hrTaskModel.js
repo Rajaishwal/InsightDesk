@@ -42,12 +42,25 @@ const hrTaskSchema = new mongoose.Schema(
       enum: ["Assigned", "In Progress", "Completed", "Failed"],
       default: "Assigned",
     },
-    completedAt: {   // ✅ properly added here
+    completedAt: {
       type: Date,
       default: null,
     },
+    timers: [{
+      userId:          { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+      userName:        { type: String },
+      timerStartedAt:  { type: Date, default: null },
+      totalTimeLogged: { type: Number, default: 0 },
+      sessions: [{
+        startTime: { type: Date, required: true },
+        endTime:   { type: Date, required: true },
+        duration:  { type: Number, required: true },
+        _id: false,
+      }],
+      _id: false,
+    }],
   },
-  { timestamps: true },  
+  { timestamps: true },
 );
 
 const HRTask = mongoose.model("HRTask", hrTaskSchema);

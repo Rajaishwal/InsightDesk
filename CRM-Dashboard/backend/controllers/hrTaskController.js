@@ -1,5 +1,6 @@
 import HRTask from "../model/hrTaskModel.js";
 import User from "../model/User.js";
+import ProjectTask from "../model/ProjectTask.js";
 
 // 👉 HR assigns a task to employee route: POST /api/hr-tasks/
 export const assignTask = async (req, res) => {
@@ -96,6 +97,84 @@ export const deleteHRTask = async (req, res) => {
     res.status(200).json({ success: true, message: "Task deleted" });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// POST /api/hr-tasks/:id/timer/start
+export const startHrTimer = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId   = (req.user._id || req.user.id).toString();
+    const userName = req.user.name;
+
+    const task = await HRTask.findById(id);
+    if (!task) return res.status(404).json({ message: 'Task not found' });
+    if (task.status === 'Completed') return res.status(400).json({ message: 'Task already completed' });
+
+    // Enforce one active timer across both collections
+    const [activeProjTimer, activeHrTimer] = await Promise.all([
+      ProjectTask.findOne({ 'timers.userId': userId, 'timers.timerStartedAt': { $ne: null } }),
+      HRTask.findOne({      'timers.userId': userId, 'timers.timerStartedAt': { $ne: null } }),
+    ]);
+    const activeTask = activeProjTimer || activeHrTimer;
+    if (activeTask && activeTask._id.toString() !== id) {
+      return res.status(409).json({ message: `You already have an active timer on "${activeTask.title}". Pause it first.` });
+    }
+
+    const entry = task.timers.find(t => t.userId.toString() === userId);
+    if (entry) {
+      if (entry.timerStartedAt) return res.status(400).json({ message: 'Timer already running' });
+      await HRTask.updateOne(
+        { _id: task._id, 'timers.userId': userId },
+        { $set: { 'timers.$.timerStartedAt': new Date() } }
+      );
+    } else {
+      await HRTask.updateOne(
+        { _id: task._id },
+        { $push: { timers: { userId, userName, timerStartedAt: new Date(), totalTimeLogged: 0, sessions: [] } } }
+      );
+    }
+
+    if (task.status === 'Assigned') {
+      await HRTask.updateOne({ _id: task._id }, { $set: { status: 'In Progress' } });
+    }
+
+    const updated = await HRTask.findById(id);
+    res.json({ task: updated });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// POST /api/hr-tasks/:id/timer/stop
+export const stopHrTimer = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = (req.user._id || req.user.id).toString();
+
+    const task = await HRTask.findById(id);
+    if (!task) return res.status(404).json({ message: 'Task not found' });
+
+    const entry = task.timers.find(t => t.userId.toString() === userId);
+    if (!entry || !entry.timerStartedAt) return res.status(400).json({ message: 'No running timer found' });
+
+    const startTime = new Date(entry.timerStartedAt);
+    const endTime   = new Date();
+    const elapsed   = Math.floor((endTime - startTime) / 1000);
+    const newTotal  = (entry.totalTimeLogged || 0) + elapsed;
+
+    await HRTask.updateOne(
+      { _id: task._id, 'timers.userId': userId },
+      {
+        $set:  { 'timers.$.timerStartedAt': null, 'timers.$.totalTimeLogged': newTotal },
+        $push: { 'timers.$.sessions': { startTime, endTime, duration: elapsed } },
+      }
+    );
+
+    const updated = await HRTask.findById(id);
+    res.json({ task: updated });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
 };
 

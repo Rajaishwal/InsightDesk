@@ -6,7 +6,9 @@ import {
   getMyAssignedTasks,
   updateHRTask,
   deleteHRTask,
-  updateTaskTime
+  updateTaskTime,
+  startHrTimer,
+  stopHrTimer,
 } from "../controllers/hrTaskController.js";
 import { protect } from "../middleware/authMiddleware.js";
 
@@ -32,6 +34,10 @@ router.delete("/:id", protect, deleteHRTask);
 
 // Employee updates task time
 router.put("/:id/time", protect, updateTaskTime);
+
+// Timer
+router.post("/:id/timer/start", protect, startHrTimer);
+router.post("/:id/timer/stop",  protect, stopHrTimer);
 
 
 

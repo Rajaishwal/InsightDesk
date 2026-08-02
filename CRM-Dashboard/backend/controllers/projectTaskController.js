@@ -2,6 +2,7 @@ import ProjectTask from '../model/ProjectTask.js';
 import Project from '../model/Project.js';
 import ProjectActivity from '../model/ProjectActivity.js';
 import User from '../model/User.js';
+import HRTask from '../model/hrTaskModel.js';
 
 const logActivity = async (data) => {
   try {
@@ -147,6 +148,16 @@ export const startTimer = async (req, res) => {
 
     const task = await ProjectTask.findById(taskId);
     if (!task) return res.status(404).json({ message: 'Task not found' });
+
+    // Enforce one active timer across both ProjectTask and HrTask
+    const [activeProjTimer, activeHrTimer] = await Promise.all([
+      ProjectTask.findOne({ 'timers.userId': userId, 'timers.timerStartedAt': { $ne: null } }),
+      HRTask.findOne({      'timers.userId': userId, 'timers.timerStartedAt': { $ne: null } }),
+    ]);
+    const activeTask = activeProjTimer || activeHrTimer;
+    if (activeTask && activeTask._id.toString() !== taskId) {
+      return res.status(409).json({ message: `You already have an active timer on "${activeTask.title}". Pause it first.` });
+    }
 
     let entry = task.timers.find(t => t.userId.toString() === userId.toString());
     if (!entry) {
