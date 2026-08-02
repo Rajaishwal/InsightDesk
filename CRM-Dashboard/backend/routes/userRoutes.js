@@ -59,7 +59,7 @@ router.get('/profile-stats', protect, async (req, res) => {
 });
 
 // GET /api/users/admin-stats — dashboard stats for admin
-router.get('/admin-stats', protect, admin, async (req, res) => {
+router.get('/admin-stats', protect, admin, async (_req, res) => {
   try {
     const now = new Date();
     const today = now.toISOString().split('T')[0];
@@ -93,7 +93,13 @@ router.get('/admin-stats', protect, admin, async (req, res) => {
     breakUsersData.forEach(u => { breakUsersMap[u._id.toString()] = u; });
     const breakAttMap = {};
     todayAtt.forEach(a => { breakAttMap[a.userId?.toString()] = a; });
-    const onBreakEmployees = activeBreaks.map(b => {
+    const seenBreakUsers = new Set();
+    const onBreakEmployees = activeBreaks.filter(b => {
+      const uid = b.userId?.toString();
+      if (seenBreakUsers.has(uid)) return false;
+      seenBreakUsers.add(uid);
+      return true;
+    }).map(b => {
       const u = breakUsersMap[b.userId?.toString()] || {};
       const att = breakAttMap[b.userId?.toString()] || {};
       return {
@@ -226,7 +232,7 @@ router.get('/admin-stats', protect, admin, async (req, res) => {
     res.json({
       totalEmployees,
       newJoined,
-      onBreakCount,
+      onBreakCount: onBreakEmployees.length,
       presentCount,
       lateCount,
       onLeaveCount,

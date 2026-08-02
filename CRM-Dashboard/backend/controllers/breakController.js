@@ -12,6 +12,8 @@ export const startBreak = async (req, res) => {
     if (!mongoose.isValidObjectId(userId)) {
       return res.status(400).json({ message: "Invalid userId" });
     }
+    const existing = await Break.findOne({ userId, endTime: null }).sort({ startTime: -1 });
+    if (existing) return res.status(200).json(existing);
     const newBreak = new Break({ userId, startTime: new Date() });
     await newBreak.save();
     res.status(201).json(newBreak);
