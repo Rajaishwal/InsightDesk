@@ -1,6 +1,7 @@
 import ProjectTask from '../model/ProjectTask.js';
 import Project from '../model/Project.js';
 import ProjectActivity from '../model/ProjectActivity.js';
+import User from '../model/User.js';
 
 const logActivity = async (data) => {
   try {
@@ -182,13 +183,13 @@ export const startTimer = async (req, res) => {
 export const stopTimer = async (req, res) => {
   try {
     const { taskId } = req.params;
-    const userId   = req.user._id || req.user.id;
+    const userId   = (req.user._id || req.user.id).toString();
     const userName = req.user.name;
 
     const task = await ProjectTask.findById(taskId);
     if (!task) return res.status(404).json({ message: 'Task not found' });
 
-    const entry = task.timers.find(t => t.userId.toString() === userId.toString());
+    const entry = task.timers.find(t => t.userId.toString() === userId);
     if (!entry || !entry.timerStartedAt) {
       return res.status(400).json({ message: 'No running timer found' });
     }
@@ -196,12 +197,18 @@ export const stopTimer = async (req, res) => {
     const startTime = new Date(entry.timerStartedAt);
     const endTime   = new Date();
     const elapsed   = Math.floor((endTime - startTime) / 1000);
-    entry.totalTimeLogged += elapsed;
-    entry.timerStartedAt  = null;
-    if (!entry.sessions) entry.sessions = [];
-    entry.sessions.push({ startTime, endTime, duration: elapsed });
+    const newTotal  = (entry.totalTimeLogged || 0) + elapsed;
 
-    await task.save();
+    // Use MongoDB $push/$set directly — avoids Mongoose change-tracking issues with _id:false nested arrays
+    await ProjectTask.updateOne(
+      { _id: task._id, 'timers.userId': entry.userId },
+      {
+        $set:  { 'timers.$.timerStartedAt': null, 'timers.$.totalTimeLogged': newTotal },
+        $push: { 'timers.$.sessions': { startTime, endTime, duration: elapsed } },
+      }
+    );
+
+    const updatedTask = await ProjectTask.findById(taskId);
 
     const project = await Project.findOne({ projectId: task.projectId });
     await logActivity({
@@ -214,7 +221,7 @@ export const stopTimer = async (req, res) => {
       action:      'timer_stopped',
     });
 
-    res.json({ task });
+    res.json({ task: updatedTask });
   } catch (err) {
     res.status(500).json({ message: 'Server error stopping timer' });
   }
@@ -250,6 +257,174 @@ export const getMyTodayTime = async (req, res) => {
     }
 
     res.json({ completedSeconds, isRunning, runningStartedAt });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// GET /api/project-tasks/active-timers
+export const getActiveTimers = async (req, res) => {
+  try {
+    const tasks = await ProjectTask.find({ 'timers': { $elemMatch: { timerStartedAt: { $ne: null } } } }).lean();
+
+    const userIds    = [...new Set(tasks.flatMap(t => t.timers.filter(tm => tm.timerStartedAt).map(tm => tm.userId?.toString())))];
+    const projectIds = [...new Set(tasks.map(t => t.projectId))];
+
+    const [users, projects] = await Promise.all([
+      User.find({ _id: { $in: userIds } }).select('name employeeId designation photo').lean(),
+      Project.find({ projectId: { $in: projectIds } }).select('projectId title').lean(),
+    ]);
+
+    const userMap    = Object.fromEntries(users.map(u => [u._id.toString(), u]));
+    const projectMap = Object.fromEntries(projects.map(p => [p.projectId, p]));
+
+    const active = [];
+    for (const task of tasks) {
+      for (const timer of task.timers) {
+        if (!timer.timerStartedAt) continue;
+        const user    = userMap[timer.userId?.toString()] || {};
+        const project = projectMap[task.projectId] || {};
+        active.push({
+          taskId:       task._id,
+          taskTitle:    task.title,
+          projectId:    task.projectId,
+          projectTitle: project.title || task.projectId,
+          userId:       timer.userId,
+          userName:     timer.userName || user.name,
+          employeeId:   user.employeeId,
+          designation:  user.designation,
+          photo:        user.photo,
+          startedAt:    timer.timerStartedAt,
+          totalLogged:  timer.totalTimeLogged || 0,
+        });
+      }
+    }
+
+    res.json({ active });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// GET /api/project-tasks/work-log?period=today|all
+export const getWorkLog = async (req, res) => {
+  try {
+    const { period = 'all' } = req.query;
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const filterToday = period === 'today';
+
+    const tasks = await ProjectTask.find({ 'timers.0': { $exists: true } }).lean();
+
+    const userIds    = [...new Set(tasks.flatMap(t => t.timers.map(tm => tm.userId?.toString())))];
+    const projectIds = [...new Set(tasks.map(t => t.projectId))];
+
+    const [users, projects] = await Promise.all([
+      User.find({ _id: { $in: userIds } }).select('name employeeId designation photo').lean(),
+      Project.find({ projectId: { $in: projectIds } }).select('projectId title').lean(),
+    ]);
+
+    const userMap    = Object.fromEntries(users.map(u => [u._id.toString(), u]));
+    const projectMap = Object.fromEntries(projects.map(p => [p.projectId, p]));
+
+    const rows = [];
+    for (const task of tasks) {
+      const project = projectMap[task.projectId] || {};
+      for (const timer of (task.timers || [])) {
+        const user = userMap[timer.userId?.toString()] || {};
+
+        let logged = 0;
+        if (filterToday) {
+          // Sum only sessions that started today
+          for (const s of (timer.sessions || [])) {
+            if (new Date(s.startTime) >= todayStart) logged += s.duration || 0;
+          }
+          // Add running time if timer started today
+          if (timer.timerStartedAt && new Date(timer.timerStartedAt) >= todayStart) {
+            logged += Math.floor((Date.now() - new Date(timer.timerStartedAt)) / 1000);
+          }
+          if (logged === 0) continue; // skip rows with no activity today
+        } else {
+          const running = timer.timerStartedAt
+            ? Math.floor((Date.now() - new Date(timer.timerStartedAt)) / 1000) : 0;
+          logged = (timer.totalTimeLogged || 0) + running;
+          if (logged === 0) continue;
+        }
+
+        rows.push({
+          taskId:       task._id,
+          taskTitle:    task.title,
+          taskStatus:   task.status,
+          projectId:    task.projectId,
+          projectTitle: project.title || task.projectId,
+          userId:       timer.userId,
+          userName:     timer.userName || user.name,
+          employeeId:   user.employeeId,
+          designation:  user.designation,
+          photo:        user.photo,
+          totalLogged:  logged,
+          isRunning:    !!timer.timerStartedAt,
+          sessionCount: (timer.sessions || []).length,
+        });
+      }
+    }
+
+    rows.sort((a, b) => b.totalLogged - a.totalLogged);
+    res.json({ rows });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// GET /api/project-tasks/all-sessions?period=today|week|month|all
+export const getAllSessions = async (req, res) => {
+  try {
+    const { period = 'today' } = req.query;
+    const now = new Date();
+    const cutoff = period === 'today'  ? new Date(now.getFullYear(), now.getMonth(), now.getDate()) :
+                   period === 'week'   ? new Date(now - 7 * 86400000) :
+                   period === 'month'  ? new Date(now.getFullYear(), now.getMonth(), 1) : null;
+
+    const tasks = await ProjectTask.find().lean();
+
+    const userIds    = [...new Set(tasks.flatMap(t => t.timers.map(tm => tm.userId?.toString())))];
+    const projectIds = [...new Set(tasks.map(t => t.projectId))];
+
+    const [users, projects] = await Promise.all([
+      User.find({ _id: { $in: userIds } }).select('name employeeId designation photo').lean(),
+      Project.find({ projectId: { $in: projectIds } }).select('projectId title').lean(),
+    ]);
+
+    const userMap    = Object.fromEntries(users.map(u => [u._id.toString(), u]));
+    const projectMap = Object.fromEntries(projects.map(p => [p.projectId, p]));
+
+    const sessions = [];
+    for (const task of tasks) {
+      const project = projectMap[task.projectId] || {};
+      for (const timer of (task.timers || [])) {
+        const user = userMap[timer.userId?.toString()] || {};
+        for (const s of (timer.sessions || [])) {
+          if (cutoff && new Date(s.startTime) < cutoff) continue;
+          sessions.push({
+            taskId:       task._id,
+            taskTitle:    task.title,
+            projectId:    task.projectId,
+            projectTitle: project.title || task.projectId,
+            userId:       timer.userId,
+            userName:     timer.userName || user.name,
+            employeeId:   user.employeeId,
+            designation:  user.designation,
+            photo:        user.photo,
+            startTime:    s.startTime,
+            endTime:      s.endTime,
+            duration:     s.duration,
+          });
+        }
+      }
+    }
+
+    sessions.sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
+    res.json({ sessions });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
