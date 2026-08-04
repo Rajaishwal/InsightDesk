@@ -113,6 +113,22 @@ export const updateTaskStatus = async (req, res) => {
     const task = await ProjectTask.findById(taskId);
     if (!task) return res.status(404).json({ message: 'Task not found' });
 
+    // Once completed, the status is permanently locked
+    if (task.status === 'Completed') {
+      return res.status(403).json({ message: 'Completed tasks cannot be reopened' });
+    }
+
+    // Only the task creator (or admin/manager) can mark a task as Completed
+    if (status === 'Completed') {
+      const userId  = (user._id || user.id).toString();
+      const isOwner = task.createdBy?.toString() === userId;
+      if (!isOwner && user.role !== 'admin') {
+        return res.status(403).json({
+          message: `Only ${task.createdByName} (the task creator) can mark this as completed`,
+        });
+      }
+    }
+
     const fromStatus = task.status;
     task.status = status;
     if (status === 'Completed') task.completedAt = new Date();
