@@ -277,6 +277,45 @@ export const getMyTodayTime = async (req, res) => {
   }
 };
 
+// GET /api/project-tasks/all-users-today-time  (admin view — all users' task seconds today)
+export const getAllUsersTodayTime = async (req, res) => {
+  try {
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const [projTasks, hrTasks] = await Promise.all([
+      ProjectTask.find({ 'timers.0': { $exists: true } }).lean(),
+      HRTask.find({      'timers.0': { $exists: true } }).lean(),
+    ]);
+
+    const totals = {}; // { userId: seconds }
+
+    for (const task of [...projTasks, ...hrTasks]) {
+      for (const entry of (task.timers || [])) {
+        const uid = entry.userId?.toString();
+        if (!uid) continue;
+        if (!totals[uid]) totals[uid] = 0;
+
+        for (const s of (entry.sessions || [])) {
+          if (new Date(s.startTime) >= startOfDay) {
+            totals[uid] += s.duration || 0;
+          }
+        }
+        // Add live running time
+        if (entry.timerStartedAt) {
+          const started = new Date(entry.timerStartedAt);
+          const since = started >= startOfDay ? started : startOfDay;
+          totals[uid] += Math.floor((Date.now() - since) / 1000);
+        }
+      }
+    }
+
+    res.json({ totals });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 // GET /api/project-tasks/active-timers
 export const getActiveTimers = async (req, res) => {
   try {
