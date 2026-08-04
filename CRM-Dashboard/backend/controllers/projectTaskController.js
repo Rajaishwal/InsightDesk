@@ -150,9 +150,10 @@ export const startTimer = async (req, res) => {
     if (!task) return res.status(404).json({ message: 'Task not found' });
 
     // Enforce one active timer across both ProjectTask and HrTask
+    // $elemMatch ensures BOTH conditions match the same array element (same user's entry)
     const [activeProjTimer, activeHrTimer] = await Promise.all([
-      ProjectTask.findOne({ 'timers.userId': userId, 'timers.timerStartedAt': { $ne: null } }),
-      HRTask.findOne({      'timers.userId': userId, 'timers.timerStartedAt': { $ne: null } }),
+      ProjectTask.findOne({ timers: { $elemMatch: { userId, timerStartedAt: { $ne: null } } } }),
+      HRTask.findOne({      timers: { $elemMatch: { userId, timerStartedAt: { $ne: null } } } }),
     ]);
     const activeTask = activeProjTimer || activeHrTimer;
     if (activeTask && activeTask._id.toString() !== taskId) {

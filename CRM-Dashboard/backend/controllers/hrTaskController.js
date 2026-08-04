@@ -112,9 +112,10 @@ export const startHrTimer = async (req, res) => {
     if (task.status === 'Completed') return res.status(400).json({ message: 'Task already completed' });
 
     // Enforce one active timer across both collections
+    // $elemMatch ensures BOTH conditions match the same array element (same user's entry)
     const [activeProjTimer, activeHrTimer] = await Promise.all([
-      ProjectTask.findOne({ 'timers.userId': userId, 'timers.timerStartedAt': { $ne: null } }),
-      HRTask.findOne({      'timers.userId': userId, 'timers.timerStartedAt': { $ne: null } }),
+      ProjectTask.findOne({ timers: { $elemMatch: { userId, timerStartedAt: { $ne: null } } } }),
+      HRTask.findOne({      timers: { $elemMatch: { userId, timerStartedAt: { $ne: null } } } }),
     ]);
     const activeTask = activeProjTimer || activeHrTimer;
     if (activeTask && activeTask._id.toString() !== id) {
