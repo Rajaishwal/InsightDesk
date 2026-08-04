@@ -98,6 +98,8 @@ io.on("connection", (socket) => {
   socket.on("send_message", async ({ senderId, receiverId, text, fileUrl, fileName, fileType, replyTo }) => {
     try {
       const Message = (await import("./models/Message.js")).default;
+      const User    = (await import("./model/User.js")).default;
+
       const msg = await Message.create({
         senderId,
         receiverId,
@@ -108,10 +110,14 @@ io.on("connection", (socket) => {
         replyTo: replyTo || undefined,
       });
 
+      // Attach sender info so the receiver can show a rich notification
+      const sender = await User.findById(senderId).select("name photo employeeId").lean();
+      const enriched = { ...msg.toObject(), senderName: sender?.name || "Someone", senderPhoto: sender?.photo || null, senderEmpId: sender?.employeeId || null };
+
       // Send to receiver's room
-      io.to(receiverId).emit("receive_message", msg);
+      io.to(receiverId).emit("receive_message", enriched);
       // Confirm back to sender
-      socket.emit("receive_message", msg);
+      socket.emit("receive_message", enriched);
     } catch (err) {
       console.error("Socket send_message error:", err.message);
     }
