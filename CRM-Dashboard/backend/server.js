@@ -26,6 +26,7 @@ import employeeRoutes from "./routes/employeeRoutes.js";
 import messageRoutes from "./routes/messageRoutes.js";
 import projectTaskRoutes from "./routes/projectTaskRoutes.js";
 import projectActivityRoutes from "./routes/projectActivityRoutes.js";
+import { setIo } from "./socket.js";
 
 dotenv.config();
 connectDB();
@@ -82,6 +83,9 @@ const io = new Server(httpServer, {
     credentials: true,
   },
 });
+
+// Share io instance with controllers so they can emit real-time events
+setIo(io);
 
 // userId -> socketId map
 const onlineUsers = new Map();

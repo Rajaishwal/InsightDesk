@@ -2,6 +2,7 @@ import Attendance from "../model/Attendance.js";
 import User from "../model/User.js";
 import Location from "../model/Location.js";
 import Break from "../models/Break.js";
+import { getIo } from "../socket.js";
 
 // Check In - Create new attendance record for the day
 export const checkIn = async (req, res) => {
@@ -61,8 +62,11 @@ export const checkIn = async (req, res) => {
       timeZone: "Asia/Kolkata",
     });
 
-    res.status(201).json({ 
-      message: "Checked In Successfully", 
+    // Notify all connected clients that attendance data changed
+    getIo()?.emit("attendance:updated");
+
+    res.status(201).json({
+      message: "Checked In Successfully",
       time,
       attendance,
       locationTrackingActivated: true
@@ -124,8 +128,11 @@ export const checkOut = async (req, res) => {
       timeZone: "Asia/Kolkata",
     });
 
-    res.status(200).json({ 
-      message: "Checked Out Successfully", 
+    // Notify all connected clients that attendance data changed
+    getIo()?.emit("attendance:updated");
+
+    res.status(200).json({
+      message: "Checked Out Successfully",
       time,
       attendance,
       workingHours: attendance.workingHours,

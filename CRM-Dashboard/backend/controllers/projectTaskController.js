@@ -3,6 +3,7 @@ import Project from '../model/Project.js';
 import ProjectActivity from '../model/ProjectActivity.js';
 import User from '../model/User.js';
 import HRTask from '../model/hrTaskModel.js';
+import { getIo } from '../socket.js';
 
 const logActivity = async (data) => {
   try {
@@ -137,6 +138,24 @@ export const updateTaskStatus = async (req, res) => {
     await task.save();
 
     const project = await Project.findOne({ projectId: task.projectId });
+
+    // Auto-sync project status based on task status change:
+    // • Any task → Ongoing  : project becomes Ongoing  (if it was Pending)
+    // • All tasks Completed : project becomes Completed (if not already)
+    if (project) {
+      if (status === 'Ongoing' && project.status === 'Pending') {
+        project.status = 'Ongoing';
+        await project.save();
+      } else if (status === 'Completed') {
+        const allTasks = await ProjectTask.find({ projectId: task.projectId });
+        const allDone  = allTasks.every(t => t._id.toString() === taskId || t.status === 'Completed');
+        if (allDone && project.status !== 'Completed') {
+          project.status = 'Completed';
+          await project.save();
+        }
+      }
+    }
+
     await logActivity({
       projectId:   task.projectId,
       projectName: project?.title || task.projectId,
@@ -149,6 +168,7 @@ export const updateTaskStatus = async (req, res) => {
       toStatus:    status,
     });
 
+    getIo()?.emit("task:updated");
     res.json({ task });
   } catch (err) {
     res.status(500).json({ message: 'Server error updating task status' });

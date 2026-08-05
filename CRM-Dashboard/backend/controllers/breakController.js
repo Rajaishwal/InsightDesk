@@ -1,5 +1,6 @@
 import Break from "../models/Break.js";
 import mongoose from "mongoose";
+import { getIo } from "../socket.js";
 
 // Use a valid ObjectId string from your User collection or just a random valid ObjectId for testing
 const DUMMY_USER_ID = "64d3e4b7f2a4c2a1b1234567"; // 24 hex chars
@@ -16,6 +17,7 @@ export const startBreak = async (req, res) => {
     if (existing) return res.status(200).json(existing);
     const newBreak = new Break({ userId, startTime: new Date() });
     await newBreak.save();
+    getIo()?.emit("attendance:updated");
     res.status(201).json(newBreak);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -60,6 +62,7 @@ export const stopBreak = async (req, res) => {
     breakData.endTime = new Date(endMs);
     breakData.durationInSeconds = durationSeconds;
     await breakData.save();
+    getIo()?.emit("attendance:updated");
     res.json(breakData);
   } catch (error) {
     console.error("Error in stopBreak:", error);

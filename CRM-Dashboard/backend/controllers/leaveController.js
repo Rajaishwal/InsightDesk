@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import Leave from '../model/Leave.js';
 import User from '../model/User.js';
 import MonthlyLeaveAllocation from '../model/MonthlyLeaveAllocation.js';
+import { getIo } from '../socket.js';
 
 // Utility function to calculate working days (excluding weekends)
 const calculateWorkingDays = (startDate, endDate) => {
@@ -107,6 +108,7 @@ export const applyLeave = async (req, res) => {
     // Update monthly allocation - add to pending leaves
     await MonthlyLeaveAllocation.updateLeaveCount(userId, leaveYear, leaveMonth, 0, requestedDays);
 
+    getIo()?.emit("leave:updated");
     res.status(201).json({
       message: 'Leave application submitted successfully',
       leave: newLeave
@@ -530,6 +532,7 @@ export const cancelLeave = async (req, res) => {
     await Leave.findByIdAndDelete(leaveId);
     await MonthlyLeaveAllocation.updateLeaveCount(userId, leaveYear, leaveMonth, 0, -leaveDays);
 
+    getIo()?.emit("leave:updated");
     res.json({ message: 'Leave request cancelled successfully' });
   } catch (error) {
     console.error('Cancel leave error:', error);
