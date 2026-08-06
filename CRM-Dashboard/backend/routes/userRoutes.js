@@ -25,8 +25,8 @@ router.get('/', protect, hrOrAdmin, getAllUsers);
 // GET /api/users/profile-stats
 router.get('/profile-stats', protect, async (req, res) => {
   try {
-    const userId  = req.user._id;
-    const empId   = req.user.employeeId;
+    const userId = req.user._id;
+    const empId = req.user.employeeId;
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
@@ -125,9 +125,9 @@ router.get('/admin-stats', protect, admin, async (_req, res) => {
     ]);
     const projMap = {};
     projectAgg.forEach(p => { projMap[p._id] = p.count; });
-    const ongoingProjects   = projMap['Ongoing']   || 0;
+    const ongoingProjects = projMap['Ongoing'] || 0;
     const completedProjects = projMap['Completed'] || 0;
-    const pendingProjects   = projMap['Pending']   || 0;
+    const pendingProjects = projMap['Pending'] || 0;
 
     // Ongoing projects list for dashboard scroll
     const ongoingProjectsRaw = await Project.find({ status: 'Ongoing', statusFlag: true })
@@ -258,15 +258,15 @@ router.get('/admin-stats', protect, admin, async (_req, res) => {
 // GET /api/users/employee-dashboard — rich self-service dashboard data
 router.get('/employee-dashboard', protect, async (req, res) => {
   try {
-    const userId  = req.user._id;
-    const empId   = req.user.employeeId;
-    const now     = new Date();
-    const year    = now.getFullYear();
-    const month   = now.getMonth();
+    const userId = req.user._id;
+    const empId = req.user.employeeId;
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
     const todayStr = now.toISOString().split('T')[0];
     const startStr = new Date(year, month, 1).toISOString().split('T')[0];
-    const lastDay  = new Date(year, month + 1, 0);
-    const endStr   = lastDay.toISOString().split('T')[0];
+    const lastDay = new Date(year, month + 1, 0);
+    const endStr = lastDay.toISOString().split('T')[0];
     const daysInMonth = lastDay.getDate();
 
     const [attendance, projects, tasks, leaves] = await Promise.all([
@@ -277,7 +277,7 @@ router.get('/employee-dashboard', protect, async (req, res) => {
         userId,
         status: 'Approved',
         startDate: { $lte: new Date(endStr + 'T23:59:59') },
-        endDate:   { $gte: new Date(startStr + 'T00:00:00') },
+        endDate: { $gte: new Date(startStr + 'T00:00:00') },
       }).lean(),
     ]);
 
@@ -299,11 +299,11 @@ router.get('/employee-dashboard', protect, async (req, res) => {
     let workingDays = 0, presentDays = 0, leaveDayCount = 0, totalWorkHours = 0;
 
     for (let d = 1; d <= daysInMonth; d++) {
-      const ds  = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       const dow = new Date(ds).getDay(); // 0=Sun 6=Sat
       const isWeekend = dow === 0 || dow === 6;
-      const isFuture  = ds > todayStr;
-      const isToday   = ds === todayStr;
+      const isFuture = ds > todayStr;
+      const isToday = ds === todayStr;
       let status = 'future', checkIn = null, checkOut = null, workingHours = 0;
 
       if (isWeekend) {
@@ -312,15 +312,15 @@ router.get('/employee-dashboard', protect, async (req, res) => {
         status = 'future';
       } else {
         workingDays++;
-        const att      = attMap[ds];
-        const onLeave  = leaveDates.has(ds);
+        const att = attMap[ds];
+        const onLeave = leaveDates.has(ds);
         if (att) {
           presentDays++;
           totalWorkHours += att.workingHours || 0;
-          checkIn      = att.checkInTime;
-          checkOut     = att.checkOutTime;
+          checkIn = att.checkInTime;
+          checkOut = att.checkOutTime;
           workingHours = att.workingHours || 0;
-          const ci  = new Date(att.checkInTime);
+          const ci = new Date(att.checkInTime);
           const late = ci.getHours() > 9 || (ci.getHours() === 9 && ci.getMinutes() > 30);
           status = late ? 'late' : 'present';
         } else if (onLeave) {
@@ -333,17 +333,17 @@ router.get('/employee-dashboard', protect, async (req, res) => {
       calendarDays.push({ date: ds, day: d, dow, status, checkIn, checkOut, workingHours, isToday });
     }
 
-    const totalTasks       = tasks.length;
-    const completedTasks   = tasks.filter(t => t.status === 'Completed').length;
-    const activeProjects   = projects.filter(p => p.status === 'Ongoing').length;
-    const completedProjects= projects.filter(p => p.status === 'Completed').length;
-    const effectiveWorkDays= workingDays - leaveDayCount;
-    const attendanceRate   = effectiveWorkDays > 0 ? Math.round((presentDays / effectiveWorkDays) * 100) : 100;
+    const totalTasks = tasks.length;
+    const completedTasks = tasks.filter(t => t.status === 'Completed').length;
+    const activeProjects = projects.filter(p => p.status === 'Ongoing').length;
+    const completedProjects = projects.filter(p => p.status === 'Completed').length;
+    const effectiveWorkDays = workingDays - leaveDayCount;
+    const attendanceRate = effectiveWorkDays > 0 ? Math.round((presentDays / effectiveWorkDays) * 100) : 100;
     const taskCompletionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
     res.json({
-      attendanceDaysThisMonth:  presentDays,
-      workingHoursThisMonth:    Math.round(totalWorkHours * 10) / 10,
+      attendanceDaysThisMonth: presentDays,
+      workingHoursThisMonth: Math.round(totalWorkHours * 10) / 10,
       totalWorkingDaysThisMonth: effectiveWorkDays,
       activeProjects, completedProjects, totalProjects: projects.length,
       completedTasks, totalTasks,
@@ -358,21 +358,21 @@ router.get('/employee-dashboard', protect, async (req, res) => {
 });
 
 // GET /api/users/next-employee-id — returns the next auto-generated employee ID
-// Scans all EMP\d+ IDs, finds the max, increments by 1 (e.g. EMP042 → EMP043)
+// Scans all EID\d+ IDs, finds the max, increments by 1 (e.g. EID041 → EID042)
 router.get('/next-employee-id', protect, hrOrAdmin, async (_req, res) => {
   try {
     const employees = await User.find(
-      { employeeId: { $regex: /^EMP\d+$/i } },
+      { employeeId: { $regex: /^IDE\d+$/i } },
       { employeeId: 1, _id: 0 }
     ).lean();
 
     let max = 0;
     for (const emp of employees) {
-      const num = parseInt(emp.employeeId.replace(/^EMP/i, ''), 10);
+      const num = parseInt(emp.employeeId.replace(/^IDE/i, ''), 10);
       if (!isNaN(num) && num > max) max = num;
     }
 
-    const nextId = `EMP${String(max + 1).padStart(3, '0')}`;
+    const nextId = `IDE${String(max + 1).padStart(3, '0')}`;
     res.json({ nextId });
   } catch (err) {
     res.status(500).json({ message: 'Failed to generate next employee ID', error: err.message });
