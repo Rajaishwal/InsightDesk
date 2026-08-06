@@ -357,6 +357,28 @@ router.get('/employee-dashboard', protect, async (req, res) => {
   }
 });
 
+// GET /api/users/next-employee-id — returns the next auto-generated employee ID
+// Scans all EMP\d+ IDs, finds the max, increments by 1 (e.g. EMP042 → EMP043)
+router.get('/next-employee-id', protect, hrOrAdmin, async (_req, res) => {
+  try {
+    const employees = await User.find(
+      { employeeId: { $regex: /^EMP\d+$/i } },
+      { employeeId: 1, _id: 0 }
+    ).lean();
+
+    let max = 0;
+    for (const emp of employees) {
+      const num = parseInt(emp.employeeId.replace(/^EMP/i, ''), 10);
+      if (!isNaN(num) && num > max) max = num;
+    }
+
+    const nextId = `EMP${String(max + 1).padStart(3, '0')}`;
+    res.json({ nextId });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to generate next employee ID', error: err.message });
+  }
+});
+
 // GET /api/users/search?query=... — search employees by name for chat
 router.get('/search', protect, async (req, res) => {
   try {
