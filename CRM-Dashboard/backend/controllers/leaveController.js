@@ -24,7 +24,7 @@ const calculateWorkingDays = (startDate, endDate) => {
 // Apply for leave
 export const applyLeave = async (req, res) => {
   try {
-    const { leaveType, startDate, endDate, reason } = req.body;
+    const { leaveType, startDate, endDate, reason, halfDay } = req.body;
     const userId = req.user._id || req.user.id;
 
     // Get user details
@@ -69,9 +69,10 @@ export const applyLeave = async (req, res) => {
     }
 
     // Calculate working days (excluding weekends) and check monthly allocation
-    const requestedDays = calculateWorkingDays(start, end);
-    
-    if (requestedDays <= 0) {
+    // For half-day leaves, use 0.5 regardless of the date range
+    const requestedDays = halfDay ? 0.5 : calculateWorkingDays(start, end);
+
+    if (!halfDay && requestedDays <= 0) {
       return res.status(400).json({ message: 'No working days found in the selected date range' });
     }
     
@@ -100,7 +101,8 @@ export const applyLeave = async (req, res) => {
       leaveType,
       startDate: start,
       endDate: end,
-      reason
+      reason,
+      halfDay: !!halfDay
     });
 
     await newLeave.save();

@@ -281,12 +281,18 @@ router.get('/employee-dashboard', protect, async (req, res) => {
       }).lean(),
     ]);
 
-    // Build leave date set
+    // Build leave date sets — track half-day leaves separately
     const leaveDates = new Set();
+    const halfDayDates = new Set();
+    const leaveDateTypes = {};          // date -> leaveType string
     for (const lv of leaves) {
       for (let d = new Date(lv.startDate); d <= new Date(lv.endDate); d.setDate(d.getDate() + 1)) {
         const ds = d.toISOString().split('T')[0];
-        if (ds >= startStr && ds <= endStr) leaveDates.add(ds);
+        if (ds >= startStr && ds <= endStr) {
+          leaveDates.add(ds);
+          if (lv.halfDay) halfDayDates.add(ds);
+          leaveDateTypes[ds] = lv.leaveType;
+        }
       }
     }
 
@@ -324,13 +330,13 @@ router.get('/employee-dashboard', protect, async (req, res) => {
           const late = ci.getHours() > 9 || (ci.getHours() === 9 && ci.getMinutes() > 30);
           status = late ? 'late' : 'present';
         } else if (onLeave) {
-          leaveDayCount++;
-          status = 'leave';
+          leaveDayCount += halfDayDates.has(ds) ? 0.5 : 1;
+          status = halfDayDates.has(ds) ? 'half-leave' : 'leave';
         } else {
           status = 'absent';
         }
       }
-      calendarDays.push({ date: ds, day: d, dow, status, checkIn, checkOut, workingHours, isToday });
+      calendarDays.push({ date: ds, day: d, dow, status, checkIn, checkOut, workingHours, isToday, halfDay: halfDayDates.has(ds), leaveType: leaveDateTypes[ds] || null });
     }
 
     const totalTasks = tasks.length;

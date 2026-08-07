@@ -61,6 +61,10 @@ const leaveSchema = new mongoose.Schema({
   reviewedAt: {
     type: Date
   },
+  halfDay: {
+    type: Boolean,
+    default: false
+  },
   totalDays: {
     type: Number,
     min: 0.5
@@ -91,12 +95,19 @@ leaveSchema.pre('save', function(next) {
     // Ensure dates are Date objects
     const startDate = new Date(this.startDate);
     const endDate = new Date(this.endDate);
-    
+
     // Check if dates are valid
     if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+      // Half-day leave: always exactly 0.5 days, no weekend calculation needed
+      if (this.halfDay) {
+        this.totalDays = 0.5;
+        this.updatedAt = new Date();
+        return next();
+      }
+
       // Calculate working days (excluding weekends)
       let workingDays = 0;
-      
+
       // Iterate through each day between start and end (inclusive)
       for (let date = new Date(startDate); date <= endDate; date.setDate(date.getDate() + 1)) {
         const dayOfWeek = date.getDay(); // 0 = Sunday, 6 = Saturday
@@ -104,8 +115,7 @@ leaveSchema.pre('save', function(next) {
           workingDays++;
         }
       }
-      
-      
+
       this.totalDays = Math.max(1, workingDays); // Ensure at least 1 working day
     } else {
       return next(new Error('Invalid start or end date provided'));
@@ -113,7 +123,7 @@ leaveSchema.pre('save', function(next) {
   } else {
     return next(new Error('Start date and end date are required'));
   }
-  
+
   this.updatedAt = new Date();
   next();
 });
