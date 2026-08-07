@@ -1,5 +1,6 @@
 // backend/controllers/authController.js
 import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
 import User from "../model/User.js";
 
 const signToken = (id) => jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || "30d" });
@@ -97,9 +98,11 @@ export const loginUser = async (req, res) => {
 
 // Logout user - clear cookie
 export const logoutUser = (req, res) => {
-  res.cookie('token', 'loggedout', {
-    expires: new Date(Date.now() + 10 * 1000),
-    httpOnly: true
+  // Clear the auth cookie immediately
+  res.clearCookie('token', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax'
   });
   res.status(200).json({ message: "Logged out successfully" });
 };
@@ -138,9 +141,9 @@ export const changePassword = async (req, res) => {
       return res.status(400).json({ message: "New password must be different from current password" });
     }
 
-    // Update password
-    user.password = newPassword;
-    await user.save();
+    // Hash explicitly then update directly — bypasses any pre-save hook ambiguity
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    await User.updateOne({ _id: userId }, { $set: { password: hashedPassword } });
     
     return res.status(200).json({ 
       message: "Password changed successfully" 
