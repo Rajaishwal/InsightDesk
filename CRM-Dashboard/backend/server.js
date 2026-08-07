@@ -26,6 +26,7 @@ import employeeRoutes from "./routes/employeeRoutes.js";
 import messageRoutes from "./routes/messageRoutes.js";
 import projectTaskRoutes from "./routes/projectTaskRoutes.js";
 import projectActivityRoutes from "./routes/projectActivityRoutes.js";
+import ticketRoutes from "./routes/ticketRoutes.js";
 import { setIo } from "./socket.js";
 
 dotenv.config();
@@ -73,6 +74,7 @@ app.use("/api/hr-projects", hrProjectRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/project-tasks", projectTaskRoutes);
 app.use("/api/project-activity", projectActivityRoutes);
+app.use("/api/tickets", ticketRoutes);
 
 // Socket.io
 const httpServer = createServer(app);
