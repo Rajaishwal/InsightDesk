@@ -271,7 +271,10 @@ router.get('/employee-dashboard', protect, async (req, res) => {
 
     const [attendance, projects, tasks, leaves] = await Promise.all([
       Attendance.find({ userId, date: { $gte: startStr, $lte: todayStr } }).sort({ date: 1 }).lean(),
-      Project.find({ 'teamMembers.empId': empId, statusFlag: true }).select('projectId title status manager').lean(),
+      Project.find({
+        $or: [{ 'teamMembers.empId': empId }, { 'teamMembers.empEmail': req.user.email }],
+        statusFlag: true,
+      }).select('projectId title status manager').lean(),
       HRTask.find({ assignedTo: empId }).sort({ createdAt: -1 }).lean(),
       Leave.find({
         userId,

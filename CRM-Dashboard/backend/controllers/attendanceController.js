@@ -2,6 +2,8 @@ import Attendance from "../model/Attendance.js";
 import User from "../model/User.js";
 import Location from "../model/Location.js";
 import Break from "../models/Break.js";
+import ProjectTask from "../model/ProjectTask.js";
+import HRTask from "../model/hrTaskModel.js";
 import { getIo } from "../socket.js";
 
 // Check In - Create new attendance record for the day
@@ -113,23 +115,84 @@ export const checkOut = async (req, res) => {
 
     await attendance.save();
 
-    // Deactivate location tracking for this user
+    const checkOutNow = new Date();
+
+    // ── 1. Close any active break ──────────────────────────────────────────
     try {
-      await Location.updateMany(
-        { userId },
-        { isActive: false }
-      );
+      const activeBreaks = await Break.find({ userId, endTime: null });
+      for (const br of activeBreaks) {
+        const elapsed = Math.max(0, Math.round((checkOutNow - new Date(br.startTime)) / 1000));
+        br.endTime = checkOutNow;
+        br.durationInSeconds = elapsed;
+        await br.save();
+      }
+    } catch (breakErr) {
+      console.error('Error closing active breaks on checkout:', breakErr);
+    }
+
+    // ── 2. Stop any running ProjectTask timer ──────────────────────────────
+    try {
+      const activeProjTasks = await ProjectTask.find({
+        timers: { $elemMatch: { userId, timerStartedAt: { $ne: null } } },
+      });
+      for (const task of activeProjTasks) {
+        const entry = task.timers.find(
+          t => t.userId.toString() === userId.toString() && t.timerStartedAt
+        );
+        if (!entry) continue;
+        const elapsed  = Math.floor((checkOutNow - new Date(entry.timerStartedAt)) / 1000);
+        const newTotal = (entry.totalTimeLogged || 0) + elapsed;
+        await ProjectTask.updateOne(
+          { _id: task._id, 'timers.userId': entry.userId },
+          {
+            $set:  { 'timers.$.timerStartedAt': null, 'timers.$.totalTimeLogged': newTotal },
+            $push: { 'timers.$.sessions': { startTime: new Date(entry.timerStartedAt), endTime: checkOutNow, duration: elapsed } },
+          }
+        );
+      }
+    } catch (projErr) {
+      console.error('Error stopping project task timers on checkout:', projErr);
+    }
+
+    // ── 3. Stop any running HRTask timer ──────────────────────────────────
+    try {
+      const activeHrTasks = await HRTask.find({
+        timers: { $elemMatch: { userId, timerStartedAt: { $ne: null } } },
+      });
+      for (const task of activeHrTasks) {
+        const entry = task.timers.find(
+          t => t.userId.toString() === userId.toString() && t.timerStartedAt
+        );
+        if (!entry) continue;
+        const elapsed  = Math.floor((checkOutNow - new Date(entry.timerStartedAt)) / 1000);
+        const newTotal = (entry.totalTimeLogged || 0) + elapsed;
+        await HRTask.updateOne(
+          { _id: task._id, 'timers.userId': entry.userId },
+          {
+            $set:  { 'timers.$.timerStartedAt': null, 'timers.$.totalTimeLogged': newTotal },
+            $push: { 'timers.$.sessions': { startTime: new Date(entry.timerStartedAt), endTime: checkOutNow, duration: elapsed } },
+          }
+        );
+      }
+    } catch (hrErr) {
+      console.error('Error stopping HR task timers on checkout:', hrErr);
+    }
+
+    // ── 4. Deactivate location tracking ───────────────────────────────────
+    try {
+      await Location.updateMany({ userId }, { isActive: false });
     } catch (locationError) {
       console.error('Error deactivating location tracking:', locationError);
-      // Don't fail the check-out if location deactivation fails
     }
 
     const time = new Date().toLocaleTimeString("en-US", {
       timeZone: "Asia/Kolkata",
     });
 
-    // Notify all connected clients that attendance data changed
-    getIo()?.emit("attendance:updated");
+    // Notify all connected clients
+    const io = getIo();
+    io?.emit("attendance:updated");
+    io?.emit("crm:task:updated"); // Clears running timers in LiveTaskTimer & task boards
 
     res.status(200).json({
       message: "Checked Out Successfully",

@@ -303,7 +303,9 @@ export const getMyTodayTime = async (req, res) => {
 
       if (entry.timerStartedAt) {
         isRunning = true;
-        runningStartedAt = entry.timerStartedAt;
+        // Cap to start of today — prevents stale timers from past days inflating the count
+        const startedAt = new Date(entry.timerStartedAt);
+        runningStartedAt = startedAt >= startOfDay ? entry.timerStartedAt : startOfDay.toISOString();
       }
     }
 
