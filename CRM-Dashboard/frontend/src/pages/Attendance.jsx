@@ -86,6 +86,7 @@ function Attendance({ onClose }) {
       window.dispatchEvent(new CustomEvent("attendanceUpdate", {
         detail: { type: "checkin", userId: user._id }
       }));
+      window.dispatchEvent(new CustomEvent("crm:attendance:updated"));
       localStorage.setItem("attendanceEvent", Date.now().toString());
       fetchTodayStatus();
 
@@ -130,9 +131,10 @@ function Attendance({ onClose }) {
         timer: 2000,
       });
 
-      window.dispatchEvent(new CustomEvent("attendanceUpdate", { 
-        detail: { type: "checkout", userId: user._id } 
+      window.dispatchEvent(new CustomEvent("attendanceUpdate", {
+        detail: { type: "checkout", userId: user._id }
       }));
+      window.dispatchEvent(new CustomEvent("crm:attendance:updated"));
       localStorage.setItem("attendanceEvent", Date.now().toString());
 
       fetchTodayStatus();
@@ -198,20 +200,20 @@ function Attendance({ onClose }) {
           <button
             onClick={handleCheckIn}
             disabled={loading || attendanceStatus.hasCheckedIn}
-            className={`rounded-lg px-5 py-2 font-semibold text-white transition 
-              ${attendanceStatus.hasCheckedIn || loading 
-                ? "cursor-not-allowed bg-green-500 opacity-60" 
-                : "bg-green-500 hover:bg-green-600"}`}
+            className={`rounded-lg px-5 py-2 font-semibold transition border
+              ${attendanceStatus.hasCheckedIn || loading
+                ? "cursor-not-allowed border-green-400 text-green-400 opacity-50"
+                : "border-green-500 text-green-600 hover:bg-green-50"}`}
           >
             {loading ? "Processing..." : "Check In"}
           </button>
           <button
             onClick={handleCheckOut}
             disabled={loading || !attendanceStatus.hasCheckedIn || attendanceStatus.hasCheckedOut}
-            className={`rounded-lg px-5 py-2 font-semibold text-white transition 
+            className={`rounded-lg px-5 py-2 font-semibold transition border
               ${!attendanceStatus.hasCheckedIn || attendanceStatus.hasCheckedOut || loading
-                ? "cursor-not-allowed bg-red-500 opacity-60" 
-                : "bg-red-500 hover:bg-red-600"}`}
+                ? "cursor-not-allowed border-red-400 text-red-400 opacity-50"
+                : "border-red-500 text-red-600 hover:bg-red-50"}`}
           >
             {loading ? "Processing..." : "Check Out"}
           </button>

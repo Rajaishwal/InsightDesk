@@ -1,7 +1,8 @@
-import React, { useState } from "react";
-import PrjTeamModle from "./PrjTeamModle";
+// ProjectModal.jsx — Modal popup showing full project details (title, description, manager, status, contact & team members)
+import { useState } from "react";
+import ProjectTeamModal from "./ProjectTeamModal";
 
-const PrjModle = ({ project, onClose, isHrView = false }) => {
+const ProjectModal = ({ project, onClose, isHrView = false }) => {
   const [showTeamModal, setShowTeamModal] = useState(false);
   const [teamMembers, setTeamMembers] = useState([]);
 
@@ -39,7 +40,7 @@ const PrjModle = ({ project, onClose, isHrView = false }) => {
 
         <div className="space-y-3">
           <p className="text-gray-700">
-            <span className="font-semibold">Project ID:</span> {project.projectId}
+            <span className="font-semibold pl-3">Project ID:</span> {project.projectId}
           </p>
           <p className="text-gray-700">
             <span className="font-semibold">Title:</span> {project.title}
@@ -90,7 +91,7 @@ const PrjModle = ({ project, onClose, isHrView = false }) => {
         </div>
 
         {showTeamModal && (
-          <PrjTeamModle
+          <ProjectTeamModal
             teamMembers={teamMembers}
             onClose={() => setShowTeamModal(false)}
           />
@@ -100,4 +101,4 @@ const PrjModle = ({ project, onClose, isHrView = false }) => {
   );
 };
 
-export default PrjModle;
+export default ProjectModal;

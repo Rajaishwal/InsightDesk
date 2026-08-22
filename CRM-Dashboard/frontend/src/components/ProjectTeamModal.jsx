@@ -1,4 +1,5 @@
-const PrjTeamModle = ({ teamMembers = [], projectTitle = "", onClose }) => {
+// ProjectTeamModal.jsx — Modal listing all team members (emp ID + email) assigned to a project
+const ProjectTeamModal = ({ teamMembers = [], projectTitle = "", onClose }) => {
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/50 backdrop-blur-sm">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-md relative">
@@ -59,4 +60,4 @@ const PrjTeamModle = ({ teamMembers = [], projectTitle = "", onClose }) => {
   );
 };
 
-export default PrjTeamModle;
+export default ProjectTeamModal;

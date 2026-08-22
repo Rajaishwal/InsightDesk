@@ -1,4 +1,6 @@
+// AdminDashboard.jsx — Admin/Manager dashboard: stat cards, attendance table, break tracking, ongoing projects, pie chart
 import React, { useState, useEffect } from "react";
+import { useAutoRefresh } from "../hooks/useAutoRefresh";
 import EditProfileModal from "../components/EditProfileModal";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -6,14 +8,15 @@ import {
 } from "recharts";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/axios";
+import { getCache, setCache } from "../utils/pageCache";
 import { Users, UserPlus, Briefcase, CheckCircle2, AlertCircle, XCircle, X, Clock, Coffee, Pencil, MapPin, RefreshCw } from "lucide-react";
 
 const PIE_COLORS = ["#7c3aed", "#06b6d4", "#f59e0b"];
 
 const AdminDashboard = () => {
   const { user } = useAuth();
-  const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [stats, setStats]     = useState(getCache("admin-stats") || null);
+  const [loading, setLoading] = useState(!getCache("admin-stats"));
   const [activeFilter, setActiveFilter] = useState(null); // 'present'|'late'|'onLeave'|'absent'
   const [showEditModal, setShowEditModal] = useState(false);
   const [locationStatus, setLocationStatus] = useState("checked-out");
@@ -23,7 +26,7 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     api.get("/users/admin-stats")
-      .then(r => setStats(r.data))
+      .then(r => { setStats(r.data); setCache("admin-stats", r.data); })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -45,6 +48,13 @@ const AdminDashboard = () => {
     } catch {}
     finally { setRefreshing(false); }
   };
+
+  // Silent background refresh — no spinner, data swaps in-place
+  const silentRefresh = () =>
+    api.get("/users/admin-stats")
+      .then(r => { setStats(r.data); setCache("admin-stats", r.data); })
+      .catch(() => {});
+  useAutoRefresh(silentRefresh, ["crm:attendance:updated", "crm:task:updated"]);
 
   const toggleBreakExpand = async (userId) => {
     if (expandedBreakEmp === userId) { setExpandedBreakEmp(null); return; }
@@ -90,8 +100,6 @@ const AdminDashboard = () => {
                   </div>
                 )}
               </div>
-              {/* Green status dot */}
-              <span className="absolute bottom-1.5 right-1.5 w-3 h-3 bg-green-400 border-2 border-white rounded-full" />
               {/* Edit button — 50% inside / 50% outside top-right corner */}
               <button
                 onClick={() => setShowEditModal(true)}

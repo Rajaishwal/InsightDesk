@@ -1,10 +1,13 @@
+// AttendanceTab.jsx — HR attendance records tab: fetches logs, task time map, passes to AttendanceTable
 import { useState, useEffect } from "react";
 import api from "../../services/axios";
 import AttendanceFilters from "./AttendanceFilters";
 import AttendanceTable from "./AttendanceTable";
+import { useAutoRefresh } from "../../hooks/useAutoRefresh";
 
 const AttendanceTab = () => {
   const [attendanceData, setAttendanceData] = useState([]);
+  const [taskTimeMap, setTaskTimeMap] = useState({});   // { userId: seconds }
   const [filters, setFilters] = useState({
     page: 1,
     limit: 20,
@@ -19,10 +22,6 @@ const AttendanceTab = () => {
     totalRecords: 0
   });
 
-  useEffect(() => {
-    fetchAttendanceData();
-  }, [filters]);
-
   const fetchAttendanceData = async () => {
     try {
       setLoading(true);
@@ -36,6 +35,24 @@ const AttendanceTab = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchAttendanceData();
+  }, [filters]);
+
+  // Silent background refresh when any attendance event fires
+  useAutoRefresh(fetchAttendanceData, ["crm:attendance:updated"]);
+
+  // Refresh task time every 30s so live timers stay current
+  useEffect(() => {
+    const fetchTaskTime = () =>
+      api.get("/project-tasks/all-users-today-time")
+        .then((r) => setTaskTimeMap(r.data.totals || {}))
+        .catch(() => {});
+    fetchTaskTime();
+    const id = setInterval(fetchTaskTime, 30000);
+    return () => clearInterval(id);
+  }, []);
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
@@ -57,6 +74,7 @@ const AttendanceTab = () => {
           pagination={pagination}
           setFilters={setFilters}
           filters={filters}
+          taskTimeMap={taskTimeMap}
         />
       </div>
     </div>

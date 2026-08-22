@@ -1,4 +1,6 @@
+// ProjectTaskCard.jsx — Employee dashboard card showing active project tasks with live timer and progress ring
 ﻿import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import { CircleStop, ClipboardList, Pause, Play, TimerIcon, Trash2Icon } from "lucide-react";
 import Timer from "../timer/Timer";
 import { useEffect, useState } from "react";
@@ -9,6 +11,7 @@ import axios from "../services/axios";
   let isGlobalRunning = activeTimerId !== null;
 
   const TaskTimer = ({ task }) => {
+    const toast = useToast();
     const [isRunning, setIsRunning] = useState(activeTimerId === task._id);
     const [isStopped, setIsStopped] = useState(!!task.taskCompletionTime);  
     const [secondsElapsed, setSecondsElapsed] = useState(
@@ -40,7 +43,7 @@ import axios from "../services/axios";
 
     const handleStart = () => {
       if (isGlobalRunning && activeTimerId !== task._id) {
-        alert("⏱️ Another task timer is already running. Please stop it first.");
+        toast.warning("Another task timer is already running. Please stop it first.");
         return;
       }
 
@@ -121,8 +124,9 @@ import axios from "../services/axios";
 
 
 /* --------------------- Main Dashboard Card --------------------- */
-const DashCard = ({ onSaveTask, showTimerModal, onOpenTimer, onCloseTimer }) => {
+const ProjectTaskCard = ({ onSaveTask, showTimerModal, onOpenTimer, onCloseTimer }) => {
   const { user } = useAuth();
+  const toast = useToast();
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [hrTasks, setHrTasks] = useState([]);
@@ -197,7 +201,7 @@ const DashCard = ({ onSaveTask, showTimerModal, onOpenTimer, onCloseTimer }) => 
       }
     } catch (err) {
       console.error("Error deleting task:", err);
-      alert("Failed to delete task. Try again!");
+      toast.error("Failed to delete task. Try again!");
     }
   };
 
@@ -357,4 +361,4 @@ const DashCard = ({ onSaveTask, showTimerModal, onOpenTimer, onCloseTimer }) => 
   );
 };
 
-export default DashCard;
+export default ProjectTaskCard;

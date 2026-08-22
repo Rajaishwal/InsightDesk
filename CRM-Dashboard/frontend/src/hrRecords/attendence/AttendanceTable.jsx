@@ -1,6 +1,26 @@
+// AttendanceTable.jsx — Table displaying employee check-in/out, working hours, break, and task time columns
 import { useState, useEffect } from "react";
 
-const AttendanceTable = ({ data, loading }) => {
+/* Format seconds → "1h 23m" or "45m" or "—" */
+const fmtTaskTime = (secs) => {
+  if (!secs || secs <= 0) return null;
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  if (h > 0 && m > 0) return `${h}h ${m}m`;
+  if (h > 0) return `${h}h`;
+  return `${m}m`;
+};
+
+/* Format date → DD-MM-YYYY */
+const fmtDate = (dateStr) => {
+  const d = new Date(dateStr);
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${dd}-${mm}-${yyyy}`;
+};
+
+const AttendanceTable = ({ data, loading, taskTimeMap = {} }) => {
   const [now, setNow] = useState(new Date());
 
   // Tick every second while any employee is still checked in
@@ -62,6 +82,9 @@ const AttendanceTable = ({ data, loading }) => {
               Working Hours
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Task Time
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Break
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -105,8 +128,8 @@ const AttendanceTable = ({ data, loading }) => {
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   {record.userName}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {new Date(record.checkInTime).toLocaleDateString()}
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
+                  {fmtDate(record.checkInTime)}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {new Date(record.checkInTime).toLocaleTimeString()}
@@ -117,7 +140,7 @@ const AttendanceTable = ({ data, loading }) => {
                       {new Date(record.checkOutTime).toLocaleTimeString()}
                     </span>
                   ) : (
-                    <span className="text-yellow-600 font-medium">N/A</span>
+                    <span className="text-gray-300 font-mono">00:00:00</span>
                   )}
                 </td>
 
@@ -125,6 +148,18 @@ const AttendanceTable = ({ data, loading }) => {
                   {hoursDisplay}
                 </td>
 
+                {/* Task Time — must come before Break to match the header order */}
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-mono">
+                  {(() => {
+                    const uid = record.userId?._id?.toString() || record.userId?.toString();
+                    const label = fmtTaskTime(taskTimeMap[uid]);
+                    return label
+                      ? <span className="font-semibold text-indigo-600">{label}</span>
+                      : <span className="text-gray-300">—</span>;
+                  })()}
+                </td>
+
+                {/* Break */}
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                   <span className={breakColor}>
                     {breakLabel || <span className="text-gray-300">—</span>}

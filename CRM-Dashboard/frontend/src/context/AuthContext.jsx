@@ -83,7 +83,13 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      // Tell the backend to clear the HTTP-only cookie
+      await api.post("http://localhost:5000/api/auth/logout");
+    } catch (_) {
+      // ignore network errors — still clear client state
+    }
     localStorage.removeItem("token");
     setUser(null);
   };

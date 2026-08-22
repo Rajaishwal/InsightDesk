@@ -1,10 +1,12 @@
+// HrProjectAssignment.jsx — HR/Admin page: view all projects, assign team members, track project tasks
 import { useState, useEffect, useRef } from "react";
 import { Eye, Search, X, ListChecks } from "lucide-react";
-import PrjModle from "../components/PrjModle";
-import ProjectTracklist from "../components/ProjectTracklist";
+import ProjectModal from "../components/ProjectModal";
+import ProjectTaskDrawer from "../components/ProjectTaskDrawer";
 import ProjectActivityFeed from "../components/ProjectActivityFeed";
 import AddProject from "./AddProject";
 import axios from "../services/axios";
+import { useToast } from "../context/ToastContext";
 
 // Mini segmented progress bar for task stats
 function TaskProgressBar({ stats }) {
@@ -19,8 +21,8 @@ function TaskProgressBar({ stats }) {
       {/* Counts row */}
       <div className="flex items-center gap-2 mb-1.5 text-[11px] font-medium">
         <span className="text-emerald-600">{completed} done</span>
-        {ongoing > 0  && <span className="text-indigo-500">{ongoing} active</span>}
-        {pending > 0  && <span className="text-amber-500">{pending} pending</span>}
+        {ongoing > 0 && <span className="text-indigo-500">{ongoing} active</span>}
+        {pending > 0 && <span className="text-amber-500">{pending} pending</span>}
         <span className="text-gray-400 ml-auto">{total} total</span>
       </div>
       {/* Segmented bar */}
@@ -39,7 +41,8 @@ function TaskProgressBar({ stats }) {
   );
 }
 
-const HrProject = () => {
+const HrProjectAssignment = () => {
+  const toast = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [selectedEmp, setSelectedEmp] = useState(null);
@@ -146,7 +149,7 @@ const HrProject = () => {
       <div className="bg-white rounded-xl shadow-lg p-6">
         {/* Header + Search + Button */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
-          <h1 className="text-2xl font-bold text-gray-900">HR Employee Projects</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Employee Projects</h1>
 
           <div className="flex flex-col md:flex-row md:items-center gap-3 w-full md:w-auto">
             <div className="relative w-full md:w-72" ref={wrapperRef}>
@@ -235,21 +238,22 @@ const HrProject = () => {
                         onChange={async (e) => {
                           const newStatus = e.target.value;
                           try {
-                            await axios.put(`http://localhost:5000/projects/${emp.projectId}`, { status: newStatus });
+                            await axios.put(`http://localhost:5000/api/projects/${emp.projectId}`, { status: newStatus });
                             fetchData();
                           } catch {
-                            alert("Failed to update status");
+                            toast.error("Failed to update status");
                           }
                         }}
                         className={`px-3 py-1 text-xs font-semibold rounded-full ${
                           emp.status === "Completed"
-                            ? "bg-green-100 text-green-800"
+                            ? "border border-emerald-400 text-emerald-600"
                             : emp.status === "Ongoing"
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-gray-100 text-gray-800"
+                              ? "border border-blue-400 text-blue-600"
+                              : "border border-amber-400 text-amber-600"
                         }`}
                         style={{ minWidth: 100 }}
                       >
+                        <option value="Pending">Pending</option>
                         <option value="Ongoing">Ongoing</option>
                         <option value="Completed">Completed</option>
                       </select>
@@ -294,7 +298,7 @@ const HrProject = () => {
 
         {/* Tracklist drawer */}
         {tracklistProject && (
-          <ProjectTracklist
+          <ProjectTaskDrawer
             project={tracklistProject}
             onClose={() => setTracklistProject(null)}
             isManager={true}
@@ -303,7 +307,7 @@ const HrProject = () => {
 
         {/* Modal */}
         {showModal && (
-          <PrjModle
+          <ProjectModal
             project={selectedEmp}
             onClose={() => setShowModal(false)}
             isHrView={true}
@@ -314,4 +318,4 @@ const HrProject = () => {
   );
 };
 
-export default HrProject;
+export default HrProjectAssignment;

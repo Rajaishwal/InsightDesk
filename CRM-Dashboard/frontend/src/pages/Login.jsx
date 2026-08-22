@@ -1,10 +1,13 @@
+// Login.jsx — Employee and admin login page with JWT authentication
 ﻿import React, { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, X } from "lucide-react";
 import axios from "../services/axios";
+import { useToast } from "../context/ToastContext";
 
 export default function Login() {
+  const toast = useToast();
   const { user, login } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({ email: "", password: "" });
@@ -188,7 +191,7 @@ export default function Login() {
 
                 if (loginResponse.data.token) {
                   await axios.put(
-                    "http://localhost:5000/auth/change-password",
+                    "http://localhost:5000/api/auth/change-password",
                     {
                       currentPassword: passwordData.currentPassword,
                       newPassword: passwordData.newPassword,
@@ -199,7 +202,7 @@ export default function Login() {
                       },
                     }
                   );
-                  alert("Password changed successfully! Please login with new password.");
+                  toast.success("Password changed successfully! Please login with new password.");
                   setPasswordData({
                     email: "",
                     currentPassword: "",

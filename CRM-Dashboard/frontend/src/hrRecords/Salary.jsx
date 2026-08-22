@@ -1,12 +1,16 @@
+// Salary.jsx — HR salary management: view, update, and track employee salary records
 import { useEffect, useState, useRef } from "react";
+import { useToast } from "../context/ToastContext";
 import { useAuth } from "../context/AuthContext";
 import axios from "../services/axios";
+import { getCache, setCache } from "../utils/pageCache";
 import { PlusCircle, Trash2, CheckCircle, X, Search, FileEdit, IndianRupee } from "lucide-react";
 
 const Salary = () => {
   const { user } = useAuth();
-  const [salaries, setSalaries] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const toast = useToast();
+  const [salaries, setSalaries] = useState(getCache("salaries") || []);
+  const [loading, setLoading]   = useState(!getCache("salaries"));
   const [searchTerm, setSearchTerm] = useState("");
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -87,10 +91,11 @@ const Salary = () => {
   }, [formData.userId, showForm]);
 
   const fetchSalaries = async () => {
-    setLoading(true);
+    if (!getCache("salaries")) setLoading(true);
     try {
       const res = await axios.get("http://localhost:5000/api/salary");
       setSalaries(res.data);
+      setCache("salaries", res.data);
     } catch (err) {
       console.error(err.response?.data || err.message);
     }
@@ -141,7 +146,7 @@ const Salary = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.userId || formData.userId.trim() === "") {
-      alert("Employee ID is missing.");
+      toast.error("Employee ID is missing.");
       return;
     }
     try {
@@ -159,7 +164,7 @@ const Salary = () => {
       setShowForm(false);
       fetchSalaries();
     } catch (err) {
-      alert(err.response?.data?.error || "Error saving salary");
+      toast.error(err?.response?.data?.error || "Error saving salary");
     }
   };
 
@@ -169,7 +174,7 @@ const Salary = () => {
       await axios.delete(`http://localhost:5000/api/salary/${id}`);
       fetchSalaries();
     } catch (err) {
-      alert(err.response?.data?.error || "Error deleting salary");
+      toast.error(err?.response?.data?.error || "Error deleting salary");
     }
   };
 
@@ -178,7 +183,7 @@ const Salary = () => {
       await axios.patch(`http://localhost:5000/api/salary/${id}/status`, { status });
       fetchSalaries();
     } catch (err) {
-      alert(err.response?.data?.error || "Error updating status");
+      toast.error(err?.response?.data?.error || "Error updating status");
     }
   };
 

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import AttendanceTab from "../hrRecords/attendence/AttendanceTab";
 import { useAuth } from "../context/AuthContext";
 import { UserCheck, ClipboardList, CalendarCheck, MapPin, Users, UserPlus2, UserSearchIcon } from "lucide-react";
@@ -7,7 +7,7 @@ import TasksTab from "../hrRecords/tasks/TasksTab";
 import LeaveTab from "../hrRecords/LeaveTab";
 import LocationTab from "../hrRecords/locations/LocationTab";
 import EmployeeSearchTab from "../hrRecords/EmployeeSearchTab";
-import Signup from "./Signup";
+import RegisterEmployee from "./RegisterEmployee";
 
 const HrRecord = () => {
   const { user } = useAuth();
@@ -59,7 +59,7 @@ const HrRecord = () => {
         {activeTab === "leaves" && <LeaveTab />}
         {activeTab === "locations" && <LocationTab />}
         {activeTab === "employees" && <EmployeeSearchTab />}
-        {activeTab === "register" && <Signup />}
+        {activeTab === "register" && <RegisterEmployee setActiveTab={setActiveTab} />}
       </div>
     </div>
   );

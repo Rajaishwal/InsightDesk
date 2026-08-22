@@ -1,8 +1,11 @@
+// LocationStatus.jsx — Live GPS location badge shown on employee dashboard
 import { useState } from "react";
+import { useToast } from "../context/ToastContext";
 import { useAuth } from "../context/AuthContext";
 import { MapPin, RefreshCw, AlertCircle } from "lucide-react";
 
 const LocationStatus = () => {
+  const toast = useToast();
   const { locationTracker, user } = useAuth();
   const [isRetrying, setIsRetrying] = useState(false);
 
@@ -26,7 +29,7 @@ const LocationStatus = () => {
       else if (error.code === 2) msg = "Location unavailable. Check your device settings.";
       else if (error.code === 3) msg = "Location request timed out.";
       else msg = error.message || "Unknown error accessing location";
-      alert(msg);
+      toast.error(msg);
     } finally {
       setIsRetrying(false);
     }

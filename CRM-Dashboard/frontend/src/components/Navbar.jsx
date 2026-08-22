@@ -1,6 +1,9 @@
+// Navbar.jsx — Top navigation bar: attendance check-in/out, break timer, messages, logout
 import { useState, useEffect, useRef } from "react";
+import logo from "../assets/logo.png";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useSocket } from "../context/SocketContext.jsx";
+import { useToast } from "../context/ToastContext.jsx";
 import { UserCheck, LogOut, Coffee, MessageSquare } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Attendance from "../pages/Attendance.jsx";
@@ -11,6 +14,7 @@ import api from "../services/axios.js";
 const Navbar = () => {
   const { user, logout } = useAuth();
   const { unreadCount } = useSocket();
+  const toast = useToast();
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
   const [showChat, setShowChat] = useState(false);
 
@@ -123,6 +127,7 @@ const Navbar = () => {
   }, [isOnBreak]);
 
   const formatBreakTime = (seconds) => {
+    if (!seconds || seconds <= 0) return "—";
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
     return `${m}:${s.toString().padStart(2, "0")}`;
@@ -134,8 +139,9 @@ const Navbar = () => {
         userId: user._id,
       });
       setIsOnBreak(true);
+      window.dispatchEvent(new CustomEvent("crm:attendance:updated"));
     } catch {
-      alert("Failed to start break. Please try again.");
+      toast.error("Failed to start break. Please try again.");
     }
   };
 
@@ -145,61 +151,56 @@ const Navbar = () => {
         userId: user._id,
       });
       setIsOnBreak(false);
+      window.dispatchEvent(new CustomEvent("crm:attendance:updated"));
     } catch {
-      alert("Failed to end break. Please try again.");
+      toast.error("Failed to end break. Please try again.");
     }
   };
 
   const breakOverLimit = breakElapsed > 60 * 60;
 
   return (
-    <nav className="w-full bg-white shadow-md border-b border-gray-200 p-2 shadow-lg">
+    <nav className="w-full p-2">
       <div className="max-w-8xl mx-auto px-6 py-3 flex items-center justify-between">
         {/* Brand */}
-        <div className="flex items-center gap-2.5">
-          {/* InsightDesk logo — square box, D with I through its center */}
-          <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-            {/* Square box, border-radius 3 */}
-            <rect width="36" height="36" rx="3" fill="#1d4ed8" />
-            {/* D — white, stem + semicircle with hollow bowl (evenodd) */}
-            <path
-              fillRule="evenodd"
-              fill="white"
-              d="M4,4 L4,32 L10,32 A14,14 0 0,0 10,4 Z M10,9 A9,9 0 0,1 10,27 Z"
-            />
-            {/* I — yellow, bold serif, centered inside D bowl */}
-            <rect x="11" y="9" width="7" height="2.5" rx="0.5" fill="#facc15" />
-            <rect x="13" y="11.5" width="3" height="13" rx="0.5" fill="#facc15" />
-            <rect x="11" y="24.5" width="7" height="2.5" rx="0.5" fill="#facc15" />
-          </svg>
-          <div className="text-[1.45rem] font-extrabold tracking-tight leading-none">
-            <span className="text-blue-600">Insight</span><span className="text-yellow-400">Desk</span>
+        <div className="flex items-center">
+          {/*
+            InsightDesk mark — "ID" monogram
+            Blue [  = bracket (the I)
+            Gold D  = two quarter-arcs through midpoint (avoids degenerate chord=diameter arc)
+          */}
+          <img src={logo} alt="InsightDesk logo" className="h-12" />
+
+          {/* Wordmark + tagline */}
+          <div className="flex flex-col leading-none">
+            <div className="text-[1.4rem] font-extrabold tracking-tight">
+              <span className="text-blue-600">Insight</span><span className="text-amber-400">Desk</span>
+            </div>
+            <span className="text-[0.56rem] font-semibold tracking-[0.18em] text-gray-400 uppercase mt-2">
+              Track Your Performance
+            </span>
           </div>
         </div>
 
         {/* Right side */}
         {user ? (
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
 
             {/* Attendance */}
             <div className="relative group">
               <button
                 onClick={() => setShowAttendanceModal(true)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl transition ${isCheckedIn
-                  ? "bg-blue-50 text-blue-600 group-hover:bg-red-100 group-hover:text-red-700"
-                  : "bg-blue-50 text-blue-600 group-hover:bg-green-100 group-hover:text-green-700"
+                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all ${isCheckedIn
+                  ? "bg-indigo-50 text-indigo-500 border-indigo-200 group-hover:bg-red-50 group-hover:text-red-500 group-hover:border-red-200"
+                  : "bg-indigo-50 text-indigo-500 border-indigo-200 group-hover:bg-green-50 group-hover:text-green-600 group-hover:border-green-200"
                   }`}
               >
-                <UserCheck className="w-5 h-5" />
+                <UserCheck className="w-4 h-4" />
                 <span className="hidden sm:inline">
-                  {/* Default label — hidden on hover */}
                   <span className="block group-hover:hidden tabular-nums">
-                    {isCheckedIn
-                      ? formatAttendanceTime(attendanceElapsed)
-                      : "Attendance"}
+                    {isCheckedIn ? formatAttendanceTime(attendanceElapsed) : "Attendance"}
                   </span>
-                  {/* Hover label — shown on hover */}
-                  <span className="hidden group-hover:block font-semibold">
+                  <span className="hidden group-hover:block">
                     {isCheckedIn ? "Check Out" : "Check In"}
                   </span>
                 </span>
@@ -209,10 +210,10 @@ const Navbar = () => {
             {/* Messages */}
             <button
               onClick={() => setShowChat(true)}
-              className="relative flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-50 text-violet-600 hover:bg-violet-100 transition"
+              className="relative flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border border-purple-200 bg-purple-50 text-purple-500 hover:bg-purple-100 transition-all"
             >
-              <MessageSquare className="w-5 h-5" />
-              <span className="hidden sm:inline">Messages</span>
+              <MessageSquare className="w-4 h-4" />
+              <span className="hidden sm:inline">Chat</span>
               {unreadCount > 0 && (
                 <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
                   {unreadCount > 99 ? "99+" : unreadCount}
@@ -226,44 +227,42 @@ const Navbar = () => {
                 <button
                   disabled
                   title={isCheckedOut ? "Break disabled after check-out" : "Check in first to use Break"}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-100 text-gray-400 cursor-not-allowed opacity-60 transition"
+                  className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed transition-all"
                 >
-                  <Coffee className="w-5 h-5" />
+                  <Coffee className="w-4 h-4" />
                   <span className="hidden sm:inline">Break</span>
                 </button>
               ) : isOnBreak ? (
                 <button
                   onClick={handleBreakEnd}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl transition animate-pulse ${breakOverLimit
-                    ? "bg-red-100 text-red-700 hover:bg-red-200"
-                    : "bg-orange-100 text-orange-700 hover:bg-orange-200"
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all animate-pulse ${breakOverLimit
+                    ? "bg-red-50 text-red-500 border-red-200 hover:bg-red-100"
+                    : "bg-orange-50 text-orange-500 border-orange-200 hover:bg-orange-100"
                     }`}
                 >
-                  <Coffee className="w-5 h-5" />
-                  <span className="hidden sm:inline font-medium">
-                    End Break {formatBreakTime(breakElapsed)}
-                  </span>
+                  <Coffee className="w-4 h-4" />
+                  <span className="hidden sm:inline">End {formatBreakTime(breakElapsed)}</span>
                 </button>
               ) : (
                 <button
                   onClick={handleBreakStart}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-50 text-amber-600 hover:bg-amber-100 transition"
+                  className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border border-amber-300 bg-amber-100 text-amber-700 hover:bg-amber-100 transition-all"
                 >
-                  <Coffee className="w-5 h-5" />
+                  <Coffee className="w-4 h-4" />
                   <span className="hidden sm:inline">Break</span>
                 </button>
               )}
-              {/* Break Tooltip — only when actively checked in */}
+              {/* Break tooltip */}
               {isCheckedIn && (
                 <div className="absolute right-0 top-full mt-2 z-50 hidden group-hover:block">
                   <div className="relative">
-                    <div className="absolute -top-1 right-4 w-2 h-2 rotate-45 bg-white border-l border-t border-red-500" />
-                    <div className="bg-white text-red-600 text-xs font-semibold border border-red-500 rounded-xl px-4 py-2.5 shadow-lg whitespace-nowrap">
+                    <div className="absolute -top-1 right-4 w-2 h-2 rotate-45 bg-white border-l border-t border-gray-200" />
+                    <div className="bg-white text-gray-600 text-xs font-semibold border border-gray-200 rounded-xl px-4 py-2.5 shadow-lg whitespace-nowrap">
                       {breakOverLimit
-                        ? `Work extended  ${formatBreakTime(breakElapsed - 60 * 60)} min`
+                        ? `Overtime: ${formatBreakTime(breakElapsed - 60 * 60)}`
                         : isOnBreak
-                          ? `${formatBreakTime(60 * 60 - breakElapsed)} min remaining`
-                          : "Max break allowed: 60 min"}
+                          ? `${formatBreakTime(60 * 60 - breakElapsed)} remaining`
+                          : "Max break: 60 min"}
                     </div>
                   </div>
                 </div>
@@ -276,19 +275,19 @@ const Navbar = () => {
                 onClick={isCheckedIn ? undefined : logout}
                 disabled={isCheckedIn}
                 title={isCheckedIn ? "Please check out before logging out" : "Logout"}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl transition ${isCheckedIn
-                  ? "bg-gray-100 text-gray-400 cursor-not-allowed opacity-60"
-                  : "bg-red-50 text-red-600 hover:bg-red-100"
+                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all ${isCheckedIn
+                  ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                  : "bg-red-50 text-red-500 border-red-200 hover:bg-red-100"
                   }`}
               >
-                <LogOut className="w-5 h-5" />
+                <LogOut className="w-4 h-4" />
                 <span className="hidden sm:inline">Logout</span>
               </button>
               {isCheckedIn && (
                 <div className="absolute right-0 top-full mt-2 z-50 hidden group-hover:block">
                   <div className="relative">
-                    <div className="absolute -top-1 right-4 w-2 h-2 rotate-45 bg-white border-l border-t border-orange-400" />
-                    <div className="bg-white text-orange-600 text-xs font-semibold border border-orange-400 rounded-xl px-4 py-2.5 shadow-lg whitespace-nowrap">
+                    <div className="absolute -top-1 right-4 w-2 h-2 rotate-45 bg-white border-l border-t border-gray-200" />
+                    <div className="bg-white text-gray-600 text-xs font-semibold border border-gray-200 rounded-xl px-4 py-2.5 shadow-lg whitespace-nowrap">
                       Check out first before logging out
                     </div>
                   </div>

@@ -3,9 +3,9 @@ import api from "../services/axios";
 import { CheckCircle, XCircle, Check, X, RefreshCw } from "lucide-react";
 
 const STATUS_CHIP = {
-  Pending: "bg-amber-100 text-amber-700",
-  Approved: "bg-emerald-100 text-emerald-700",
-  Rejected: "bg-red-100 text-red-700",
+  Pending:  "border border-amber-400 text-amber-600",
+  Approved: "border border-emerald-400 text-emerald-600",
+  Rejected: "border border-red-400 text-red-500",
 };
 
 const fmt = (d) => new Date(d).toLocaleDateString();
@@ -104,30 +104,28 @@ export default function LeaveTab() {
       {/* Confirm dialog */}
       {confirm && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden">
+          <div className={`bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border
+            ${confirm.action === "Approved" ? "border-emerald-400" : "border-red-400"}`}>
 
-            {/* Gradient header */}
-            <div className={`px-6 pt-6 pb-5 text-white text-center
-              ${confirm.action === "Approved"
-                ? "bg-gradient-to-br from-emerald-400 to-emerald-600"
-                : "bg-gradient-to-br from-red-400 to-red-600"}`}>
-              <div className="w-12 h-12 rounded-lg bg-white/20 flex items-center justify-center mx-auto mb-3">
+            {/* Header — white bg, colored text */}
+            <div className="px-6 pt-6 pb-5 text-center">
+              <div className={`w-12 h-12 rounded-full border-2 flex items-center justify-center mx-auto mb-3
+                ${confirm.action === "Approved" ? "border-emerald-400" : "border-red-400"}`}>
                 {confirm.action === "Approved"
-                  ? <CheckCircle className="w-6 h-6 text-white" />
-                  : <XCircle className="w-6 h-6 text-white" />}
+                  ? <CheckCircle className="w-6 h-6 text-emerald-500" />
+                  : <XCircle className="w-6 h-6 text-red-500" />}
               </div>
-              <h3 className="text-lg font-bold tracking-tight">
+              <h3 className={`text-lg font-bold tracking-tight ${confirm.action === "Approved" ? "text-emerald-600" : "text-red-600"}`}>
                 {confirm.action === "Approved" ? "Approve Leave?" : "Reject Leave?"}
               </h3>
-              <p className="text-white/70 text-xs mt-1">This action will update the leave status</p>
             </div>
 
             {/* Body */}
-            <div className="px-6 py-5">
+            <div className="px-6 pb-6">
               {/* Employee info row */}
-              <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-3 mb-5">
-                <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-sm font-bold text-white flex-shrink-0
-                  ${confirm.action === "Approved" ? "bg-emerald-500" : "bg-red-500"}`}>
+              <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3 mb-5">
+                <div className={`w-9 h-9 rounded-full border-2 flex items-center justify-center text-sm font-bold flex-shrink-0
+                  ${confirm.action === "Approved" ? "border-emerald-400 text-emerald-600" : "border-red-400 text-red-600"}`}>
                   {confirm.name?.charAt(0).toUpperCase()}
                 </div>
                 <div>
@@ -143,16 +141,16 @@ export default function LeaveTab() {
                 <button
                   onClick={executeAction}
                   disabled={!!actionLoading}
-                  className={`flex-1 py-2.5 rounded-lg text-sm font-semibold text-white transition disabled:opacity-60
+                  className={`flex-1 py-2.5 rounded-full text-sm font-semibold border transition disabled:opacity-60
                     ${confirm.action === "Approved"
-                      ? "bg-emerald-500 hover:bg-emerald-600"
-                      : "bg-red-500 hover:bg-red-600"}`}
+                      ? "border-emerald-400 text-emerald-600 hover:bg-emerald-50"
+                      : "border-red-400 text-red-600 hover:bg-red-50"}`}
                 >
                   {actionLoading ? "Saving..." : confirm.action === "Approved" ? "Yes, Approve" : "Yes, Reject"}
                 </button>
                 <button
                   onClick={() => setConfirm(null)}
-                  className="flex-1 py-2.5 rounded-lg text-sm font-semibold border border-gray-200 hover:bg-gray-50 text-gray-500 transition"
+                  className="flex-1 py-2.5 rounded-full text-sm font-semibold border border-gray-200 hover:bg-gray-50 text-gray-500 transition"
                 >
                   Cancel
                 </button>

@@ -1,116 +1,265 @@
-import { faQuestionCircle } from '@fortawesome/free-regular-svg-icons';
-import { faBug } from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { Link, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
-import { faqs } from '../data'; 
-import { HelpCircle, HelpingHand } from 'lucide-react';
-import RaiseTicket from '../components/RiseTicket';
-import HelpSupport from '../components/HelpSupport';
+// Report.jsx — Support page: role-based ticket system + FAQ
+import { useState, useEffect, useCallback } from "react";
+import { RefreshCw, Plus, ChevronDown, ChevronUp, Ticket } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import { useSocket } from "../context/SocketContext";
+import api from "../services/axios";
+import RaiseTicket from "../components/RaiseTicket";
+import TicketDrawer from "../components/TicketDrawer";
 
-const Report = () => {
-  const [openIndex, setOpenIndex] = useState(null);
-  const [isTicketModalOpen, setIsTicketModalOpen] = useState(false); // separate
-  const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+/* ── static FAQ data ── */
+const FAQS = [
+  { q: "How do I apply for leave?", a: "Go to Leave Management from the sidebar, click 'Request Leave', fill in the dates and type, then submit." },
+  { q: "How do I check my attendance?", a: "Your attendance calendar is visible on the Employee Dashboard. Click 'Attendance' in the navbar to check in/out." },
+  { q: "How do I change my password?", a: "Click 'Reset Password' on the Login page, enter your email and current password, then set a new one." },
+  { q: "Who do I contact for payslip issues?", a: "Raise a ticket under the 'Payroll' category with priority High and describe the issue." },
+  { q: "How long does ticket resolution take?", a: "Most tickets are resolved within 1–2 business days. High priority tickets are addressed within 4 hours." },
+];
 
-  const handleTicketSubmit = (ticketData) => {
-    console.log("Ticket Created:", ticketData);
-    // Here you can call API: axios.post("/api/tickets", ticketData)
+/* ── status/priority styles ── */
+const STATUS_CHIP = {
+  "Open":        "border-blue-400 text-blue-600",
+  "In Progress": "border-amber-400 text-amber-600",
+  "Resolved":    "border-emerald-400 text-emerald-600",
+  "Closed":      "border-gray-300 text-gray-500",
+};
+const PRIORITY_CHIP = {
+  Low:    "border-gray-300 text-gray-500",
+  Medium: "border-amber-400 text-amber-600",
+  High:   "border-red-400 text-red-600",
+};
+
+const fmt = (d) => new Date(d).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
+
+export default function Report() {
+  const { user }   = useAuth();
+  const { socket } = useSocket();
+  const isAdmin    = user?.role === "admin";
+
+  const [tickets, setTickets]         = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [refreshing, setRefreshing]   = useState(false);
+  const [showModal, setShowModal]     = useState(false);
+  const [activeTicket, setActiveTicket] = useState(null);
+  const [toast, setToast]             = useState(null);
+
+  // Admin filters
+  const [filters, setFilters] = useState({ status: "all", priority: "all", category: "all" });
+
+  // FAQ accordion
+  const [openFaq, setOpenFaq] = useState(null);
+
+  const showToast = (type, msg) => {
+    setToast({ type, msg });
+    setTimeout(() => setToast(null), 4000);
   };
 
-  const handleSupportSubmit = (supportData) => {
-    console.log("Support Request Created:", supportData);
-    // Here you can call API: axios.post("/api/support", supportData)
+  const fetchTickets = useCallback(async (silent = false) => {
+    try {
+      if (!silent) setLoading(true); else setRefreshing(true);
+      const endpoint = isAdmin ? "/tickets/all" : "/tickets/my";
+      const params   = isAdmin ? filters : {};
+      const res = await api.get(endpoint, { params });
+      setTickets(res.data.tickets || []);
+    } catch {
+      if (!silent) showToast("error", "Failed to load tickets.");
+    } finally {
+      if (!silent) setLoading(false); else setRefreshing(false);
+    }
+  }, [isAdmin, filters]);
+
+  useEffect(() => { if (user) fetchTickets(); }, [user, fetchTickets]);
+
+  // Real-time socket events
+  useEffect(() => {
+    if (!socket) return;
+    const onReply = ({ ticketRef }) => {
+      showToast("success", `New reply on ${ticketRef}`);
+      fetchTickets(true);
+    };
+    const onStatus = ({ ticketRef, status }) => {
+      showToast("success", `Ticket ${ticketRef} marked ${status}`);
+      fetchTickets(true);
+    };
+    const onNew = ({ ticketId, userName }) => {
+      showToast("success", `New ticket from ${userName} (${ticketId})`);
+      fetchTickets(true);
+    };
+    socket.on("ticket:reply",        onReply);
+    socket.on("ticket:statusUpdate", onStatus);
+    socket.on("ticket:new",          onNew);
+    return () => {
+      socket.off("ticket:reply",        onReply);
+      socket.off("ticket:statusUpdate", onStatus);
+      socket.off("ticket:new",          onNew);
+    };
+  }, [socket, fetchTickets]);
+
+  const handleTicketUpdate = (updated) => {
+    setTickets(prev => prev.map(t => t._id === updated._id ? updated : t));
+    if (activeTicket?._id === updated._id) setActiveTicket(updated);
   };
 
-  const toggleFAQ = (index) => {
-    setOpenIndex(index === openIndex ? null : index);
-  };
+  // Stats
+  const open       = tickets.filter(t => t.status === "Open").length;
+  const inProgress = tickets.filter(t => t.status === "In Progress").length;
+  const resolved   = tickets.filter(t => t.status === "Resolved").length;
+  const closed     = tickets.filter(t => t.status === "Closed").length;
 
   return (
-    <div className="min-h-screen px-8 py-10">
-      <h1 className="text-2xl font-bold text-center mb-10 text-gray-800">
-        Support & Issue Center
-        <HelpingHand className="w-12 h-12 inline-block pl-2"/>
-      </h1>
+    <div className="p-6 bg-gray-50 min-h-screen">
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-        {/* Raise Ticket */}
-        <div className="bg-gray-900 text-white rounded-lg shadow-lg p-8 flex flex-col justify-between">
-          <div>
-            <h2 className="text-2xl font-bold mb-6 flex items-center gap-4">
-              <FontAwesomeIcon icon={faBug} className="text-red-400 text-3xl" />
-              Raise a Ticket
-            </h2>
-            <p className="text-gray-300 mb-6">
-              Encountered a bug or issue? Submit a detailed report so our team can assist you.
-            </p>
-          </div>
-          <button
-             onClick={() => setIsTicketModalOpen(true)}
-            className="text-center bg-white text-gray-900 border-2 border-black font-semibold py-2 rounded hover:bg-blue-700 hover:text-white transition"
-          >
-            Visit
-          </button>
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed top-5 right-5 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium
+          ${toast.type === "success" ? "bg-emerald-500 text-white" : "bg-red-500 text-white"}`}>
+          {toast.msg}
         </div>
+      )}
 
-        {/* Raise Ticket Modal */}
-        <RaiseTicket
-          isOpen={isTicketModalOpen}
-          onClose={() => setIsTicketModalOpen(false)}
-          onSubmit={handleTicketSubmit}
-        />
-
-        {/* Help & Support */}
-        <div className="bg-gray-900 text-white rounded-lg shadow-lg p-8 flex flex-col justify-between">
-          <div>
-            <h2 className="text-2xl font-bold mb-6 flex items-center gap-4">
-              <FontAwesomeIcon icon={faQuestionCircle} className="text-yellow-400 text-3xl" />
-              Help & Support
-            </h2>
-            <p className="text-gray-300 mb-6">
-              Need assistance? Access helpful documentation and get answers to common questions.
-            </p>
-          </div>
-          <button
-            onClick={() => setIsSupportModalOpen(true)}
-            className="text-center bg-white text-gray-900 border-2 border-black font-semibold py-2 rounded hover:bg-blue-700 hover:text-white transition"
-          >
-            Visit
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-lg font-bold text-gray-800">Support Center</h1>
+          <p className="text-xs text-gray-400 mt-0.5">{isAdmin ? "Manage all employee tickets" : "Track your support requests"}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={() => fetchTickets(true)} disabled={refreshing}
+            className="flex items-center gap-1.5 text-xs text-indigo-500 hover:text-indigo-700 transition">
+            <RefreshCw size={13} className={refreshing ? "animate-spin" : ""} />
+            {refreshing ? "Refreshing..." : "Refresh"}
           </button>
+          {!isAdmin && (
+            <button onClick={() => setShowModal(true)}
+              className="flex items-center gap-1.5 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-semibold rounded-xl shadow-sm transition">
+              <Plus size={15} /> Raise Ticket
+            </button>
+          )}
         </div>
       </div>
-      {/* Help & Support Modal */}
-        <HelpSupport
-          isOpen={isSupportModalOpen}
-          onClose={() => setIsSupportModalOpen(false)}
-          onSubmit={handleSupportSubmit}
-        />
 
-      {/* FAQ / Q&A Section */}
-      <div className="max-w-4xl mx-auto mt-16">
-        <h2 className="text-xl font-bold  mb-6 text-gray-800">
-          <HelpCircle className="w-6 h-16 pb-2 inline-block mr-5" />
-          Frequently Asked Questions :</h2>
-        <div className="space-y-4">
-          {faqs.map((faq, index) => (
-            <div key={index} className="bg-white border border-gray-300 rounded-lg shadow">
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+        {[
+          { label: "Open",        value: open,       color: "text-blue-600",    border: "border-blue-400",    bg: "bg-blue-50" },
+          { label: "In Progress", value: inProgress, color: "text-amber-600",   border: "border-amber-400",   bg: "bg-amber-50" },
+          { label: "Resolved",    value: resolved,   color: "text-emerald-600", border: "border-emerald-400", bg: "bg-emerald-50" },
+          { label: "Closed",      value: closed,     color: "text-gray-500",    border: "border-gray-300",    bg: "bg-gray-50" },
+        ].map(({ label, value, color, border, bg }) => (
+          <div key={label} className={`bg-white rounded-xl border ${border} shadow-sm p-4`}>
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">{label}</p>
+            <p className={`text-3xl font-black mt-1 ${color}`}>{value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Admin filters */}
+      {isAdmin && (
+        <div className="flex gap-3 mb-4 flex-wrap">
+          {[
+            { key: "status",   options: ["all", "Open", "In Progress", "Resolved", "Closed"] },
+            { key: "priority", options: ["all", "Low", "Medium", "High"] },
+            { key: "category", options: ["all", "IT Support", "HR", "Finance", "Payroll", "Leave Related", "Other"] },
+          ].map(({ key, options }) => (
+            <select key={key} value={filters[key]}
+              onChange={e => setFilters(p => ({ ...p, [key]: e.target.value }))}
+              className="border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-600 focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white">
+              {options.map(o => (
+                <option key={o} value={o}>{o === "all" ? `All ${key.charAt(0).toUpperCase() + key.slice(1)}` : o}</option>
+              ))}
+            </select>
+          ))}
+        </div>
+      )}
+
+      {/* Tickets table */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 mb-8">
+        <div className="px-6 py-4 border-b border-gray-100">
+          <h2 className="text-sm font-bold text-gray-700">{isAdmin ? "All Tickets" : "My Tickets"}</h2>
+        </div>
+
+        {loading ? (
+          <div className="py-16 text-center text-sm text-gray-400">Loading...</div>
+        ) : tickets.length === 0 ? (
+          <div className="py-16 text-center">
+            <Ticket className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+            <p className="text-sm text-gray-400">{isAdmin ? "No tickets found" : "No tickets yet — raise one above"}</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-100">
+                <tr>
+                  {["Ticket ID", "Category", "Problem", isAdmin && "Employee", "Priority", "Status", "Raised", ""].filter(Boolean).map(h => (
+                    <th key={h} className="px-4 py-3 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wide">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {tickets.map(t => (
+                  <tr key={t._id} className="hover:bg-indigo-50/30 transition cursor-pointer" onClick={() => setActiveTicket(t)}>
+                    <td className="px-4 py-3 font-mono text-xs font-bold text-gray-500">{t.ticketId}</td>
+                    <td className="px-4 py-3 text-gray-700">{t.category}</td>
+                    <td className="px-4 py-3 text-gray-400 text-xs max-w-[160px] truncate">{t.problem || "—"}</td>
+                    {isAdmin && <td className="px-4 py-3 text-gray-700 text-xs">{t.userName}<br/><span className="text-gray-400 font-mono">{t.userEmployeeId}</span></td>}
+                    <td className="px-4 py-3">
+                      <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${PRIORITY_CHIP[t.priority]}`}>{t.priority}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${STATUS_CHIP[t.status]}`}>{t.status}</span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-400 text-xs">{fmt(t.createdAt)}</td>
+                    <td className="px-4 py-3 text-xs text-indigo-400 font-medium whitespace-nowrap">
+                      {t.replies?.length > 0 && `${t.replies.length} repl${t.replies.length === 1 ? "y" : "ies"}`}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* FAQ */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <h2 className="text-sm font-bold text-gray-700 mb-4">Frequently Asked Questions</h2>
+        <div className="space-y-2">
+          {FAQS.map((f, i) => (
+            <div key={i} className="border border-gray-100 rounded-xl overflow-hidden">
               <button
-                onClick={() => toggleFAQ(index)}
-                className="w-full text-left px-6 py-4 font-semibold text-gray-800 flex justify-between items-center"
+                onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition text-left"
               >
-                {faq.question}
-                <span className="text-lg">{openIndex === index ? '-' : '+'}</span>
+                {f.q}
+                {openFaq === i ? <ChevronUp size={15} className="text-gray-400 flex-shrink-0" /> : <ChevronDown size={15} className="text-gray-400 flex-shrink-0" />}
               </button>
-              {openIndex === index && (
-                <div className="px-6 pb-4 text-gray-600">{faq.answer}</div>
+              {openFaq === i && (
+                <div className="px-4 pb-3 text-sm text-gray-500 bg-gray-50">{f.a}</div>
               )}
             </div>
           ))}
         </div>
       </div>
+
+      {/* Modals */}
+      {showModal && (
+        <RaiseTicket
+          isOpen={showModal}
+          onClose={() => setShowModal(false)}
+          onSubmit={(ticket) => {
+            showToast("success", `Ticket ${ticket.ticketId} submitted!`);
+            fetchTickets(true);
+          }}
+        />
+      )}
+
+      {activeTicket && (
+        <TicketDrawer
+          ticket={activeTicket}
+          onClose={() => setActiveTicket(null)}
+          onUpdate={handleTicketUpdate}
+        />
+      )}
     </div>
   );
-};
-
-export default Report;
+}

@@ -1,16 +1,19 @@
-﻿import { useState, useEffect } from "react";
+// Projects.jsx — Project list table for employees and HR (view, task drawer, team members)
+import { useState, useEffect } from "react";
+import { useAutoRefresh } from "../hooks/useAutoRefresh";
 import { Eye, Search, Users2, ListChecks } from "lucide-react";
-import PrjModle from "../components/PrjModle";
-import PrjTeamModle from "../components/PrjTeamModle";
-import ProjectTracklist from "../components/ProjectTracklist";
+import ProjectModal from "../components/ProjectModal";
+import ProjectTeamModal from "../components/ProjectTeamModal";
+import ProjectTaskDrawer from "../components/ProjectTaskDrawer";
 import api from "../services/axios";
 import { useAuth } from "../context/AuthContext";
+import { getCache, setCache } from "../utils/pageCache";
 
 const Projects = () => {
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
-  const [projects, setProjects] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [projects, setProjects] = useState(getCache("projects") || []);
+  const [loading, setLoading] = useState(!getCache("projects"));
   const [error, setError] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [showTeamModal, setShowTeamModal] = useState(false);
@@ -33,40 +36,43 @@ const Projects = () => {
     }
   };
 
-  // Fetch projects — employees use my-projects, HR/admin use all projects
-  useEffect(() => {
-    const fetchProjects = async () => {
-      try {
-        setLoading(true);
-        const isEmployee = user?.role === "employee";
-        const endpoint = isEmployee ? "/projects/my-projects" : "/projects";
-        const response = await api.get(endpoint);
-        if (response.data.success) {
-          setProjects(response.data.projects);
-        } else {
-          setError("Failed to load projects");
-        }
-      } catch (err) {
-        console.error("Error fetching projects:", err);
-        setError(err.response?.data?.message || "Failed to load projects");
-      } finally {
-        setLoading(false);
-      }
-    };
+  // Fetch projects — instant render from cache, loading only on true first visit
+  const fetchProjects = async () => {
+    const cached = !!getCache("projects");
+    try {
+      if (!cached) setLoading(true);
+      const isEmployee = user?.role === "employee";
+      const endpoint = isEmployee ? "/projects/my-projects" : "/projects";
+      const { data } = await api.get(endpoint);
+      if (data.success) {
+        setProjects(data.projects);
+        setCache("projects", data.projects);   // persist for next navigation
+      } else if (!cached) setError("Failed to load projects");
+    } catch (err) {
+      if (!cached) setError(err.response?.data?.message || "Failed to load projects");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    if (user) fetchProjects();
-  }, [user]);
+  // Use user._id — not user object — so a new object reference doesn't re-trigger
+  useEffect(() => {
+    if (user?._id) fetchProjects();
+  }, [user?._id]);
+
+  // Silent background refresh when tasks or projects change
+  useAutoRefresh(fetchProjects, ["crm:task:updated"]);
 
   const filteredProjects = projects.filter((project) => {
-  const search = searchTerm.toLowerCase();
-  return (
-    (project.projectId?.toLowerCase() || "").includes(search) ||
-    (project.title?.toLowerCase() || "").includes(search) ||
-    (project.description?.toLowerCase() || "").includes(search) ||
-    (project.manager?.toLowerCase() || "").includes(search) ||
-    (project.status?.toLowerCase() || "").includes(search)
-  );
-});
+    const search = searchTerm.toLowerCase();
+    return (
+      (project.projectId?.toLowerCase() || "").includes(search) ||
+      (project.title?.toLowerCase() || "").includes(search) ||
+      (project.description?.toLowerCase() || "").includes(search) ||
+      (project.manager?.toLowerCase() || "").includes(search) ||
+      (project.status?.toLowerCase() || "").includes(search)
+    );
+  });
 
 
   const handleView = (project) => {
@@ -165,13 +171,12 @@ const Projects = () => {
                     </td>
                     <td className="py-3 px-6 text-sm">
                       <span
-                        className={`px-3 py-1 inline-flex text-xs font-semibold rounded-full ${
-                          project.status === "Completed"
-                            ? "bg-green-100 text-green-800"
-                            : project.status === "Ongoing"
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-gray-100 text-gray-800"
-                        }`}
+                        className={`px-3 py-1 inline-flex text-xs font-semibold rounded-full ${project.status === "Completed"
+                          ? "border border-emerald-400 text-emerald-600"
+                          : project.status === "Ongoing"
+                            ? "border border-blue-400 text-blue-600"
+                            : "border border-amber-400 text-amber-600"
+                          }`}
                         style={{ minWidth: 100 }}
                       >
                         {project.status}
@@ -224,7 +229,7 @@ const Projects = () => {
           </table>
         </div>
         {tracklistProject && (
-          <ProjectTracklist
+          <ProjectTaskDrawer
             project={tracklistProject}
             onClose={() => setTracklistProject(null)}
             isManager={user?.role !== "employee"}
@@ -232,16 +237,15 @@ const Projects = () => {
         )}
 
         {showTeamModal && (
-          <PrjTeamModle
+          <ProjectTeamModal
             teamMembers={teamMembers}
             projectTitle={teamModalTitle}
             onClose={() => setShowTeamModal(false)}
           />
         )}
 
-        {/* Modal */}
         {showModal && (
-          <PrjModle
+          <ProjectModal
             project={selectedProject}
             onClose={() => setShowModal(false)}
           />

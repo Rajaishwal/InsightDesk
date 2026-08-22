@@ -1,12 +1,13 @@
+// ProjectTaskDrawer.jsx — Slide-out drawer showing task timeline, timers, and status for a single project
 import { useState, useEffect, useRef } from "react";
 import { X, Plus, RefreshCw, GitCommitHorizontal, Play, Square, Clock } from "lucide-react";
 import api from "../services/axios";
 import { useAuth } from "../context/AuthContext";
 
 const STATUS_STYLES = {
-  Pending:   { dot: "bg-amber-400",   badge: "bg-amber-100 text-amber-700" },
-  Ongoing:   { dot: "bg-indigo-500",  badge: "bg-indigo-100 text-indigo-700" },
-  Completed: { dot: "bg-emerald-500", badge: "bg-emerald-100 text-emerald-700" },
+  Pending:   { dot: "bg-amber-400",   badge: "border border-amber-400   text-amber-600" },
+  Ongoing:   { dot: "bg-indigo-500",  badge: "border border-indigo-400  text-indigo-600" },
+  Completed: { dot: "bg-emerald-500", badge: "border border-emerald-400 text-emerald-600" },
 };
 
 // Format seconds → "1h 04m 32s" or "04m 32s" or "32s"
@@ -32,7 +33,7 @@ function LiveTimer({ startedAt, base }) {
   return <span className="font-mono text-xs font-bold text-indigo-600">{fmtDuration(base + elapsed)}</span>;
 }
 
-export default function ProjectTracklist({ project, onClose, isManager }) {
+export default function ProjectTaskDrawer({ project, onClose, isManager }) {
   const { user } = useAuth();
   const [tasks, setTasks]                 = useState([]);
   const [loading, setLoading]             = useState(true);
@@ -42,6 +43,7 @@ export default function ProjectTracklist({ project, onClose, isManager }) {
   const [statusLoading, setStatusLoading] = useState(null);
   const [timerLoading, setTimerLoading]   = useState(null);
   const [toast, setToast]                 = useState(null);
+  const [isCheckedIn, setIsCheckedIn]     = useState(false);
   const bottomRef = useRef(null);
 
   const myId = user?._id || user?.id;
@@ -63,7 +65,16 @@ export default function ProjectTracklist({ project, onClose, isManager }) {
     }
   };
 
-  useEffect(() => { fetchTasks(); }, [project.projectId]);
+  // Check if the current employee is checked in today (and hasn't checked out yet)
+  const fetchAttendanceStatus = async () => {
+    if (!myId) return;
+    try {
+      const res = await api.get(`http://localhost:5000/api/attendance/status/${myId}`);
+      setIsCheckedIn(res.data.hasCheckedIn && !res.data.hasCheckedOut);
+    } catch {}
+  };
+
+  useEffect(() => { fetchTasks(); fetchAttendanceStatus(); }, [project.projectId]);
 
   // Returns the current user's timer entry for a task
   const myTimer = (task) => task.timers?.find(t => t.userId === myId || t.userId?._id === myId || t.userId?.toString?.() === myId);
@@ -97,11 +108,12 @@ export default function ProjectTracklist({ project, onClose, isManager }) {
             : t
         )
       );
+      window.dispatchEvent(new CustomEvent("crm:task:updated"));
       if (isRevision && status === "Completed") {
         showToast("success", "Revision complete — manager has been notified.");
       }
-    } catch {
-      showToast("error", "Failed to update status");
+    } catch (err) {
+      showToast("error", err.response?.data?.message || "Failed to update status");
     } finally {
       setStatusLoading(null);
     }
@@ -111,6 +123,11 @@ export default function ProjectTracklist({ project, onClose, isManager }) {
     const timer   = myTimer(task);
     const running = !!timer?.timerStartedAt;
     const action  = running ? "stop" : "start";
+    // Block starting a timer if the employee hasn't checked in today
+    if (!running && !isCheckedIn) {
+      showToast("error", "You must check in before starting a timer.");
+      return;
+    }
     try {
       setTimerLoading(task._id);
       const res = await api.post(`http://localhost:5000/api/project-tasks/${task._id}/timer/${action}`);
@@ -173,10 +190,13 @@ export default function ProjectTracklist({ project, onClose, isManager }) {
                 const style    = STATUS_STYLES[task.status] || STATUS_STYLES.Pending;
                 const dotCls   = task.isRevision ? "bg-red-500" : style.dot;
                 const badgeCls = task.isRevision ? "bg-red-100 text-red-700" : style.badge;
-                const timer    = myTimer(task);
-                const running  = !!timer?.timerStartedAt;
-                const base     = timer?.totalTimeLogged || 0;
-                const busy     = timerLoading === task._id || statusLoading === task._id;
+                const timer       = myTimer(task);
+                const running     = !!timer?.timerStartedAt;
+                const base        = timer?.totalTimeLogged || 0;
+                const busy        = timerLoading === task._id || statusLoading === task._id;
+                // Only the creator (or admin) can complete the task
+                const isOwner     = task.createdBy?.toString?.() === myId || task.createdBy === myId;
+                const canComplete = isOwner || isManager;
 
                 return (
                   <div key={task._id} className="flex gap-4 relative">
@@ -202,17 +222,24 @@ export default function ProjectTracklist({ project, onClose, isManager }) {
                             </span>
                           )}
                         </div>
-                        <select
-                          value={task.status}
-                          disabled={busy}
-                          onChange={(e) => handleStatusChange(task._id, e.target.value, task.isRevision)}
-                          className={`flex-shrink-0 text-xs font-semibold px-2 py-1 rounded-lg border-0 cursor-pointer
-                            focus:outline-none focus:ring-1 focus:ring-indigo-400 ${badgeCls}`}
-                        >
-                          <option value="Pending">Pending</option>
-                          <option value="Ongoing">Ongoing</option>
-                          <option value="Completed">Completed</option>
-                        </select>
+                        {/* Editable dropdown only for creator/admin on non-completed tasks */}
+                        {canComplete && task.status !== "Completed" ? (
+                          <select
+                            value={task.status}
+                            disabled={busy}
+                            onChange={(e) => handleStatusChange(task._id, e.target.value, task.isRevision)}
+                            className={`flex-shrink-0 text-xs font-semibold px-2 py-1 rounded-lg border-0 cursor-pointer
+                              focus:outline-none focus:ring-1 focus:ring-indigo-400 ${badgeCls}`}
+                          >
+                            <option value="Pending">Pending</option>
+                            <option value="Ongoing">Ongoing</option>
+                            <option value="Completed">Completed</option>
+                          </select>
+                        ) : (
+                          <span className={`flex-shrink-0 text-xs font-semibold px-2 py-1 rounded-lg ${badgeCls}`}>
+                            {task.status}
+                          </span>
+                        )}
                       </div>
 
                       {/* Description */}
@@ -245,16 +272,22 @@ export default function ProjectTracklist({ project, onClose, isManager }) {
                             <span className="text-[11px] text-gray-400 hidden sm:inline">{task.createdByName}</span>
                           </div>
 
-                          {/* Timer button */}
-                          {task.status !== "Completed" && (
+                          {/* Timer button — task creator only */}
+                          {isOwner && !isManager && task.status !== "Completed" && (
                             <button
                               onClick={() => handleTimerToggle(task)}
-                              disabled={busy}
-                              title={running ? "Stop timer" : "Start timer"}
-                              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition disabled:opacity-50
+                              disabled={busy || (!running && !isCheckedIn)}
+                              title={
+                                !running && !isCheckedIn
+                                  ? "Check in to start a timer"
+                                  : running ? "Stop timer" : "Start timer"
+                              }
+                              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed
                                 ${running
                                   ? "bg-red-100 text-red-600 hover:bg-red-200"
-                                  : "bg-indigo-100 text-indigo-600 hover:bg-indigo-200"}`}
+                                  : !isCheckedIn
+                                    ? "bg-gray-100 text-gray-400"
+                                    : "bg-indigo-100 text-indigo-600 hover:bg-indigo-200"}`}
                             >
                               {running
                                 ? <><Square size={11} className="fill-current" /> Stop</>

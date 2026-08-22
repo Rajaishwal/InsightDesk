@@ -1,15 +1,25 @@
+// TasksTab.jsx — HR tasks management tab: assign tasks to employees, view status and time taken
 import { useState, useEffect, useMemo, useRef } from "react";
 import api from "../../services/axios";
 import { HrTaskForm } from "../../components/HrTaskCard";
 import TasksTable from "./TasksTable";
 import {
   CheckCircle2, Search, Clock, RotateCcw, Plus,
-  X, ClipboardList, Loader2, Users,
+  X, ClipboardList, Loader2, Users, Radio,
 } from "lucide-react";
 
 /* ─────────────────────────────────────────────────────────
    Helpers
 ───────────────────────────────────────────────────────── */
+const fmtDur = (sec) => {
+  if (!sec || sec <= 0) return "0s";
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+};
+
+
 const fmtShort = (ts) => {
   if (!ts) return "—";
   const d = new Date(ts);
@@ -64,7 +74,49 @@ export default function TasksTab() {
   const [empTasks,    setEmpTasks]    = useState([]);
   const [taskLoading, setTaskLoading] = useState(false);
 
+  /* ── Active timers ── */
+  const [activeTimers,      setActiveTimers]      = useState([]);
+  const [activeLoading,     setActiveLoading]     = useState(true);
+  const [activeNow,         setActiveNow]         = useState(new Date());
+
+  /* ── Work log (totals per employee per task) ── */
+  const [workLog,        setWorkLog]        = useState([]);
+  const [workLogLoading, setWorkLogLoading] = useState(true);
+  const [workLogPeriod,  setWorkLogPeriod]  = useState("today");
+
   const wrapRef = useRef(null);
+
+  /* ── Load active timers (auto-refresh every 30s) ── */
+  const loadActiveTimers = () => {
+    setActiveLoading(true);
+    api.get("/project-tasks/active-timers")
+      .then(r => setActiveTimers(r.data.active || []))
+      .catch(() => {})
+      .finally(() => setActiveLoading(false));
+  };
+
+  useEffect(() => {
+    loadActiveTimers();
+    const id = setInterval(() => { loadActiveTimers(); setActiveNow(new Date()); }, 30000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Tick active elapsed times every second
+  useEffect(() => {
+    const id = setInterval(() => setActiveNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  /* ── Load work log ── */
+  const loadWorkLog = (p = workLogPeriod) => {
+    setWorkLogLoading(true);
+    api.get(`/project-tasks/work-log?period=${p}`)
+      .then(r => setWorkLog(r.data.rows || []))
+      .catch(() => {})
+      .finally(() => setWorkLogLoading(false));
+  };
+
+  useEffect(() => { loadWorkLog(workLogPeriod); }, [workLogPeriod]);
 
   /* ── Load all completed tasks ── */
   const loadCompleted = () => {
@@ -247,6 +299,158 @@ export default function TasksTab() {
       </div>
 
 
+      {/* ── Active Now + Work Sessions side by side ── */}
+      <div className="grid grid-cols-1 xl:grid-cols-[320px_1fr] gap-5 items-start">
+
+        {/* Active Now */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/60">
+            <div className="flex items-center gap-2">
+              <Radio className="w-3.5 h-3.5 text-emerald-500" />
+              <span className="text-xs font-bold text-gray-800">Active Now</span>
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${activeTimers.length > 0 ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-400"}`}>
+                {activeTimers.length}
+              </span>
+              {activeTimers.length > 0 && (
+                <span className="flex items-center gap-1 text-[10px] text-emerald-500 font-semibold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" />
+                  Live
+                </span>
+              )}
+            </div>
+            <button onClick={loadActiveTimers} title="Refresh" className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition">
+              <RotateCcw className="w-3 h-3" />
+            </button>
+          </div>
+
+          {activeLoading ? (
+            <div className="flex items-center justify-center gap-2 py-8 text-sm text-gray-400">
+              <div className="w-3.5 h-3.5 border-2 border-indigo-200 border-t-indigo-500 rounded-full animate-spin" />
+            </div>
+          ) : activeTimers.length === 0 ? (
+            <div className="py-8 text-center text-xs text-gray-400">Nobody working right now.</div>
+          ) : (
+            <div className="divide-y divide-gray-50 max-h-[320px] overflow-y-auto">
+              {activeTimers.map((t, i) => {
+                const elapsed = Math.floor((activeNow - new Date(t.startedAt)) / 1000);
+                return (
+                  <div key={`${t.taskId}-${i}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50/60 transition">
+                    {t.photo
+                      ? <img src={t.photo} className="w-8 h-8 rounded-lg object-cover flex-shrink-0" alt="" />
+                      : <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                          {t.userName?.[0]?.toUpperCase() || "?"}
+                        </div>
+                    }
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-gray-800 truncate">{t.userName}</span>
+                        {t.employeeId && <span className="font-mono text-[9px] font-bold text-indigo-500 bg-indigo-50 px-1 py-0.5 rounded flex-shrink-0">{t.employeeId}</span>}
+                      </div>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <span className="text-[10px] font-semibold text-violet-500">{t.projectId}</span>
+                        <span className="text-gray-300 text-[9px]">›</span>
+                        <span className="text-[10px] text-gray-400 truncate">{t.taskTitle}</span>
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="font-mono text-xs font-black text-emerald-600">{fmtDur(elapsed)}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Work Sessions */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-100 bg-gray-50/60 flex-wrap gap-y-2">
+            <div className="flex items-center gap-2">
+              <Clock className="w-3.5 h-3.5 text-indigo-500" />
+              <span className="text-xs font-bold text-gray-800">Work Log</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
+                <button onClick={() => setWorkLogPeriod("today")}
+                  className={`text-[10px] font-bold px-2.5 py-1 rounded-md transition-all ${workLogPeriod === "today" ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
+                  Today
+                </button>
+                <button onClick={() => setWorkLogPeriod("all")}
+                  className={`text-[10px] font-bold px-2.5 py-1 rounded-md transition-all ${workLogPeriod === "all" ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
+                  All Time
+                </button>
+              </div>
+              <button onClick={() => loadWorkLog(workLogPeriod)} title="Refresh"
+                className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition">
+                <RotateCcw className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
+
+        {workLogLoading ? (
+            <div className="flex items-center justify-center gap-2 py-8 text-sm text-gray-400">
+              <div className="w-4 h-4 border-2 border-indigo-200 border-t-indigo-500 rounded-full animate-spin" />
+            </div>
+          ) : workLog.length === 0 ? (
+            <div className="py-8 text-center text-xs text-gray-400">No task work recorded yet.</div>
+          ) : (
+            <div className="overflow-y-auto" style={{ maxHeight: "340px" }}>
+              <table className="min-w-full">
+                <thead className="sticky top-0 z-10 bg-gray-50 border-b border-gray-100">
+                  <tr>
+                    {["Employee", "Project", "Task", "Status", "Total Time"].map(h => (
+                      <th key={h} className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {workLog.map((r, i) => (
+                    <tr key={i} className={`${i % 2 === 0 ? "bg-white" : "bg-gray-50/30"} hover:bg-indigo-50/30 transition`}>
+                      <td className="px-4 py-2.5 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          {r.photo
+                            ? <img src={r.photo} className="w-7 h-7 rounded-lg object-cover" alt="" />
+                            : <div className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold">
+                                {r.userName?.[0]?.toUpperCase()}
+                              </div>
+                          }
+                          <div>
+                            <p className="text-xs font-bold text-gray-800">{r.userName}</p>
+                            {r.employeeId && <p className="font-mono text-[10px] text-indigo-500">{r.employeeId}</p>}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2.5 whitespace-nowrap">
+                        <span className="font-mono text-[11px] font-bold text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded">{r.projectId}</span>
+                      </td>
+                      <td className="px-4 py-2.5 max-w-[180px]">
+                        <p className="text-xs font-medium text-gray-700 truncate" title={r.taskTitle}>{r.taskTitle}</p>
+                      </td>
+                      <td className="px-4 py-2.5 whitespace-nowrap">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          r.taskStatus === "Completed" ? "bg-emerald-100 text-emerald-700" :
+                          r.taskStatus === "Ongoing"   ? "bg-blue-100 text-blue-700" :
+                          "bg-gray-100 text-gray-500"
+                        }`}>{r.taskStatus}</span>
+                      </td>
+                      <td className="px-4 py-2.5 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono text-sm font-black text-indigo-600">{fmtDur(r.totalLogged)}</span>
+                          {r.isRunning && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />}
+                        </div>
+                        {r.sessionCount > 0 && <p className="text-[9px] text-gray-400 mt-0.5">{r.sessionCount} session{r.sessionCount !== 1 ? "s" : ""}</p>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        }
+
+        </div>{/* end Work Log card */}
+      </div>{/* end grid */}
+
       {/* ── Recent Completed Tasks panel ── */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         {/* Header */}
@@ -318,9 +522,13 @@ export default function TasksTab() {
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">{task.assignedToName || "—"}</td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      {task.taskCompletionTime
-                        ? <span className="font-mono text-sm font-bold text-emerald-600">{task.taskCompletionTime}</span>
-                        : <span className="text-gray-300 text-xs">—</span>}
+                      {(() => {
+                        const timerTotal = (task.timers || []).reduce((s, t) => s + (t.totalTimeLogged || 0), 0);
+                        const display = task.taskCompletionTime || (timerTotal > 0 ? fmtDur(timerTotal) : null);
+                        return display
+                          ? <span className="font-mono text-sm font-bold text-emerald-600">{display}</span>
+                          : <span className="text-gray-300 text-xs">—</span>;
+                      })()}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">

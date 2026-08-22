@@ -1,4 +1,6 @@
+// EditProfileModal.jsx — Modal form for employees to update their profile details
 import { useState, useEffect, useRef } from "react";
+import { useToast } from "../context/ToastContext";
 import { X, Camera, Loader2, ChevronRight, Check, Lock } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/axios";
@@ -15,6 +17,7 @@ const SHIFTS  = ["07:00 AM - 02:00 PM", "09:00 AM - 06:00 PM", "10:00 AM - 07:00
 
 export default function EditProfileModal({ onClose }) {
   const { user } = useAuth();
+  const toast = useToast();
   const fileRef = useRef(null);
 
   const [tab, setTab] = useState("info");        // "info" | "address"
@@ -72,7 +75,7 @@ export default function EditProfileModal({ onClose }) {
       await api.put(`http://localhost:5000/api/users/${user._id}/profile`, { photo: up.data.fileUrl });
       window.location.reload();
     } catch (err) {
-      alert(err.response?.data?.message || "Photo upload failed");
+      toast.error(err?.response?.data?.message || "Photo upload failed");
     } finally { setPhotoLoading(false); }
   };
 
@@ -84,7 +87,7 @@ export default function EditProfileModal({ onClose }) {
       setSaved(true);
       setTimeout(() => { setSaved(false); setEditing(false); }, 1400);
     } catch (err) {
-      alert(err.response?.data?.message || "Update failed");
+      toast.error(err?.response?.data?.message || "Update failed");
     } finally { setLoading(false); }
   };
 

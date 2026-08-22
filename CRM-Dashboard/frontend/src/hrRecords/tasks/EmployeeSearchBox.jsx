@@ -1,8 +1,10 @@
 ﻿import React, { useState, useEffect, useRef } from "react";
+import { useToast } from "../../context/ToastContext";
 import api from "../../services/axios";
 import { User, CheckCircle, Search as SearchIcon, Frown } from "lucide-react";
 
 const EmployeeSearchBox = ({ onSelectEmployee }) => {
+  const toast = useToast();
   const [employees, setEmployees] = useState([]);
   const [search, setSearch] = useState("");
   const [selectedEmployee, setSelectedEmployee] = useState(null);
@@ -20,9 +22,9 @@ const EmployeeSearchBox = ({ onSelectEmployee }) => {
         console.error("Error searching employees:", err);
         const status = err.response?.status;
         if (status === 401) {
-          alert("Session expired. Please log in again.");
+          toast.error("Session expired. Please log in again.");
         } else if (status >= 500) {
-          alert("Server error while searching. Check if the backend is running.");
+          toast.error("Server error while searching. Check if the backend is running.");
         }
         setEmployees([]);
       } finally {

@@ -1,3 +1,4 @@
+// ChatPanel.jsx — Full-screen chat panel: conversation list, real-time messaging, file attachments
 import { useState, useEffect, useRef } from "react";
 import { X, Search, Send, MessageSquare, Circle, Paperclip, FileText, Download, Pencil, Trash2, Check, CornerUpLeft } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -247,9 +248,7 @@ const ChatPanel = ({ onClose }) => {
                     >
                       <div className="relative flex-shrink-0">
                         <Avatar name={emp.name} photo={emp.photo} size="w-12 h-12" />
-                        {isOnline(emp._id) && (
-                          <span className="absolute bottom-0.5 right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
-                        )}
+                        <span className={`absolute bottom-0.5 right-0.5 w-3 h-3 rounded-full border-2 border-white ${isOnline(emp._id) ? "online-glow-dot" : "offline-glass-dot"}`} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-[15px] font-medium text-gray-900 truncate">{emp.name}</p>
@@ -285,9 +284,7 @@ const ChatPanel = ({ onClose }) => {
                       {/* Avatar */}
                       <div className="relative flex-shrink-0">
                         <Avatar name={conv.name} photo={conv.photo} size="w-12 h-12" />
-                        {isOnline(conv.userId) && (
-                          <span className="absolute bottom-0.5 right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
-                        )}
+                        <span className={`absolute bottom-0.5 right-0.5 w-3 h-3 rounded-full border-2 border-white ${isOnline(conv.userId) ? "online-glow-dot" : "offline-glass-dot"}`} />
                       </div>
 
                       {/* Content */}
@@ -343,16 +340,14 @@ const ChatPanel = ({ onClose }) => {
               <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100 bg-white shadow-sm flex-shrink-0">
                 <div className="relative">
                   <Avatar name={activeChat.name} photo={activeChat.photo} size="w-10 h-10" />
-                  {isOnline(activeChat._id) && (
-                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-400 rounded-full border-2 border-white" />
-                  )}
+                  <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${isOnline(activeChat._id) ? "online-glow-dot" : "offline-glass-dot"}`} />
                 </div>
                 <div>
                   <p className="font-bold text-gray-800 text-sm">{activeChat.name}</p>
-                  <p className="text-xs text-gray-400 flex items-center gap-1">
-                    <Circle className={`w-2 h-2 fill-current ${isOnline(activeChat._id) ? "text-green-400" : "text-gray-300"}`} />
+                  <p className="text-xs flex items-center gap-1" style={{ color: isOnline(activeChat._id) ? "#16a34a" : "#ef4444" }}>
+                    <Circle className={`w-2 h-2 fill-current`} />
                     {isOnline(activeChat._id) ? "Online" : "Offline"}
-                    {activeChat.designation && ` · ${activeChat.designation}`}
+                    {activeChat.designation && <span className="text-gray-400"> · {activeChat.designation}</span>}
                   </p>
                 </div>
               </div>

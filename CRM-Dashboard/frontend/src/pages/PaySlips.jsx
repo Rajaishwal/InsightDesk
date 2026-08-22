@@ -1,15 +1,17 @@
+// PaySlips.jsx — Employee payslip viewer with month/year filter and download
 ﻿import { useState, useEffect } from "react";
 import { Calendar, Receipt, Download, ReceiptIndianRupee, Check, X } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faIndianRupee } from "@fortawesome/free-solid-svg-icons";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
+import { getCache, setCache } from "../utils/pageCache";
 
 const PaySlips = () => {
-  const [salary, setSalary] = useState({});
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [dynamicPayslips, setDynamicPayslips] = useState([]);
+  const [salary, setSalary]               = useState(getCache("payslips-latest") || {});
+  const [loading, setLoading]             = useState(!getCache("payslips"));
+  const [error, setError]                 = useState("");
+  const [dynamicPayslips, setDynamicPayslips] = useState(getCache("payslips") || []);
   const { user } = useAuth();
   const loggedInUserId = user?.employeeId;
   const isHR = user?.role === "HR";
@@ -39,10 +41,12 @@ const PaySlips = () => {
       );
 
       setDynamicPayslips(sorted);
+      setCache("payslips", sorted);
 
       // ✅ Set latest payslip as salary
       if (sorted.length > 0) {
         setSalary(sorted[0]);
+        setCache("payslips-latest", sorted[0]);
       }
     } catch (err2) {
       if (err2.response && err2.response.status === 404) {
@@ -58,7 +62,8 @@ const PaySlips = () => {
       setError("No employeeId found. Please log in again.");
       return;
     }
-    setLoading(true);
+    // Only show spinner on true first visit — skip if cache already warm
+    if (!getCache("payslips")) setLoading(true);
     fetchPayslips().finally(() => setLoading(false));
   }, [loggedInUserId]);
 

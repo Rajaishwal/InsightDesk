@@ -1,4 +1,6 @@
+// TasksTable.jsx — Table rendering HR-assigned tasks with status badge and timer totals
 import { Trash2Icon } from "lucide-react";
+import { useToast } from "../../context/ToastContext";
 import axios from "../../services/axios";
 
 const STATUS_CHIP = {
@@ -12,6 +14,7 @@ const fmt = (ts) =>
   ts ? new Date(ts).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
 
 const TasksTable = ({ tasks, loading, setTasks }) => {
+  const toast = useToast();
   if (loading)
     return <div className="text-center py-10 text-gray-500 font-medium">Loading tasks…</div>;
 
@@ -38,7 +41,7 @@ const TasksTable = ({ tasks, loading, setTasks }) => {
       setTasks(prev => prev.filter(t => t._id !== taskId));
     } catch (err) {
       console.error(err);
-      alert("Failed to delete task.");
+      toast.error("Failed to delete task.");
     }
   };
 

@@ -1,56 +1,46 @@
+// EmployeeDashboard.jsx — Employee home dashboard: focus ring, project task cards, HR task board, calendar
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/axios";
-import { Calendar, Clock, Layers, CheckSquare, User, TrendingUp, Pencil, ListChecks, MapPin } from "lucide-react";
+import { useAutoRefresh } from "../hooks/useAutoRefresh";
+import { getCache, setCache } from "../utils/pageCache";
+import { Calendar, Clock, Layers, CheckSquare, User, Pencil, ListChecks, MapPin } from "lucide-react";
 import EditProfileModal from "../components/EditProfileModal";
-import TaskBoard from "../components/TaskBoard";
-import ProjectTracklist from "../components/ProjectTracklist";
-
-/* ── SVG Performance Ring ── */
-const Ring = ({ percent, color, label, sub }) => {
-  const r = 36, circ = 2 * Math.PI * r;
-  const dash = Math.min(Math.max(percent, 0), 100) / 100 * circ;
-  return (
-    <div className="flex flex-col items-center gap-1.5">
-      <div className="relative w-[88px] h-[88px]">
-        <svg viewBox="0 0 88 88" className="w-full h-full -rotate-90">
-          <circle cx="44" cy="44" r={r} fill="none" stroke="#f3f4f6" strokeWidth="8" />
-          <circle cx="44" cy="44" r={r} fill="none" stroke={color} strokeWidth="8"
-            strokeDasharray={`${dash} ${circ}`} strokeLinecap="round" />
-        </svg>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-[17px] font-black text-gray-800">{percent}%</span>
-        </div>
-      </div>
-      <p className="text-xs font-bold text-gray-700 text-center">{label}</p>
-      <p className="text-[10px] text-gray-400 text-center">{sub}</p>
-    </div>
-  );
-};
+import HrTaskBoard from "../components/HrTaskBoard";
+import ProjectTaskDrawer from "../components/ProjectTaskDrawer";
+import LiveTaskTimer from "../components/LiveTaskTimer";
 
 /* ── Calendar day status styles ── */
 const DAY_STYLE = {
-  present: ["bg-emerald-100 hover:bg-emerald-200", "text-emerald-700"],
-  late:    ["bg-amber-100   hover:bg-amber-200",   "text-amber-700"],
-  leave:   ["bg-blue-100    hover:bg-blue-200",    "text-blue-700"],
-  absent:  ["bg-red-100     hover:bg-red-200",     "text-red-600"],
-  weekend: ["bg-gray-50",                          "text-gray-300 cursor-default"],
-  future:  ["bg-white",                            "text-gray-200 cursor-default"],
+  present:    ["bg-emerald-100 hover:bg-emerald-200", "text-emerald-700"],
+  late:       ["bg-amber-100   hover:bg-amber-200",   "text-amber-700"],
+  leave:      ["bg-blue-100    hover:bg-blue-200",    "text-blue-700"],
+  "half-leave": [null, "text-blue-700"],   // background handled via inline gradient
+  absent:     ["bg-red-100     hover:bg-red-200",     "text-red-600"],
+  weekend:    ["bg-gray-50",                          "text-gray-300 cursor-default"],
+  future:     ["bg-white",                            "text-gray-200 cursor-default"],
 };
-const STATUS_LABEL = { present:"Present", late:"Late (after 9:30)", leave:"On Leave", absent:"Absent", weekend:"Weekend", future:"—" };
+const STATUS_LABEL = { present:"Present", late:"Late (after 9:30)", leave:"On Leave", "half-leave":"Half Day Leave", absent:"Absent", weekend:"Weekend", future:"—" };
+
+const LEAVE_ABBR = {
+  "Planned Leave":          "PL",
+  "Wellness Leave":         "SL",
+  "Polling Leave":          "PoL",
+  "Unplanned Leave (LOP)":  "LOP",
+};
 
 const PROJ_CHIP = {
-  "Ongoing":   "bg-blue-50   text-blue-700",
-  "Completed": "bg-emerald-50 text-emerald-700",
-  "Pending":   "bg-amber-50  text-amber-700",
+  "Ongoing":   "border border-blue-400    text-blue-600",
+  "Completed": "border border-emerald-400 text-emerald-600",
+  "Pending":   "border border-amber-400   text-amber-600",
 };
 
 const fmtTime = (ts) => ts ? new Date(ts).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }) : "—";
 
 export default function EmployeeDashboard() {
   const { user } = useAuth();
-  const [data, setData]             = useState(null);
-  const [loading, setLoading]       = useState(true);
+  const [data, setData]       = useState(getCache("emp-dashboard") || null);
+  const [loading, setLoading] = useState(!getCache("emp-dashboard"));
   const [hoveredDay, setHoveredDay] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [tracklistProject, setTracklistProject] = useState(null);
@@ -58,7 +48,7 @@ export default function EmployeeDashboard() {
 
   useEffect(() => {
     api.get("/users/employee-dashboard")
-      .then(r => { setData(r.data); setLoading(false); })
+      .then(r => { setData(r.data); setCache("emp-dashboard", r.data); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
 
@@ -68,6 +58,19 @@ export default function EmployeeDashboard() {
       .then(r => setLocationStatus(r.data?.attendance?.status || "checked-out"))
       .catch(() => setLocationStatus("checked-out"));
   }, [user?._id]);
+
+  // Silent background refresh — swaps data in-place, no loading flash
+  const silentRefresh = () => Promise.all([
+    api.get("/users/employee-dashboard").then(r => { setData(r.data); setCache("emp-dashboard", r.data); }).catch(() => {}),
+    user?._id
+      ? api.get(`/attendance/status/${user._id}`)
+          .then(r => setLocationStatus(r.data?.attendance?.status || "checked-out"))
+          .catch(() => {})
+      : Promise.resolve(),
+  ]);
+  useAutoRefresh(silentRefresh, ["crm:attendance:updated", "crm:task:updated"]);
+
+  // Task timer lives in <LiveTaskTimer /> — no polling here
 
   if (loading) return (
     <div className="flex items-center justify-center h-screen bg-gray-50">
@@ -84,7 +87,7 @@ export default function EmployeeDashboard() {
     attendanceDaysThisMonth, workingHoursThisMonth, totalWorkingDaysThisMonth,
     activeProjects, completedProjects, totalProjects,
     completedTasks, totalTasks,
-    attendanceRate, taskCompletionRate, avgWorkingHoursPerDay,
+    taskCompletionRate, avgWorkingHoursPerDay,
     calendarDays = [], projects = [], monthYear,
   } = data;
 
@@ -93,6 +96,8 @@ export default function EmployeeDashboard() {
   const cells       = [...Array(firstDow).fill(null), ...calendarDays];
   const calRows     = [];
   for (let i = 0; i < cells.length; i += 7) calRows.push(cells.slice(i, i + 7));
+
+  /* ── Task time lives in <LiveTaskTimer /> ── */
 
   const statCards = [
     {
@@ -133,7 +138,7 @@ export default function EmployeeDashboard() {
     <div className="p-5 bg-gray-50 min-h-screen space-y-5">
       {showEditModal && <EditProfileModal onClose={() => setShowEditModal(false)} />}
       {tracklistProject && (
-        <ProjectTracklist
+        <ProjectTaskDrawer
           project={tracklistProject}
           onClose={() => setTracklistProject(null)}
           isManager={user?.role !== "employee"}
@@ -142,7 +147,7 @@ export default function EmployeeDashboard() {
 
       {/* ── Profile header ── */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="h-1.5 bg-gradient-to-r from-indigo-500 via-violet-500 to-blue-500" />
+        <div className="h-0.5 bg-gradient-to-r from-indigo-500 via-violet-500 to-blue-500" />
         <div className="px-6 py-4 flex items-center gap-5">
           {/* Avatar with hover edit button */}
           <div className="group relative w-14 h-14 flex-shrink-0">
@@ -241,11 +246,11 @@ export default function EmployeeDashboard() {
               </div>
               <div className="flex items-center gap-3 flex-wrap justify-end">
                 {[
-                  ["bg-emerald-400","Present"],
-                  ["bg-amber-400",  "Late"],
-                  ["bg-blue-400",   "On Leave"],
-                  ["bg-red-400",    "Absent"],
-                ].map(([cls, lbl]) => (
+                  ["bg-emerald-400", null, "Present"],
+                  ["bg-amber-400",   null, "Late"],
+                  ["bg-blue-400",    null, "On Leave"],
+                  ["bg-red-400",     null, "Absent"],
+                ].map(([cls, , lbl]) => (
                   <div key={lbl} className="flex items-center gap-1">
                     <div className={`w-2 h-2 rounded-full ${cls}`} />
                     <span className="text-[10px] text-gray-500">{lbl}</span>
@@ -277,6 +282,7 @@ export default function EmployeeDashboard() {
                 }
 
                 const isInactive = cell.status === "weekend" || cell.status === "future";
+                const isHalfLeave = cell.status === "half-leave";
                 const [bg, text] = isSunday && isInactive
                   ? ["bg-rose-50", "text-rose-200 cursor-default"]
                   : (DAY_STYLE[cell.status] || ["bg-white", "text-gray-200 cursor-default"]);
@@ -286,14 +292,25 @@ export default function EmployeeDashboard() {
                     key={idx}
                     onMouseEnter={() => setHoveredDay(cell)}
                     onMouseLeave={() => setHoveredDay(null)}
+                    style={isHalfLeave ? { background: "linear-gradient(to right, #d1fae5 50%, #dbeafe 50%)" } : undefined}
                     className={`
                       relative h-9 flex items-center justify-center
                       text-[11px] font-bold select-none transition-colors duration-150
-                      ${bg} ${text}
+                      ${isHalfLeave ? "" : `${bg} ${text}`}
                       ${cell.isToday ? "ring-2 ring-inset ring-indigo-400" : ""}
                     `}
                   >
-                    {cell.day}
+                    {isHalfLeave ? (
+                      <>
+                        <span className="absolute left-[25%] -translate-x-1/2 text-[11px] font-bold text-emerald-700">{cell.day}</span>
+                        <span className="absolute right-[25%] translate-x-1/2 text-[9px] font-black text-blue-700 leading-none tracking-wide">HD</span>
+                      </>
+                    ) : cell.day}
+                    {cell.status === "leave" && cell.leaveType && (
+                      <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[7px] font-black text-blue-600 leading-none tracking-wide">
+                        {LEAVE_ABBR[cell.leaveType] ?? cell.leaveType}
+                      </span>
+                    )}
                     {isSunday && (
                       <span className="absolute top-0.5 right-0.5 text-[6px] text-rose-300 leading-none">☀</span>
                     )}
@@ -327,45 +344,14 @@ export default function EmployeeDashboard() {
           </div>
 
           {/* Task Board with live timers */}
-          <TaskBoard />
+          <HrTaskBoard />
         </div>
 
         {/* RIGHT */}
         <div className="space-y-5">
 
-          {/* Performance rings */}
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-            <div className="flex items-center gap-2 mb-5">
-              <TrendingUp className="w-4 h-4 text-indigo-500" />
-              <h2 className="text-sm font-bold text-gray-800">Performance</h2>
-            </div>
-
-            <div className="flex justify-around">
-              <Ring
-                percent={attendanceRate}
-                color="#10b981"
-                label="Attendance Rate"
-                sub={`${attendanceDaysThisMonth} of ${totalWorkingDaysThisMonth} days`}
-              />
-              <Ring
-                percent={taskCompletionRate}
-                color="#6366f1"
-                label="Task Completion"
-                sub={`${completedTasks} of ${totalTasks} tasks`}
-              />
-            </div>
-
-            <div className="mt-5 grid grid-cols-2 gap-2.5">
-              <div className="bg-gray-50 rounded-lg p-3">
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">Avg Hours/Day</p>
-                <p className="text-xl font-black text-gray-800 mt-0.5">{avgWorkingHoursPerDay}<span className="text-sm font-semibold text-gray-400">h</span></p>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-3">
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">Total Hours</p>
-                <p className="text-xl font-black text-gray-800 mt-0.5">{workingHoursThisMonth}<span className="text-sm font-semibold text-gray-400">h</span></p>
-              </div>
-            </div>
-          </div>
+          {/* Today's Focus — isolated component, only it ticks every second */}
+          <LiveTaskTimer checkedOut={locationStatus === "checked-out"} />
 
           {/* Projects */}
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
@@ -375,8 +361,8 @@ export default function EmployeeDashboard() {
                 <h2 className="text-sm font-bold text-gray-800">Projects</h2>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="text-[10px] bg-blue-50   text-blue-600   px-2 py-0.5 rounded font-bold">{activeProjects} active</span>
-                <span className="text-[10px] bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded font-bold">{completedProjects} done</span>
+                <span className="text-[10px] border border-blue-400    text-blue-600   px-2 py-0.5 rounded font-bold">{activeProjects} active</span>
+                <span className="text-[10px] border border-emerald-400 text-emerald-600 px-2 py-0.5 rounded font-bold">{completedProjects} done</span>
               </div>
             </div>
 
@@ -395,7 +381,7 @@ export default function EmployeeDashboard() {
                   >
                     <div className="flex items-center justify-between gap-2 mb-1">
                       <span className="text-[10px] font-bold text-gray-400 font-mono tracking-widest">{proj.projectId}</span>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${PROJ_CHIP[proj.status] || "bg-gray-100 text-gray-500"}`}>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${PROJ_CHIP[proj.status] || "border border-gray-300 text-gray-500"}`}>
                         {proj.status}
                       </span>
                     </div>

@@ -1,3 +1,4 @@
+// Profile.jsx — Employee profile page: personal info, skills, edit profile modal
 import {
   faUser, faSave, faIdBadge, faHome, faBriefcase, faEdit,
   faVenusMars, faBuilding, faClock, faCamera,
@@ -6,6 +7,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useState, useEffect, useRef } from "react";
+import { useToast } from "../context/ToastContext";
 import { useAuth } from "../context/AuthContext";
 import axios from "../services/axios";
 
@@ -35,6 +37,7 @@ const inputCls = (disabled) =>
   }`;
 
 export default function Profile() {
+  const toast = useToast();
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [photoUrl, setPhotoUrl] = useState(null);
@@ -99,9 +102,9 @@ export default function Profile() {
       const { data } = await axios.post("http://localhost:5000/api/upload", fd);
       await axios.put(`http://localhost:5000/api/users/${user._id}/profile`, { photo: data.fileUrl });
       setPhotoUrl(data.fileUrl);
-      alert("Profile photo updated!");
+      toast.success("Profile photo updated!");
     } catch (err) {
-      alert(err.response?.data?.message || "Photo upload failed");
+      toast.error(err?.response?.data?.message || "Photo upload failed");
     } finally {
       setLoading(false);
     }
@@ -139,12 +142,12 @@ export default function Profile() {
     try {
       const { name, email, employeeId, ...rest } = form;
       await axios.put(`http://localhost:5000/api/users/${user._id}/profile`, rest);
-      alert("Profile updated successfully!");
+      toast.success("Profile updated successfully!");
       setSavedBefore(true);
       setEditing(false);
       setEditingAddress(false);
     } catch (err) {
-      alert(err.response?.data?.message || err.message || "Error updating profile");
+      toast.error(err?.response?.data?.message || err.message || "Error updating profile");
     } finally {
       setLoading(false);
     }

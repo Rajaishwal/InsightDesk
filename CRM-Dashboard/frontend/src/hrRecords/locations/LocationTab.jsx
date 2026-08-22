@@ -1,8 +1,11 @@
+// LocationTab.jsx — HR tab showing employee location history and live location pins
 ﻿import React, { useState, useEffect } from "react";
+import { useToast } from "../../context/ToastContext";
 import api from "../../services/axios";
 import LocationFilters from "./LocationFilters";
 
 const LocationTab = () => {
+  const toast = useToast();
   const [employeeLocations, setEmployeeLocations] = useState([]);
   const [locationsLoading, setLocationsLoading] = useState(false);
   const [locationFilters, setLocationFilters] = useState({
@@ -28,16 +31,16 @@ const LocationTab = () => {
         console.log('Set employee locations:', response.data.employees);
       } else {
         console.error('Failed to fetch locations:', response.data.message);
-        alert("Failed to fetch employee locations: " + response.data.message);
+        toast.error("Failed to fetch employee locations: " + response.data.message);
       }
     } catch (error) {
       console.error("Error fetching employee locations:", error);
       if (error.response?.status === 403) {
-        alert("Access denied. You don't have permission to view employee locations.");
+        toast.error("Access denied. No permission to view employee locations.");
       } else if (error.response?.status === 401) {
-        alert("Authentication required. Please log in again.");
+        toast.error("Authentication required. Please log in again.");
       } else {
-        alert("Failed to fetch employee locations: " + (error.response?.data?.message || error.message));
+        toast.error("Failed to fetch employee locations: " + (error?.response?.data?.message || error.message));
       }
     } finally {
       setLocationsLoading(false);
@@ -88,12 +91,12 @@ const LocationTab = () => {
       } else {
         console.log('Failed to fetch location history:', response.data.message);
         setLocationHistoryData(prev => ({ ...prev, [userId]: [] }));
-        alert(`No location history found for this employee: ${response.data.message}`);
+        toast.warning(`No location history found for this employee: ${response.data.message}`);
       }
     } catch (error) {
       console.error("Error fetching location history:", error);
       setLocationHistoryData(prev => ({ ...prev, [userId]: [] }));
-      alert(`Failed to fetch history for employee ${userId}. You may not have permission.`);
+      toast.error(`Failed to fetch history for employee ${userId}.`);
     } finally {
       setHistoryLoading(prev => ({ ...prev, [userId]: false }));
     }
@@ -131,18 +134,18 @@ const LocationTab = () => {
       // Then call the backend to clean up the database
       const response = await api.delete('http://localhost:5000/api/location/clear-inactive');
       if (response.data.success) {
-        alert(`Successfully cleared ${response.data.deletedCount} inactive location records from ${response.data.clearedUsers} users.`);
+        toast.success(`Cleared ${response.data.deletedCount} inactive records from ${response.data.clearedUsers} users.`);
         // Clear any open history data for removed employees
         setLocationHistoryData({});
         setShowLocationHistory({});
       } else {
-        alert('Failed to clear inactive data: ' + response.data.message);
+        toast.error('Failed to clear inactive data: ' + response.data.message);
         // If backend failed, refresh to get accurate data
         await fetchEmployeeLocations();
       }
     } catch (error) {
       console.error('Error clearing inactive data:', error);
-      alert('Failed to clear inactive data: ' + (error.response?.data?.message || error.message));
+      toast.error('Failed to clear inactive data: ' + (error?.response?.data?.message || error.message));
       // If there was an error, refresh to get accurate data
       await fetchEmployeeLocations();
     }

@@ -1,4 +1,7 @@
+// LeaveManagement.jsx — Employee leave application and leave history page
 import { useState, useEffect } from "react";
+import { useAutoRefresh } from "../hooks/useAutoRefresh";
+import { getCache, setCache } from "../utils/pageCache";
 import LeaveDonutChart, { LEAVE_TYPE_KEYS } from "../components/LeaveDonutChart";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/axios";
@@ -47,16 +50,19 @@ const fmt = (d) => new Date(d).toLocaleDateString();
 
 export default function LeaveManagement() {
   const { user } = useAuth();
-  const [leaves, setLeaves] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [statsLoading, setStatsLoading] = useState(true);
+  const [leaves, setLeaves]         = useState(getCache("leaves") || []);
+  const [loading, setLoading]       = useState(!getCache("leaves"));
+  const [statsLoading, setStatsLoading] = useState(!getCache("leave-stats"));
   const [refreshing, setRefreshing] = useState(false);
-  const [leaveStats, setLeaveStats] = useState({ taken: 0, pending: 0, remaining: 0, monthlyAllocation: null });
+  const [leaveStats, setLeaveStats] = useState(getCache("leave-stats") || { taken: 0, pending: 0, remaining: 0, monthlyAllocation: null });
   const [showModal, setShowModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [cancellingId, setCancellingId] = useState(null);
   const [toast, setToast] = useState(null); // { type: 'success'|'error', msg }
-  const [form, setForm] = useState({ startDate: "", endDate: "", leaveType: LEAVE_TYPE_KEYS[0], reason: "" });
+  const [form, setForm] = useState({ startDate: "", endDate: "", leaveType: LEAVE_TYPE_KEYS[0], reason: "", halfDay: false });
+
+  // Leave types that support half-day option (Polling Leave excluded)
+  const HALF_DAY_TYPES = ["Planned Leave", "Wellness Leave", "Unplanned Leave (LOP)"];
   const [formErr, setFormErr] = useState("");
 
   const showToast = (type, msg) => {
@@ -68,7 +74,9 @@ export default function LeaveManagement() {
     try {
       if (!silent) setLoading(true); else setRefreshing(true);
       const res = await api.get("http://localhost:5000/api/leaves/my-leaves");
-      setLeaves(res.data.leaves || []);
+      const list = res.data.leaves || [];
+      setLeaves(list);
+      setCache("leaves", list);
     } catch {
       if (!silent) showToast("error", "Failed to load leave requests.");
     } finally {
@@ -81,12 +89,14 @@ export default function LeaveManagement() {
       setStatsLoading(true);
       const res = await api.get("http://localhost:5000/api/leaves/stats");
       const ma = res.data.monthlyAllocation;
-      setLeaveStats({
+      const computed = {
         taken: res.data.totalDaysTaken || 0,
         pending: res.data.totalDaysPending || 0,
         remaining: Math.max(0, ma ? ma.remainingLeaves : 0),
         monthlyAllocation: ma,
-      });
+      };
+      setLeaveStats(computed);
+      setCache("leave-stats", computed);
     } catch {
       /* silent */
     } finally {
@@ -104,17 +114,28 @@ export default function LeaveManagement() {
     if (user) { fetchLeaves(); fetchStats(); }
   }, [user]);
 
+  useAutoRefresh(
+    () => Promise.all([fetchLeaves(true), fetchStats()]),
+    ["crm:leave:updated"]
+  );
+
   const handleDateChange = (field, val) => {
     if (!val) { setForm(p => ({ ...p, [field]: "" })); return; }
-    setForm(p => ({ ...p, [field]: isWeekend(val) ? nextWorkingDay(val) : val }));
+    const adjusted = isWeekend(val) ? nextWorkingDay(val) : val;
+    // When half-day is on, keep end date locked to start date
+    if (field === "startDate" && form.halfDay) {
+      setForm(p => ({ ...p, startDate: adjusted, endDate: adjusted }));
+    } else {
+      setForm(p => ({ ...p, [field]: adjusted }));
+    }
   };
 
   const handleSubmit = async () => {
-    if (!form.startDate || !form.endDate || !form.leaveType) {
+    if (!form.startDate || (!form.halfDay && !form.endDate) || !form.leaveType) {
       setFormErr("Please fill in Start Date, End Date and Leave Type.");
       return;
     }
-    if (new Date(form.endDate) < new Date(form.startDate)) {
+    if (!form.halfDay && new Date(form.endDate) < new Date(form.startDate)) {
       setFormErr("End Date cannot be before Start Date.");
       return;
     }
@@ -123,13 +144,15 @@ export default function LeaveManagement() {
       setSubmitting(true);
       await api.post("http://localhost:5000/api/leaves/apply", {
         startDate: form.startDate,
-        endDate: form.endDate,
+        endDate: form.halfDay ? form.startDate : form.endDate,
         leaveType: form.leaveType,
         reason: form.reason,
+        halfDay: form.halfDay,
       });
       setShowModal(false);
-      setForm({ startDate: "", endDate: "", leaveType: LEAVE_TYPE_KEYS[0], reason: "" });
+      setForm({ startDate: "", endDate: "", leaveType: LEAVE_TYPE_KEYS[0], reason: "", halfDay: false });
       showToast("success", "Leave application submitted successfully!");
+      window.dispatchEvent(new CustomEvent("crm:leave:updated"));
       await fetchLeaves();
       await fetchStats();
     } catch (err) {
@@ -144,6 +167,7 @@ export default function LeaveManagement() {
       setCancellingId(leaveId);
       await api.delete(`http://localhost:5000/api/leaves/cancel/${leaveId}`);
       showToast("success", "Leave request cancelled.");
+      window.dispatchEvent(new CustomEvent("crm:leave:updated"));
       await fetchLeaves();
       await fetchStats();
     } catch (err) {
@@ -153,7 +177,7 @@ export default function LeaveManagement() {
     }
   };
 
-  const workingDays = calcWorkingDays(form.startDate, form.endDate);
+  const workingDays = form.halfDay ? 0.5 : calcWorkingDays(form.startDate, form.endDate);
 
   return (
     <div className="page-container p-6 font-sans">
@@ -221,7 +245,11 @@ export default function LeaveManagement() {
                     <td className="px-4 py-3 text-gray-700">{fmt(leave.startDate)}</td>
                     <td className="px-4 py-3 text-gray-700">{fmt(leave.endDate)}</td>
                     <td className="px-4 py-3 text-gray-700">{leave.leaveType}</td>
-                    <td className="px-4 py-3 font-medium text-gray-700">{leave.totalDays}</td>
+                    <td className="px-4 py-3 font-medium text-gray-700">
+                      {leave.halfDay
+                        ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-600 text-xs font-semibold">½ day</span>
+                        : leave.totalDays}
+                    </td>
                     <td className="px-4 py-3 text-gray-500 max-w-[180px] truncate">{leave.reason || "—"}</td>
                     <td className="px-4 py-3">
                       <span className={`${CODE_BASE} ${STATUS_CHIP[leave.status] || "border-gray-300 text-gray-600"}`}>
@@ -260,7 +288,7 @@ export default function LeaveManagement() {
                 <p className="text-indigo-200 text-xs mt-0.5">Fill in the details below to apply</p>
               </div>
               <button
-                onClick={() => { setShowModal(false); setFormErr(""); }}
+                onClick={() => { setShowModal(false); setFormErr(""); setForm({ startDate: "", endDate: "", leaveType: LEAVE_TYPE_KEYS[0], reason: "", halfDay: false }); }}
                 className="text-indigo-200 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition"
               >
                 <X size={18} />
@@ -296,20 +324,30 @@ export default function LeaveManagement() {
                   </label>
                   <input
                     type="date"
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 focus:ring-2 focus:ring-indigo-400 focus:outline-none focus:border-transparent"
-                    value={form.endDate}
+                    className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none focus:border-transparent transition-colors
+                      ${form.halfDay
+                        ? "border-amber-200 bg-amber-50 text-amber-600 cursor-not-allowed"
+                        : "border-gray-200 text-gray-700"}`}
+                    value={form.halfDay ? form.startDate : form.endDate}
                     min={form.startDate || minDate()}
+                    disabled={form.halfDay}
                     onChange={(e) => handleDateChange("endDate", e.target.value)}
                   />
+                  {form.halfDay && (
+                    <p className="text-[11px] text-amber-500 mt-1 ml-1">Same as start date for half-day</p>
+                  )}
                 </div>
               </div>
 
               {/* Working days pill */}
-              {form.startDate && form.endDate && (
-                <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-2.5">
-                  <span className="text-2xl font-bold text-indigo-600">{workingDays}</span>
-                  <span className="text-sm text-indigo-500">working {workingDays === 1 ? "day" : "days"} requested
-                    <span className="text-indigo-300 text-xs ml-1">(weekends excluded)</span>
+              {form.startDate && (form.halfDay || form.endDate) && (
+                <div className={`flex items-center gap-2 border rounded-xl px-4 py-2.5 ${form.halfDay ? "bg-amber-50 border-amber-100" : "bg-indigo-50 border-indigo-100"}`}>
+                  <span className={`text-2xl font-bold ${form.halfDay ? "text-amber-500" : "text-indigo-600"}`}>
+                    {form.halfDay ? "½" : workingDays}
+                  </span>
+                  <span className={`text-sm ${form.halfDay ? "text-amber-600" : "text-indigo-500"}`}>
+                    {form.halfDay ? "half day requested" : `working ${workingDays === 1 ? "day" : "days"} requested`}
+                    {!form.halfDay && <span className="text-indigo-300 text-xs ml-1">(weekends excluded)</span>}
                   </span>
                 </div>
               )}
@@ -327,7 +365,12 @@ export default function LeaveManagement() {
                       <button
                         key={t}
                         type="button"
-                        onClick={() => setForm(p => ({ ...p, leaveType: t }))}
+                        onClick={() => setForm(p => ({
+                          ...p,
+                          leaveType: t,
+                          // Reset half-day when switching to Polling Leave
+                          halfDay: HALF_DAY_TYPES.includes(t) ? p.halfDay : false,
+                        }))}
                         className={`text-left px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all
                           ${active
                             ? `${m.border} ${m.bg} ${m.text}`
@@ -343,6 +386,31 @@ export default function LeaveManagement() {
                   })}
                 </div>
               </div>
+
+              {/* Half-day toggle — only for PL, SL, LOP (not Polling Leave) */}
+              {HALF_DAY_TYPES.includes(form.leaveType) && (
+                <div className="flex items-center justify-between bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
+                  <div>
+                    <div className="text-sm font-semibold text-amber-700">Half Day</div>
+                    <div className="text-xs text-amber-500 mt-0.5">Deducts 0.5 days from your leave balance</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = !form.halfDay;
+                      setForm(p => ({
+                        ...p,
+                        halfDay: next,
+                        // Lock end date to start date when enabling half-day
+                        ...(next && p.startDate ? { endDate: p.startDate } : {}),
+                      }));
+                    }}
+                    className={`relative flex-shrink-0 w-11 h-6 rounded-full overflow-hidden transition-colors duration-200 focus:outline-none ${form.halfDay ? "bg-amber-400" : "bg-gray-200"}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${form.halfDay ? "translate-x-5" : "translate-x-0"}`} />
+                  </button>
+                </div>
+              )}
 
               {/* Reason */}
               <div>
@@ -369,7 +437,7 @@ export default function LeaveManagement() {
                   {submitting ? "Submitting..." : "Submit Request"}
                 </button>
                 <button
-                  onClick={() => { setShowModal(false); setFormErr(""); }}
+                  onClick={() => { setShowModal(false); setFormErr(""); setForm({ startDate: "", endDate: "", leaveType: LEAVE_TYPE_KEYS[0], reason: "", halfDay: false }); }}
                   className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 font-semibold py-2.5 rounded-xl text-sm transition"
                 >
                   Cancel
