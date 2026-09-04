@@ -83,6 +83,12 @@ export const addProjectTask = async (req, res) => {
       createdByRole: user.role,
     });
 
+    // A new Pending task means the project is no longer fully Completed
+    if (project.status === 'Completed') {
+      project.status = 'Ongoing';
+      await project.save();
+    }
+
     await logActivity({
       projectId:   task.projectId,
       projectName: project.title,
@@ -131,26 +137,58 @@ export const updateTaskStatus = async (req, res) => {
     }
 
     const fromStatus = task.status;
-    task.status = status;
-    if (status === 'Completed') task.completedAt = new Date();
-    else task.completedAt = undefined;
 
-    await task.save();
+    // When marking Completed: stop all running timers first using direct DB ops
+    // (avoids Mongoose nested-array change-tracking issues — same pattern as stopTimer)
+    if (status === 'Completed') {
+      const now = new Date();
+      const runningEntries = task.timers.filter(e => e.timerStartedAt);
+      for (const entry of runningEntries) {
+        const elapsed  = Math.floor((now - new Date(entry.timerStartedAt)) / 1000);
+        const newTotal = (entry.totalTimeLogged || 0) + elapsed;
+        // Split into two separate updateOne calls:
+        // $set is critical (clears timerStartedAt); $push for session log is secondary.
+        // Combining them in one call risks a silent no-op if the combined update is rejected.
+        await ProjectTask.updateOne(
+          { _id: task._id, 'timers.userId': entry.userId },
+          { $set: { 'timers.$.timerStartedAt': null, 'timers.$.totalTimeLogged': newTotal } }
+        );
+        try {
+          await ProjectTask.updateOne(
+            { _id: task._id, 'timers.userId': entry.userId },
+            { $push: { 'timers.$.sessions': { startTime: new Date(entry.timerStartedAt), endTime: now, duration: elapsed } } }
+          );
+        } catch (sessionErr) {
+          console.warn('Session log failed (non-critical):', sessionErr.message);
+        }
+      }
+    }
+
+    // Reload so status save doesn't overwrite the timer changes above
+    const freshTask = await ProjectTask.findById(taskId);
+    freshTask.status = status;
+    if (status === 'Completed') freshTask.completedAt = new Date();
+    else freshTask.completedAt = undefined;
+
+    await freshTask.save();
+    // Re-assign so the rest of the handler (project sync, logActivity) uses freshTask
+    Object.assign(task, freshTask.toObject());
 
     const project = await Project.findOne({ projectId: task.projectId });
 
-    // Auto-sync project status based on task status change:
-    // • Any task → Ongoing  : project becomes Ongoing  (if it was Pending)
-    // • All tasks Completed : project becomes Completed (if not already)
+    // Recompute project status from ALL tasks every time a task status changes:
+    // • All tasks Completed → project Completed
+    // • Any task Pending/Ongoing → project Ongoing (project has work in progress)
+    // • No tasks → leave project status unchanged
+    // freshTask.save() has already run above, so the DB reflects the new status.
     if (project) {
-      if (status === 'Ongoing' && project.status === 'Pending') {
-        project.status = 'Ongoing';
-        await project.save();
-      } else if (status === 'Completed') {
-        const allTasks = await ProjectTask.find({ projectId: task.projectId });
-        const allDone  = allTasks.every(t => t._id.toString() === taskId || t.status === 'Completed');
-        if (allDone && project.status !== 'Completed') {
-          project.status = 'Completed';
+      const allTasks = await ProjectTask.find({ projectId: task.projectId });
+      if (allTasks.length > 0) {
+        const newProjectStatus = allTasks.every(t => t.status === 'Completed')
+          ? 'Completed'
+          : 'Ongoing';
+        if (project.status !== newProjectStatus) {
+          project.status = newProjectStatus;
           await project.save();
         }
       }
@@ -168,7 +206,7 @@ export const updateTaskStatus = async (req, res) => {
       toStatus:    status,
     });
 
-    getIo()?.emit("task:updated");
+    getIo()?.emit("crm:task:updated");
     res.json({ task });
   } catch (err) {
     res.status(500).json({ message: 'Server error updating task status' });
@@ -187,9 +225,10 @@ export const startTimer = async (req, res) => {
 
     // Enforce one active timer across both ProjectTask and HrTask
     // $elemMatch ensures BOTH conditions match the same array element (same user's entry)
+    // Exclude Completed tasks — a stale timerStartedAt on a completed task must never block a new start
     const [activeProjTimer, activeHrTimer] = await Promise.all([
-      ProjectTask.findOne({ timers: { $elemMatch: { userId, timerStartedAt: { $ne: null } } } }),
-      HRTask.findOne({      timers: { $elemMatch: { userId, timerStartedAt: { $ne: null } } } }),
+      ProjectTask.findOne({ status: { $ne: 'Completed' }, timers: { $elemMatch: { userId, timerStartedAt: { $ne: null } } } }),
+      HRTask.findOne({                                     timers: { $elemMatch: { userId, timerStartedAt: { $ne: null } } } }),
     ]);
     const activeTask = activeProjTimer || activeHrTimer;
     if (activeTask && activeTask._id.toString() !== taskId) {
@@ -209,6 +248,20 @@ export const startTimer = async (req, res) => {
     await task.save();
 
     const project = await Project.findOne({ projectId: task.projectId });
+
+    // Recompute project status — starting a timer can move a task from Pending → Ongoing,
+    // which means a "Completed" project must revert to "Ongoing"
+    if (project) {
+      const allTasks = await ProjectTask.find({ projectId: task.projectId });
+      if (allTasks.length > 0) {
+        const newProjectStatus = allTasks.every(t => t.status === 'Completed') ? 'Completed' : 'Ongoing';
+        if (project.status !== newProjectStatus) {
+          project.status = newProjectStatus;
+          await project.save();
+        }
+      }
+    }
+
     await logActivity({
       projectId:   task.projectId,
       projectName: project?.title || task.projectId,
@@ -221,6 +274,7 @@ export const startTimer = async (req, res) => {
       toStatus:    task.status,
     });
 
+    getIo()?.emit("crm:task:updated");
     res.json({ task });
   } catch (err) {
     res.status(500).json({ message: 'Server error starting timer' });
@@ -269,6 +323,7 @@ export const stopTimer = async (req, res) => {
       action:      'timer_stopped',
     });
 
+    getIo()?.emit("crm:task:updated");
     res.json({ task: updatedTask });
   } catch (err) {
     res.status(500).json({ message: 'Server error stopping timer' });
@@ -301,7 +356,8 @@ export const getMyTodayTime = async (req, res) => {
         }
       }
 
-      if (entry.timerStartedAt) {
+      // Only count as running if the task is not Completed (guards against stale timerStartedAt on completed tasks)
+      if (entry.timerStartedAt && task.status !== 'Completed') {
         isRunning = true;
         // Cap to start of today — prevents stale timers from past days inflating the count
         const startedAt = new Date(entry.timerStartedAt);
