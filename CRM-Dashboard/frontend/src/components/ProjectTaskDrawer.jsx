@@ -100,14 +100,11 @@ export default function ProjectTaskDrawer({ project, onClose, isManager }) {
   const handleStatusChange = async (taskId, status, isRevision) => {
     try {
       setStatusLoading(taskId);
-      await api.put(`http://localhost:5000/api/project-tasks/${taskId}/status`, { status });
-      setTasks(prev =>
-        prev.map(t =>
-          t._id === taskId
-            ? { ...t, status, completedAt: status === "Completed" ? new Date() : t.completedAt }
-            : t
-        )
-      );
+      const res = await api.put(`http://localhost:5000/api/project-tasks/${taskId}/status`, { status });
+      // Use the server's response — not an optimistic update — so the timer
+      // state (timerStartedAt: null) is reflected immediately after completion
+      const updated = res.data.task;
+      setTasks(prev => prev.map(t => t._id === taskId ? updated : t));
       window.dispatchEvent(new CustomEvent("crm:task:updated"));
       if (isRevision && status === "Completed") {
         showToast("success", "Revision complete — manager has been notified.");
@@ -132,6 +129,8 @@ export default function ProjectTaskDrawer({ project, onClose, isManager }) {
       setTimerLoading(task._id);
       const res = await api.post(`http://localhost:5000/api/project-tasks/${task._id}/timer/${action}`);
       setTasks(prev => prev.map(t => t._id === task._id ? res.data.task : t));
+      // Notify dashboard so it re-fetches activeTimerProjectId and re-sorts the project list
+      window.dispatchEvent(new CustomEvent("crm:task:updated"));
       if (!running) showToast("success", "Timer started");
     } catch (err) {
       showToast("error", err.response?.data?.message || `Failed to ${action} timer`);
@@ -185,13 +184,23 @@ export default function ProjectTaskDrawer({ project, onClose, isManager }) {
             </div>
           ) : (
             <div>
-              {tasks.map((task, i) => {
-                const isLast   = i === tasks.length - 1;
+              {[...tasks]
+                .sort((a, b) => {
+                  // Ongoing → Pending → Completed
+                  const order = { Ongoing: 0, Pending: 1, Completed: 2 };
+                  const diff = (order[a.status] ?? 1) - (order[b.status] ?? 1);
+                  if (diff !== 0) return diff;
+                  // Within same status group: oldest first
+                  return new Date(a.createdAt) - new Date(b.createdAt);
+                })
+                .map((task, i, arr) => {
+                const isLast   = i === arr.length - 1;
                 const style    = STATUS_STYLES[task.status] || STATUS_STYLES.Pending;
                 const dotCls   = task.isRevision ? "bg-red-500" : style.dot;
                 const badgeCls = task.isRevision ? "bg-red-100 text-red-700" : style.badge;
                 const timer       = myTimer(task);
-                const running     = !!timer?.timerStartedAt;
+                // A Completed task is never "running" — even if DB still has a stale timerStartedAt
+                const running     = !!timer?.timerStartedAt && task.status !== "Completed";
                 const base        = timer?.totalTimeLogged || 0;
                 const busy        = timerLoading === task._id || statusLoading === task._id;
                 // Only the creator (or admin) can complete the task
@@ -306,7 +315,7 @@ export default function ProjectTaskDrawer({ project, onClose, isManager }) {
                               <span key={idx} className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full flex items-center gap-1">
                                 <span className="font-medium">{t.userName}</span>
                                 <span className="text-gray-400">{fmtDuration(t.totalTimeLogged)}</span>
-                                {t.timerStartedAt && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block animate-pulse" />}
+                                {t.timerStartedAt && task.status !== "Completed" && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block animate-pulse" />}
                               </span>
                             ))}
                         </div>

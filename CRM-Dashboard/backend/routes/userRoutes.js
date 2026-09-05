@@ -5,6 +5,7 @@ import Attendance from '../model/Attendance.js';
 import Project from '../model/Project.js';
 import Leave from '../model/Leave.js';
 import Break from '../models/Break.js';
+import ProjectTask from '../model/ProjectTask.js';
 import {
   updateUserProfile,
   getAllUsers,
@@ -269,8 +270,16 @@ router.get('/employee-dashboard', protect, async (req, res) => {
     const endStr = lastDay.toISOString().split('T')[0];
     const daysInMonth = lastDay.getDate();
 
-    const [attendance, projects, tasks, leaves] = await Promise.all([
-      Attendance.find({ userId, date: { $gte: startStr, $lte: todayStr } }).sort({ date: 1 }).lean(),
+    // Compute Monday of current week so the attendance query covers it even if it's in last month
+    const _dow = now.getDay();
+    const _daysSinceMon = _dow === 0 ? 6 : _dow - 1;
+    const _monDate = new Date(now);
+    _monDate.setDate(now.getDate() - _daysSinceMon);
+    const weekQueryStart = _monDate.toISOString().split('T')[0];
+    const attendanceStart = weekQueryStart < startStr ? weekQueryStart : startStr;
+
+    const [attendance, projects, hrTasks, leaves] = await Promise.all([
+      Attendance.find({ userId, date: { $gte: attendanceStart, $lte: todayStr } }).sort({ date: 1 }).lean(),
       Project.find({
         $or: [{ 'teamMembers.empId': empId }, { 'teamMembers.empEmail': req.user.email }],
         statusFlag: true,
@@ -283,6 +292,15 @@ router.get('/employee-dashboard', protect, async (req, res) => {
         endDate: { $gte: new Date(startStr + 'T00:00:00') },
       }).lean(),
     ]);
+
+    // Fetch project tasks for all the user's projects
+    const projectIds = projects.map(p => p.projectId);
+    const projectTasks = projectIds.length > 0
+      ? await ProjectTask.find({ projectId: { $in: projectIds } }).lean()
+      : [];
+
+    // Combine project tasks + HR tasks for the Tasks Done card
+    const tasks = [...projectTasks, ...hrTasks];
 
     // Build leave date sets — track half-day leaves separately
     const leaveDates = new Set();
@@ -342,6 +360,14 @@ router.get('/employee-dashboard', protect, async (req, res) => {
       calendarDays.push({ date: ds, day: d, dow, status, checkIn, checkOut, workingHours, isToday, halfDay: halfDayDates.has(ds), leaveType: leaveDateTypes[ds] || null });
     }
 
+    // Find which project has the user's currently running task timer
+    const activeTimerTask = projectTasks.find(t => {
+      if (t.status === 'Completed') return false;
+      const myTimer = (t.timers || []).find(tm => tm.userId?.toString() === userId.toString());
+      return !!myTimer?.timerStartedAt;
+    });
+    const activeTimerProjectId = activeTimerTask?.projectId || null;
+
     const totalTasks = tasks.length;
     const completedTasks = tasks.filter(t => t.status === 'Completed').length;
     const activeProjects = projects.filter(p => p.status === 'Ongoing').length;
@@ -350,11 +376,29 @@ router.get('/employee-dashboard', protect, async (req, res) => {
     const attendanceRate = effectiveWorkDays > 0 ? Math.round((presentDays / effectiveWorkDays) * 100) : 100;
     const taskCompletionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
+    // Current-week stats for the Days Present card — denominator is always 5 (Mon–Fri)
+    const currentDow = now.getDay(); // 0=Sun, 1=Mon, …, 6=Sat
+    const daysSinceMon = currentDow === 0 ? 6 : currentDow - 1;
+    const monDate = new Date(now);
+    monDate.setDate(now.getDate() - daysSinceMon);
+    monDate.setHours(0, 0, 0, 0);
+    // Iterate Mon–Fri using attMap (safe — avoids Date-vs-string comparison bugs)
+    let weekPresentDays = 0, weekLeaveDays = 0;
+    for (let i = 0; i < 5; i++) {
+      const d = new Date(monDate);
+      d.setDate(monDate.getDate() + i);
+      const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      if (attMap[ds]) weekPresentDays++;
+      if (leaveDates.has(ds)) weekLeaveDays += halfDayDates.has(ds) ? 0.5 : 1;
+    }
+    const weekWorkingDays = 5 - weekLeaveDays; // 5 = Mon–Fri, minus approved leave days
+
     res.json({
-      attendanceDaysThisMonth: presentDays,
+      attendanceDaysThisMonth: weekPresentDays,       // this week's present days
       workingHoursThisMonth: Math.round(totalWorkHours * 10) / 10,
-      totalWorkingDaysThisMonth: effectiveWorkDays,
+      totalWorkingDaysThisMonth: weekWorkingDays,     // always 5 minus leave days
       activeProjects, completedProjects, totalProjects: projects.length,
+      activeTimerProjectId,
       completedTasks, totalTasks,
       attendanceRate, taskCompletionRate,
       avgWorkingHoursPerDay: presentDays > 0 ? Math.round((totalWorkHours / presentDays) * 10) / 10 : 0,

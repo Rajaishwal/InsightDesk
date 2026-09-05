@@ -14,7 +14,9 @@ const fmtHM = (sec) => {
   const h = Math.floor(sec / 3600);
   const m = Math.floor((sec % 3600) / 60);
   const s = sec % 60;
-  return h > 0 ? `${h}h ${m}m` : m > 0 ? `${m}m ${s}s` : `${s}s`;
+  if (h > 0) return `${h}h ${String(m).padStart(2, "0")}m ${String(s).padStart(2, "0")}s`;
+  if (m > 0) return `${m}m ${String(s).padStart(2, "0")}s`;
+  return `${s}s`;
 };
 
 export default function LiveTaskTimer({ checkedOut = false }) {
@@ -76,7 +78,7 @@ export default function LiveTaskTimer({ checkedOut = false }) {
 
       {/* Arc Ring */}
       <div className="flex flex-col items-center mb-5">
-        <div className="relative w-[130px] h-[130px]">
+        <div className="relative w-[160px] h-[160px]">
           <svg viewBox="0 0 110 110" className="w-full h-full -rotate-90">
             <circle cx="55" cy="55" r={r} fill="none" stroke="#f1f5f9" strokeWidth="10" />
             <circle cx="55" cy="55" r={r} fill="none" stroke={arcColor} strokeWidth="10"
@@ -86,7 +88,7 @@ export default function LiveTaskTimer({ checkedOut = false }) {
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className={`text-[18px] font-black leading-none ${actualTaskSec > 0 ? textColor : "text-gray-300"}`}>
+            <span className={`text-[16px] font-black leading-none uppercase tracking-wide ${actualTaskSec > 0 ? textColor : "text-gray-300"}`}>
               {fmtHM(actualTaskSec)}
             </span>
             <span className="text-[9px] text-gray-400 font-semibold uppercase tracking-widest mt-0.5">
@@ -114,7 +116,7 @@ export default function LiveTaskTimer({ checkedOut = false }) {
           <p className="text-sm font-black text-emerald-600">✓ Daily target reached!</p>
         ) : (
           <>
-            <p className={`text-lg font-black ${textColor}`}>{fmtHM(remainingSec)}</p>
+            <p className={`text-lg font-black uppercase tracking-wide ${textColor}`}>{fmtHM(remainingSec)}</p>
             <p className="text-[10px] text-gray-400 mt-0.5">remaining to reach 6.5h target</p>
           </>
         )}

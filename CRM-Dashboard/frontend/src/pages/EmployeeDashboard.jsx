@@ -86,10 +86,20 @@ export default function EmployeeDashboard() {
   const {
     attendanceDaysThisMonth, workingHoursThisMonth, totalWorkingDaysThisMonth,
     activeProjects, completedProjects, totalProjects,
+    activeTimerProjectId,
     completedTasks, totalTasks,
     taskCompletionRate, avgWorkingHoursPerDay,
     calendarDays = [], projects = [], monthYear,
   } = data;
+
+  // Project with active timer first → then Ongoing → Pending → Completed
+  const STATUS_ORDER = { Ongoing: 0, Pending: 1, Completed: 2 };
+  const sortedProjects = [...projects].sort((a, b) => {
+    const aActive = a.projectId === activeTimerProjectId ? -1 : 0;
+    const bActive = b.projectId === activeTimerProjectId ? -1 : 0;
+    if (aActive !== bActive) return aActive - bActive;
+    return (STATUS_ORDER[a.status] ?? 1) - (STATUS_ORDER[b.status] ?? 1);
+  });
 
   /* ── Calendar grid ── */
   const firstDow    = calendarDays.length > 0 ? (new Date(calendarDays[0].date).getDay() + 6) % 7 : 0;
@@ -103,7 +113,7 @@ export default function EmployeeDashboard() {
     {
       label: "Days Present",
       value: attendanceDaysThisMonth,
-      sub:   `of ${totalWorkingDaysThisMonth} working days`,
+      sub:   `of ${totalWorkingDaysThisMonth} working days this week`,
       Icon:  Calendar,
       iconBg: "bg-emerald-50", iconColor: "text-emerald-600",
       accent: "border-l-4 border-emerald-400",
@@ -373,14 +383,27 @@ export default function EmployeeDashboard() {
               </div>
             ) : (
               <div className="space-y-2">
-                {projects.map((proj) => (
+                {sortedProjects.map((proj) => {
+                  const hasActiveTimer = proj.projectId === activeTimerProjectId;
+                  return (
                   <button
                     key={proj._id}
                     onClick={() => setTracklistProject(proj)}
-                    className="w-full text-left p-3 rounded-lg border border-gray-100 hover:border-indigo-300 hover:bg-indigo-50/40 transition group"
+                    className={`w-full text-left p-3 rounded-lg border transition group
+                      ${hasActiveTimer
+                        ? "border-indigo-300 bg-indigo-50/40 hover:bg-indigo-50/70"
+                        : "border-gray-100 hover:border-indigo-300 hover:bg-indigo-50/40"}`}
                   >
                     <div className="flex items-center justify-between gap-2 mb-1">
-                      <span className="text-[10px] font-bold text-gray-400 font-mono tracking-widest">{proj.projectId}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold text-gray-400 font-mono tracking-widest">{proj.projectId}</span>
+                        {hasActiveTimer && (
+                          <span className="flex items-center gap-1 text-[9px] text-indigo-500 font-semibold">
+                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse inline-block" />
+                            Timer running
+                          </span>
+                        )}
+                      </div>
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${PROJ_CHIP[proj.status] || "border border-gray-300 text-gray-500"}`}>
                         {proj.status}
                       </span>
@@ -397,7 +420,8 @@ export default function EmployeeDashboard() {
                       </span>
                     </div>
                   </button>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

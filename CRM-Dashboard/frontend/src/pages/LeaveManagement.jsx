@@ -50,8 +50,8 @@ const fmt = (d) => new Date(d).toLocaleDateString();
 
 export default function LeaveManagement() {
   const { user } = useAuth();
-  const [leaves, setLeaves]         = useState(getCache("leaves") || []);
-  const [loading, setLoading]       = useState(!getCache("leaves"));
+  const [leaves, setLeaves] = useState(getCache("leaves") || []);
+  const [loading, setLoading] = useState(!getCache("leaves"));
   const [statsLoading, setStatsLoading] = useState(!getCache("leave-stats"));
   const [refreshing, setRefreshing] = useState(false);
   const [leaveStats, setLeaveStats] = useState(getCache("leave-stats") || { taken: 0, pending: 0, remaining: 0, monthlyAllocation: null });
@@ -230,7 +230,7 @@ export default function LeaveManagement() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  {["Start Date", "End Date", "Type", "Days", "Reason", "Status", "Applied", ""].map(h => (
+                  {["Start Date", "End Date", "Type", "Days", "Reason", "Status", "Applied", "Action"].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
                   ))}
                 </tr>
@@ -248,7 +248,7 @@ export default function LeaveManagement() {
                     <td className="px-4 py-3 font-medium text-gray-700">
                       {leave.halfDay
                         ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-600 text-xs font-semibold">½ day</span>
-                        : leave.totalDays}
+                        : <span className="inline-flex items-center px-2.5 py-0.5 rounded-full border border-indigo-200 text-indigo-600 text-xs font-semibold bg-indigo-50">{leave.totalDays}</span>}
                     </td>
                     <td className="px-4 py-3 text-gray-500 max-w-[180px] truncate">{leave.reason || "—"}</td>
                     <td className="px-4 py-3">
@@ -262,7 +262,7 @@ export default function LeaveManagement() {
                         <button
                           onClick={() => handleCancel(leave._id)}
                           disabled={cancellingId === leave._id}
-                          className="text-xs text-red-500 hover:text-red-700 font-medium transition disabled:opacity-50"
+                          className="text-xs text-red-500 border border-red-300 hover:bg-red-50 font-semibold px-3 py-1 rounded-full transition disabled:opacity-50"
                         >
                           {cancellingId === leave._id ? "Cancelling..." : "Cancel"}
                         </button>
@@ -428,20 +428,23 @@ export default function LeaveManagement() {
               </div>
 
               {/* Actions */}
-              <div className="flex gap-3 pt-1">
-                <button
-                  onClick={handleSubmit}
-                  disabled={submitting}
-                  className="flex-1 bg-indigo-500 hover:bg-indigo-600 disabled:bg-indigo-300 text-white font-semibold py-2.5 rounded-xl text-sm transition shadow-sm shadow-indigo-200"
-                >
-                  {submitting ? "Submitting..." : "Submit Request"}
-                </button>
-                <button
-                  onClick={() => { setShowModal(false); setFormErr(""); setForm({ startDate: "", endDate: "", leaveType: LEAVE_TYPE_KEYS[0], reason: "", halfDay: false }); }}
-                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 font-semibold py-2.5 rounded-xl text-sm transition"
-                >
-                  Cancel
-                </button>
+              <div className="pt-1">
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Action</label>
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleSubmit}
+                    disabled={submitting}
+                    className="flex-1 bg-indigo-500 hover:bg-indigo-600 disabled:bg-indigo-300 text-white font-semibold py-2.5 rounded-full text-sm transition shadow-sm shadow-indigo-200"
+                  >
+                    {submitting ? "Submitting..." : "Submit Request"}
+                  </button>
+                  <button
+                    onClick={() => { setShowModal(false); setFormErr(""); setForm({ startDate: "", endDate: "", leaveType: LEAVE_TYPE_KEYS[0], reason: "", halfDay: false }); }}
+                    className="flex-1 border border-red-300 text-red-500 hover:bg-red-50 font-semibold py-2.5 rounded-full text-sm transition"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
 
             </div>

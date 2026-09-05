@@ -301,14 +301,21 @@ export const stopTimer = async (req, res) => {
     const elapsed   = Math.floor((endTime - startTime) / 1000);
     const newTotal  = (entry.totalTimeLogged || 0) + elapsed;
 
-    // Use MongoDB $push/$set directly — avoids Mongoose change-tracking issues with _id:false nested arrays
+    // Separate $set and $push — if they're combined in one call and MongoDB rejects it,
+    // both operations fail silently. Split ensures timerStartedAt is always cleared
+    // and the session is always logged independently.
     await ProjectTask.updateOne(
       { _id: task._id, 'timers.userId': entry.userId },
-      {
-        $set:  { 'timers.$.timerStartedAt': null, 'timers.$.totalTimeLogged': newTotal },
-        $push: { 'timers.$.sessions': { startTime, endTime, duration: elapsed } },
-      }
+      { $set: { 'timers.$.timerStartedAt': null, 'timers.$.totalTimeLogged': newTotal } }
     );
+    try {
+      await ProjectTask.updateOne(
+        { _id: task._id, 'timers.userId': entry.userId },
+        { $push: { 'timers.$.sessions': { startTime, endTime, duration: elapsed } } }
+      );
+    } catch (sessionErr) {
+      console.warn('Session log failed (non-critical):', sessionErr.message);
+    }
 
     const updatedTask = await ProjectTask.findById(taskId);
 
@@ -351,7 +358,8 @@ export const getMyTodayTime = async (req, res) => {
       if (!entry) continue;
 
       for (const s of (entry.sessions || [])) {
-        if (new Date(s.startTime) >= startOfDay) {
+        // Use endTime so sessions that started before midnight but ended today are counted
+        if (new Date(s.endTime) >= startOfDay) {
           completedSeconds += s.duration || 0;
         }
       }
