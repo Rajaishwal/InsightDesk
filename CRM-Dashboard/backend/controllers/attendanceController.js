@@ -104,7 +104,33 @@ export const checkOut = async (req, res) => {
 
     if (!attendance) {
       return res.status(400).json({ 
-        message: "No check-in record found for today or already checked out" 
+        message: "No check-in record found for today or already checked out"
+      });
+    }
+
+    // Checkout requires a clean state — no running task timer, no open break
+    const [activeProjTimer, activeHrTimer, activeBreak] = await Promise.all([
+      ProjectTask.findOne({
+        status: { $ne: 'Completed' },
+        timers: { $elemMatch: { userId, timerStartedAt: { $ne: null } } },
+      }).select('title').lean(),
+      HRTask.findOne({
+        status: { $nin: ['Completed', 'Failed'] },
+        timers: { $elemMatch: { userId, timerStartedAt: { $ne: null } } },
+      }).select('title').lean(),
+      Break.findOne({ userId, endTime: null }).lean(),
+    ]);
+    const runningTask = activeProjTimer || activeHrTimer;
+    if (runningTask) {
+      return res.status(409).json({
+        message: `Stop your task timer for "${runningTask.title}" before checking out.`,
+        code: 'TIMER_RUNNING',
+      });
+    }
+    if (activeBreak) {
+      return res.status(409).json({
+        message: "End your break before checking out.",
+        code: 'ON_BREAK',
       });
     }
 

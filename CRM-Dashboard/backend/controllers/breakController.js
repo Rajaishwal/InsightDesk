@@ -1,4 +1,6 @@
 import Break from "../models/Break.js";
+import ProjectTask from "../model/ProjectTask.js";
+import HRTask from "../model/hrTaskModel.js";
 import mongoose from "mongoose";
 import { getIo } from "../socket.js";
 
@@ -13,6 +15,26 @@ export const startBreak = async (req, res) => {
     if (!mongoose.isValidObjectId(userId)) {
       return res.status(400).json({ message: "Invalid userId" });
     }
+    // Block break if any task timer (project or HR) is actively running
+    const uid = new mongoose.Types.ObjectId(userId);
+    const [activeProjTimer, activeHrTimer] = await Promise.all([
+      ProjectTask.findOne({
+        status: { $ne: 'Completed' },
+        timers: { $elemMatch: { userId: uid, timerStartedAt: { $ne: null } } },
+      }).select('title').lean(),
+      HRTask.findOne({
+        status: { $nin: ['Completed', 'Failed'] },
+        timers: { $elemMatch: { userId: uid, timerStartedAt: { $ne: null } } },
+      }).select('title').lean(),
+    ]);
+    const activeTimerTask = activeProjTimer || activeHrTimer;
+    if (activeTimerTask) {
+      return res.status(409).json({
+        message: `Stop your task timer for "${activeTimerTask.title}" before taking a break.`,
+        code: 'TIMER_RUNNING',
+      });
+    }
+
     const existing = await Break.findOne({ userId, endTime: null }).sort({ startTime: -1 });
     if (existing) return res.status(200).json(existing);
     const newBreak = new Break({ userId, startTime: new Date() });

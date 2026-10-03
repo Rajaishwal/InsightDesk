@@ -1,6 +1,8 @@
 import HRTask from "../model/hrTaskModel.js";
 import User from "../model/User.js";
 import ProjectTask from "../model/ProjectTask.js";
+import Break from "../models/Break.js";
+import Attendance from "../model/Attendance.js";
 
 // 👉 HR assigns a task to employee route: POST /api/hr-tasks/
 export const assignTask = async (req, res) => {
@@ -110,6 +112,19 @@ export const startHrTimer = async (req, res) => {
     const task = await HRTask.findById(id);
     if (!task) return res.status(404).json({ message: 'Task not found' });
     if (task.status === 'Completed') return res.status(400).json({ message: 'Task already completed' });
+
+    // Timers only run inside a working session: checked in today, and not on a break
+    const today = new Date().toISOString().split('T')[0];
+    const [checkedIn, activeBreak] = await Promise.all([
+      Attendance.findOne({ userId, date: today, status: 'checked-in' }).lean(),
+      Break.findOne({ userId, endTime: null }).lean(),
+    ]);
+    if (!checkedIn) {
+      return res.status(409).json({ message: 'Check in before starting a task timer.' });
+    }
+    if (activeBreak) {
+      return res.status(409).json({ message: 'You are on a break. End your break before starting a task timer.' });
+    }
 
     // Enforce one active timer across both collections
     // $elemMatch ensures BOTH conditions match the same array element (same user's entry)

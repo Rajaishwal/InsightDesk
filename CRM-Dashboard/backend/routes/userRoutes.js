@@ -397,6 +397,8 @@ router.get('/employee-dashboard', protect, async (req, res) => {
       attendanceDaysThisMonth: weekPresentDays,       // this week's present days
       workingHoursThisMonth: Math.round(totalWorkHours * 10) / 10,
       totalWorkingDaysThisMonth: weekWorkingDays,     // always 5 minus leave days
+      presentDaysThisMonth: presentDays,              // total present days in the current month
+      workingDaysThisMonth: workingDays,              // total working days elapsed this month (Mon–Fri, non-future)
       activeProjects, completedProjects, totalProjects: projects.length,
       activeTimerProjectId,
       completedTasks, totalTasks,
@@ -447,6 +449,96 @@ router.get('/search', protect, async (req, res) => {
     res.json(users);
   } catch (err) {
     res.status(500).json({ message: 'Search failed', error: err.message });
+  }
+});
+
+// GET /api/users/attendance-calendar?month=YYYY-MM — lightweight calendar for a specific month
+router.get('/attendance-calendar', protect, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+
+    // Parse requested month (default = current)
+    let year, month;
+    if (req.query.month) {
+      const parts = req.query.month.split('-').map(Number);
+      year = parts[0]; month = parts[1] - 1; // 0-indexed
+    } else {
+      year = now.getFullYear(); month = now.getMonth();
+    }
+
+    const startStr = new Date(year, month, 1).toISOString().split('T')[0];
+    const lastDay  = new Date(year, month + 1, 0);
+    const endStr   = lastDay.toISOString().split('T')[0];
+    const daysInMonth = lastDay.getDate();
+
+    const [attendance, leaves] = await Promise.all([
+      Attendance.find({ userId, date: { $gte: startStr, $lte: endStr } }).sort({ date: 1 }).lean(),
+      Leave.find({
+        userId, status: 'Approved',
+        startDate: { $lte: new Date(endStr + 'T23:59:59') },
+        endDate:   { $gte: new Date(startStr + 'T00:00:00') },
+      }).lean(),
+    ]);
+
+    // Build leave sets
+    const leaveDates = new Set(); const halfDayDates = new Set(); const leaveDateTypes = {};
+    for (const lv of leaves) {
+      for (let d = new Date(lv.startDate); d <= new Date(lv.endDate); d.setDate(d.getDate() + 1)) {
+        const ds = d.toISOString().split('T')[0];
+        if (ds >= startStr && ds <= endStr) {
+          leaveDates.add(ds);
+          if (lv.halfDay) halfDayDates.add(ds);
+          leaveDateTypes[ds] = lv.leaveType;
+        }
+      }
+    }
+
+    const attMap = {};
+    for (const a of attendance) attMap[a.date] = a;
+
+    const calendarDays = [];
+    let workingDays = 0, presentDays = 0, leaveDayCount = 0;
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const dow = new Date(ds).getDay();
+      const isWeekend = dow === 0 || dow === 6;
+      const isFuture  = ds > todayStr;
+      const isToday   = ds === todayStr;
+      let status = 'future', checkIn = null, checkOut = null, workingHours = 0;
+
+      if (isWeekend) {
+        status = 'weekend';
+      } else if (isFuture) {
+        status = 'future';
+      } else {
+        workingDays++;
+        const att = attMap[ds];
+        if (att) {
+          presentDays++;
+          checkIn = att.checkInTime; checkOut = att.checkOutTime; workingHours = att.workingHours || 0;
+          const ci = new Date(att.checkInTime);
+          status = (ci.getHours() > 9 || (ci.getHours() === 9 && ci.getMinutes() > 30)) ? 'late' : 'present';
+        } else if (leaveDates.has(ds)) {
+          leaveDayCount += halfDayDates.has(ds) ? 0.5 : 1;
+          status = halfDayDates.has(ds) ? 'half-leave' : 'leave';
+        } else {
+          status = 'absent';
+        }
+      }
+      calendarDays.push({ date: ds, day: d, dow, status, checkIn, checkOut, workingHours, isToday, halfDay: halfDayDates.has(ds), leaveType: leaveDateTypes[ds] || null });
+    }
+
+    res.json({
+      calendarDays,
+      presentDaysThisMonth: presentDays,
+      workingDaysThisMonth: workingDays,
+      monthYear: new Date(year, month, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch attendance calendar', error: err.message });
   }
 });
 
