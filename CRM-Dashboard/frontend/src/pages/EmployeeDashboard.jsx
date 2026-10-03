@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import api from "../services/axios";
 import { useAutoRefresh } from "../hooks/useAutoRefresh";
 import { getCache, setCache } from "../utils/pageCache";
-import { Calendar, Clock, Layers, CheckSquare, User, Pencil, ListChecks, MapPin } from "lucide-react";
+import { Calendar, Clock, Layers, CheckSquare, User, Pencil, ListChecks, MapPin, ChevronLeft, ChevronRight } from "lucide-react";
 import EditProfileModal from "../components/EditProfileModal";
 import HrTaskBoard from "../components/HrTaskBoard";
 import ProjectTaskDrawer from "../components/ProjectTaskDrawer";
@@ -12,39 +12,41 @@ import LiveTaskTimer from "../components/LiveTaskTimer";
 
 /* ── Calendar day status styles ── */
 const DAY_STYLE = {
-  present:    ["bg-emerald-100 hover:bg-emerald-200", "text-emerald-700"],
-  late:       ["bg-amber-100   hover:bg-amber-200",   "text-amber-700"],
-  leave:      ["bg-blue-100    hover:bg-blue-200",    "text-blue-700"],
+  present: ["bg-emerald-100 hover:bg-emerald-200", "text-emerald-700"],
+  late: ["bg-amber-100   hover:bg-amber-200", "text-amber-700"],
+  leave: ["bg-blue-100    hover:bg-blue-200", "text-blue-700"],
   "half-leave": [null, "text-blue-700"],   // background handled via inline gradient
-  absent:     ["bg-red-100     hover:bg-red-200",     "text-red-600"],
-  weekend:    ["bg-gray-50",                          "text-gray-300 cursor-default"],
-  future:     ["bg-white",                            "text-gray-200 cursor-default"],
+  absent: ["bg-red-100     hover:bg-red-200", "text-red-600"],
+  weekend: ["bg-gray-50", "text-gray-300 cursor-default"],
+  future: ["bg-white", "text-gray-200 cursor-default"],
 };
-const STATUS_LABEL = { present:"Present", late:"Late (after 9:30)", leave:"On Leave", "half-leave":"Half Day Leave", absent:"Absent", weekend:"Weekend", future:"—" };
+const STATUS_LABEL = { present: "Present", late: "Late (after 9:30)", leave: "On Leave", "half-leave": "Half Day Leave", absent: "Absent", weekend: "Weekend", future: "—" };
 
 const LEAVE_ABBR = {
-  "Planned Leave":          "PL",
-  "Wellness Leave":         "SL",
-  "Polling Leave":          "PoL",
-  "Unplanned Leave (LOP)":  "LOP",
+  "Planned Leave": "PL",
+  "Wellness Leave": "SL",
+  "Polling Leave": "PoL",
+  "Unplanned Leave (LOP)": "LOP",
 };
 
 const PROJ_CHIP = {
-  "Ongoing":   "border border-blue-400    text-blue-600",
+  "Ongoing": "border border-blue-400    text-blue-600",
   "Completed": "border border-emerald-400 text-emerald-600",
-  "Pending":   "border border-amber-400   text-amber-600",
+  "Pending": "border border-amber-400   text-amber-600",
 };
 
 const fmtTime = (ts) => ts ? new Date(ts).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }) : "—";
 
 export default function EmployeeDashboard() {
   const { user } = useAuth();
-  const [data, setData]       = useState(getCache("emp-dashboard") || null);
+  const [data, setData] = useState(getCache("emp-dashboard") || null);
   const [loading, setLoading] = useState(!getCache("emp-dashboard"));
   const [hoveredDay, setHoveredDay] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [tracklistProject, setTracklistProject] = useState(null);
   const [locationStatus, setLocationStatus] = useState(null);
+  const [viewMonthOffset, setViewMonthOffset] = useState(0); // 0=current, -1=prev, -2=two months ago
+  const [calendarOverride, setCalendarOverride] = useState(null); // null = use main data
 
   useEffect(() => {
     api.get("/users/employee-dashboard")
@@ -61,14 +63,29 @@ export default function EmployeeDashboard() {
 
   // Silent background refresh — swaps data in-place, no loading flash
   const silentRefresh = () => Promise.all([
-    api.get("/users/employee-dashboard").then(r => { setData(r.data); setCache("emp-dashboard", r.data); }).catch(() => {}),
+    api.get("/users/employee-dashboard").then(r => { setData(r.data); setCache("emp-dashboard", r.data); }).catch(() => { }),
     user?._id
       ? api.get(`/attendance/status/${user._id}`)
-          .then(r => setLocationStatus(r.data?.attendance?.status || "checked-out"))
-          .catch(() => {})
+        .then(r => setLocationStatus(r.data?.attendance?.status || "checked-out"))
+        .catch(() => { })
       : Promise.resolve(),
   ]);
   useAutoRefresh(silentRefresh, ["crm:attendance:updated", "crm:task:updated"]);
+
+  // Month navigation — fetch calendar for a specific month offset (0=current, -1, -2)
+  const handleMonthNav = async (dir) => {
+    const newOffset = viewMonthOffset + dir;
+    if (newOffset < -2 || newOffset > 0) return;
+    setViewMonthOffset(newOffset);
+    if (newOffset === 0) { setCalendarOverride(null); return; }
+    const d = new Date();
+    d.setMonth(d.getMonth() + newOffset);
+    const month = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    try {
+      const r = await api.get(`/users/attendance-calendar?month=${month}`);
+      setCalendarOverride(r.data);
+    } catch { }
+  };
 
   // Task timer lives in <LiveTaskTimer /> — no polling here
 
@@ -84,13 +101,20 @@ export default function EmployeeDashboard() {
   );
 
   const {
-    attendanceDaysThisMonth, workingHoursThisMonth, totalWorkingDaysThisMonth,
+    attendanceDaysThisMonth, totalWorkingDaysThisMonth,
+    presentDaysThisMonth, workingDaysThisMonth,
     activeProjects, completedProjects, totalProjects,
     activeTimerProjectId,
     completedTasks, totalTasks,
-    taskCompletionRate, avgWorkingHoursPerDay,
+    taskCompletionRate,
     calendarDays = [], projects = [], monthYear,
   } = data;
+
+  // Effective calendar values — use month-override when navigating, else main data
+  const effCalendarDays   = calendarOverride?.calendarDays         ?? calendarDays;
+  const effPresentDays    = calendarOverride?.presentDaysThisMonth ?? presentDaysThisMonth;
+  const effWorkingDays    = calendarOverride?.workingDaysThisMonth ?? workingDaysThisMonth;
+  const effMonthYear      = calendarOverride?.monthYear            ?? monthYear;
 
   // Project with active timer first → then Ongoing → Pending → Completed
   const STATUS_ORDER = { Ongoing: 0, Pending: 1, Completed: 2 };
@@ -102,9 +126,9 @@ export default function EmployeeDashboard() {
   });
 
   /* ── Calendar grid ── */
-  const firstDow    = calendarDays.length > 0 ? (new Date(calendarDays[0].date).getDay() + 6) % 7 : 0;
-  const cells       = [...Array(firstDow).fill(null), ...calendarDays];
-  const calRows     = [];
+  const firstDow = effCalendarDays.length > 0 ? (new Date(effCalendarDays[0].date).getDay() + 6) % 7 : 0;
+  const cells = [...Array(firstDow).fill(null), ...effCalendarDays];
+  const calRows = [];
   for (let i = 0; i < cells.length; i += 7) calRows.push(cells.slice(i, i + 7));
 
   /* ── Task time lives in <LiveTaskTimer /> ── */
@@ -113,32 +137,32 @@ export default function EmployeeDashboard() {
     {
       label: "Days Present",
       value: attendanceDaysThisMonth,
-      sub:   `of ${totalWorkingDaysThisMonth} working days this week`,
-      Icon:  Calendar,
+      sub: `of ${totalWorkingDaysThisMonth} working days this week`,
+      Icon: Calendar,
       iconBg: "bg-emerald-50", iconColor: "text-emerald-600",
       accent: "border-l-4 border-emerald-400",
     },
     {
-      label: "Work Hours",
-      value: `${workingHoursThisMonth}h`,
-      sub:   `avg ${avgWorkingHoursPerDay}h / day`,
-      Icon:  Clock,
+      label: "Total Attendance",
+      value: `${effPresentDays} days`,
+      sub: `of ${effWorkingDays} working days · ${effMonthYear}`,
+      Icon: Clock,
       iconBg: "bg-indigo-50", iconColor: "text-indigo-600",
       accent: "border-l-4 border-indigo-400",
     },
     {
       label: "Projects",
       value: activeProjects,
-      sub:   `${completedProjects} completed · ${totalProjects} total`,
-      Icon:  Layers,
+      sub: `${completedProjects} completed · ${totalProjects} total`,
+      Icon: Layers,
       iconBg: "bg-violet-50", iconColor: "text-violet-600",
       accent: "border-l-4 border-violet-400",
     },
     {
       label: "Tasks Done",
       value: `${completedTasks}/${totalTasks}`,
-      sub:   `${taskCompletionRate}% completion rate`,
-      Icon:  CheckSquare,
+      sub: `${taskCompletionRate}% completion rate`,
+      Icon: CheckSquare,
       iconBg: "bg-amber-50", iconColor: "text-amber-600",
       accent: "border-l-4 border-amber-400",
     },
@@ -166,8 +190,8 @@ export default function EmployeeDashboard() {
               {user?.photo
                 ? <img src={user.photo} alt={user.name} className="w-full h-full object-cover" />
                 : <div className="w-full h-full flex items-center justify-center text-xl font-black text-indigo-600">
-                    {user?.name?.charAt(0)?.toUpperCase()}
-                  </div>
+                  {user?.name?.charAt(0)?.toUpperCase()}
+                </div>
               }
             </div>
             {/* Edit button — 50% in / 50% out of top-right corner */}
@@ -250,16 +274,33 @@ export default function EmployeeDashboard() {
 
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-sm font-bold text-gray-800">Monthly Attendance</h2>
-                <p className="text-[11px] text-gray-400 mt-0.5">{monthYear}</p>
+              <div className="flex items-center gap-2">
+                {/* Month navigation */}
+                <button
+                  onClick={() => handleMonthNav(-1)}
+                  disabled={viewMonthOffset <= -2}
+                  className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                >
+                  <ChevronLeft className="w-4 h-4 text-gray-500" />
+                </button>
+                <div>
+                  <h2 className="text-sm font-bold text-gray-800">Monthly Attendance</h2>
+                  <p className="text-[11px] text-gray-400 mt-0.5">{effMonthYear}</p>
+                </div>
+                <button
+                  onClick={() => handleMonthNav(1)}
+                  disabled={viewMonthOffset >= 0}
+                  className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                >
+                  <ChevronRight className="w-4 h-4 text-gray-500" />
+                </button>
               </div>
               <div className="flex items-center gap-3 flex-wrap justify-end">
                 {[
                   ["bg-emerald-400", null, "Present"],
-                  ["bg-amber-400",   null, "Late"],
-                  ["bg-blue-400",    null, "On Leave"],
-                  ["bg-red-400",     null, "Absent"],
+                  ["bg-amber-400", null, "Late"],
+                  ["bg-blue-400", null, "On Leave"],
+                  ["bg-red-400", null, "Absent"],
                 ].map(([cls, , lbl]) => (
                   <div key={lbl} className="flex items-center gap-1">
                     <div className={`w-2 h-2 rounded-full ${cls}`} />
@@ -271,7 +312,7 @@ export default function EmployeeDashboard() {
 
             {/* Day header row */}
             <div className="grid grid-cols-7 gap-px bg-gray-200 rounded-t-lg overflow-hidden">
-              {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((d, i) => (
+              {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d, i) => (
                 <div key={i} className={`text-center text-[10px] font-bold py-1.5 tracking-wide
                   ${i === 6 ? "text-rose-500 bg-rose-50" : "text-gray-500 bg-gray-50"}`}>
                   {d}
@@ -335,7 +376,7 @@ export default function EmployeeDashboard() {
                 <div className="px-3 py-2.5 bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-between">
                   <div>
                     <p className="text-xs font-bold text-gray-700">
-                      {new Date(hoveredDay.date).toLocaleDateString("en-US", { weekday:"long", month:"long", day:"numeric" })}
+                      {new Date(hoveredDay.date).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
                     </p>
                     <p className="text-[11px] text-gray-400 mt-0.5">{STATUS_LABEL[hoveredDay.status]}</p>
                   </div>
@@ -386,40 +427,40 @@ export default function EmployeeDashboard() {
                 {sortedProjects.map((proj) => {
                   const hasActiveTimer = proj.projectId === activeTimerProjectId;
                   return (
-                  <button
-                    key={proj._id}
-                    onClick={() => setTracklistProject(proj)}
-                    className={`w-full text-left p-3 rounded-lg border transition group
+                    <button
+                      key={proj._id}
+                      onClick={() => setTracklistProject(proj)}
+                      className={`w-full text-left p-3 rounded-lg border transition group
                       ${hasActiveTimer
-                        ? "border-indigo-300 bg-indigo-50/40 hover:bg-indigo-50/70"
-                        : "border-gray-100 hover:border-indigo-300 hover:bg-indigo-50/40"}`}
-                  >
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] font-bold text-gray-400 font-mono tracking-widest">{proj.projectId}</span>
-                        {hasActiveTimer && (
-                          <span className="flex items-center gap-1 text-[9px] text-indigo-500 font-semibold">
-                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse inline-block" />
-                            Timer running
-                          </span>
-                        )}
+                          ? "border-indigo-300 bg-indigo-50/40 hover:bg-indigo-50/70"
+                          : "border-gray-100 hover:border-indigo-300 hover:bg-indigo-50/40"}`}
+                    >
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold text-gray-400 font-mono tracking-widest">{proj.projectId}</span>
+                          {hasActiveTimer && (
+                            <span className="flex items-center gap-1 text-[9px] text-indigo-500 font-semibold">
+                              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse inline-block" />
+                              Task running
+                            </span>
+                          )}
+                        </div>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${PROJ_CHIP[proj.status] || "border border-gray-300 text-gray-500"}`}>
+                          {proj.status}
+                        </span>
                       </div>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${PROJ_CHIP[proj.status] || "border border-gray-300 text-gray-500"}`}>
-                        {proj.status}
-                      </span>
-                    </div>
-                    <p className="text-sm font-semibold text-gray-800 leading-tight">{proj.title}</p>
-                    <div className="flex items-center justify-between mt-1.5">
-                      {proj.manager && (
-                        <p className="text-[11px] text-gray-400 flex items-center gap-1">
-                          <User className="w-3 h-3" />{proj.manager}
-                        </p>
-                      )}
-                      <span className="text-[10px] text-indigo-400 font-semibold flex items-center gap-1 opacity-0 group-hover:opacity-100 transition ml-auto">
-                        <ListChecks className="w-3 h-3" />View tasks
-                      </span>
-                    </div>
-                  </button>
+                      <p className="text-sm font-semibold text-gray-800 leading-tight">{proj.title}</p>
+                      <div className="flex items-center justify-between mt-1.5">
+                        {proj.manager && (
+                          <p className="text-[11px] text-gray-400 flex items-center gap-1">
+                            <User className="w-3 h-3" />{proj.manager}
+                          </p>
+                        )}
+                        <span className="text-[10px] text-indigo-400 font-semibold flex items-center gap-1 opacity-0 group-hover:opacity-100 transition ml-auto">
+                          <ListChecks className="w-3 h-3" />View tasks
+                        </span>
+                      </div>
+                    </button>
                   );
                 })}
               </div>

@@ -140,8 +140,9 @@ const Navbar = () => {
       });
       setIsOnBreak(true);
       window.dispatchEvent(new CustomEvent("crm:attendance:updated"));
-    } catch {
-      toast.error("Failed to start break. Please try again.");
+    } catch (err) {
+      const msg = err?.response?.data?.message;
+      toast.error(msg || "Failed to start break. Please try again.");
     }
   };
 

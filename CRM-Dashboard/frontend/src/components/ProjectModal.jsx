@@ -40,7 +40,7 @@ const ProjectModal = ({ project, onClose, isHrView = false }) => {
 
         <div className="space-y-3">
           <p className="text-gray-700">
-            <span className="font-semibold pl-3">Project ID:</span> {project.projectId}
+            <span className="font-semibold">Project ID:</span> {project.projectId}
           </p>
           <p className="text-gray-700">
             <span className="font-semibold">Title:</span> {project.title}
