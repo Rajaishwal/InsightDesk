@@ -5,6 +5,7 @@ import Break from "../models/Break.js";
 import ProjectTask from "../model/ProjectTask.js";
 import HRTask from "../model/hrTaskModel.js";
 import { getIo } from "../socket.js";
+import { istDateKey, findOpenAttendance } from "../utils/istDate.js";
 
 // Check In - Create new attendance record for the day
 export const checkIn = async (req, res) => {
@@ -21,8 +22,8 @@ export const checkIn = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Get current date in YYYY-MM-DD format
-    const today = new Date().toISOString().split('T')[0];
+    // Today's date in India time (YYYY-MM-DD)
+    const today = istDateKey();
 
     // Check if user already checked in today
     const existingAttendance = await Attendance.findOne({
@@ -31,7 +32,7 @@ export const checkIn = async (req, res) => {
     });
 
     if (existingAttendance) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: "You have already checked in today",
         attendance: existingAttendance
       });
@@ -92,15 +93,8 @@ export const checkOut = async (req, res) => {
       return res.status(400).json({ message: "User ID is required" });
     }
 
-    // Get current date in YYYY-MM-DD format
-    const today = new Date().toISOString().split('T')[0];
-
-    // Find today's attendance record
-    const attendance = await Attendance.findOne({
-      userId,
-      date: today,
-      status: "checked-in"
-    });
+    // The open session — may have started before midnight
+    const attendance = await findOpenAttendance(Attendance, userId);
 
     if (!attendance) {
       return res.status(400).json({ 
@@ -297,12 +291,10 @@ export const getAllAttendance = async (req, res) => {
 export const getTodayStatus = async (req, res) => {
   try {
     const { userId } = req.params;
-    const today = new Date().toISOString().split('T')[0];
 
-    const attendance = await Attendance.findOne({
-      userId,
-      date: today
-    });
+    // A session still open from before midnight counts as today's; otherwise today's (IST) record, if any
+    const attendance = (await findOpenAttendance(Attendance, userId))
+      || await Attendance.findOne({ userId, date: istDateKey() });
 
     res.status(200).json({
       hasCheckedIn: !!attendance,

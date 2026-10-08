@@ -18,6 +18,7 @@ import LeaveManagement from './pages/LeaveManagement';
 import HrProjectAssignment from './hrRecords/HrProjectAssignment';
 import Salary from './hrRecords/Salary';
 import PaySlips from './pages/PaySlips';
+import EmployeeReport from './pages/EmployeeReport';
 import ChatNotificationPopup from './components/ChatNotificationPopup';
 
 
@@ -56,6 +57,7 @@ function App() {
               <Route path='/workload' element={<ProtectedRoute><StaffWorkload/> </ProtectedRoute>} />
               <Route path='/payslip' element={<ProtectedRoute><PaySlips /> </ProtectedRoute>} />
               <Route path='/salary' element={<ProtectedRoute><Salary/> </ProtectedRoute>} />
+              <Route path='/employees/:employeeId/report' element={<ProtectedRoute><EmployeeReport /></ProtectedRoute>} />
             </Routes>
           </main>
         </div>

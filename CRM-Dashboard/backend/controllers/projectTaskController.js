@@ -6,6 +6,7 @@ import HRTask from '../model/hrTaskModel.js';
 import Break from '../models/Break.js';
 import Attendance from '../model/Attendance.js';
 import { getIo } from '../socket.js';
+import { istDayStart, findOpenAttendance } from '../utils/istDate.js';
 
 const logActivity = async (data) => {
   try {
@@ -225,10 +226,9 @@ export const startTimer = async (req, res) => {
     const task = await ProjectTask.findById(taskId);
     if (!task) return res.status(404).json({ message: 'Task not found' });
 
-    // Timers only run inside a working session: checked in today, and not on a break
-    const today = new Date().toISOString().split('T')[0];
+    // Timers only run inside a working session: checked in (session may span midnight), and not on a break
     const [checkedIn, activeBreak] = await Promise.all([
-      Attendance.findOne({ userId, date: today, status: 'checked-in' }).lean(),
+      findOpenAttendance(Attendance, userId).lean(),
       Break.findOne({ userId, endTime: null }).lean(),
     ]);
     if (!checkedIn) {
@@ -356,8 +356,7 @@ export const stopTimer = async (req, res) => {
 export const getMyTodayTime = async (req, res) => {
   try {
     const userId = (req.user._id || req.user.id).toString();
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
+    const startOfDay = istDayStart(); // midnight India time
 
     const [projTasks, hrTasks] = await Promise.all([
       ProjectTask.find({ 'timers.userId': userId }),
@@ -397,8 +396,7 @@ export const getMyTodayTime = async (req, res) => {
 // GET /api/project-tasks/all-users-today-time  (admin view — all users' task seconds today)
 export const getAllUsersTodayTime = async (req, res) => {
   try {
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
+    const startOfDay = istDayStart(); // midnight India time
 
     const [projTasks, hrTasks] = await Promise.all([
       ProjectTask.find({ 'timers.0': { $exists: true } }).lean(),
@@ -481,8 +479,7 @@ export const getActiveTimers = async (req, res) => {
 export const getWorkLog = async (req, res) => {
   try {
     const { period = 'all' } = req.query;
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
+    const todayStart = istDayStart(); // midnight India time
     const filterToday = period === 'today';
 
     const tasks = await ProjectTask.find({ 'timers.0': { $exists: true } }).lean();

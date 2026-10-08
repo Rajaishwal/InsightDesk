@@ -1,22 +1,8 @@
 ﻿import React, { useEffect, useState } from "react";
 import { X, LogIn, LogOut } from "lucide-react";
-import Swal from "sweetalert2";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import api from "../services/axios";
-
-const Toast = Swal.mixin({
-  toast: true,
-  position: "top-end",
-  timer: 3000,
-  timerProgressBar: true,
-  background: "#333",
-  color: "#fff",
-  customClass: { popup: "long-toast" },
-  didOpen: () => {
-    const el = document.querySelector('.swal2-container');
-    if (el) el.style.zIndex = '100000';
-  }
-});
 
 // IST clock parts → { hour, minute, second, dayPeriod }
 const istClock = new Intl.DateTimeFormat("en-US", {
@@ -52,6 +38,7 @@ const CLOCK_STATES = {
 function Attendance({ onClose }) {
   const { user, locationTracker } = useAuth();
   const { startTracking, stopTracking } = locationTracker || {};
+  const toast = useToast();
   const [date, setDate] = useState(new Date());
   const [attendanceStatus, setAttendanceStatus] = useState({
     hasCheckedIn: false,
@@ -59,19 +46,6 @@ function Attendance({ onClose }) {
     attendance: null
   });
   const [loading, setLoading] = useState(false);
-  const [isAlertShowing, setIsAlertShowing] = useState(false);
-
-  const showAlert = (opts) => {
-    setIsAlertShowing(true);
-    return Swal.fire({
-      ...opts,
-      didOpen: () => {
-        const el = document.querySelector('.swal2-container');
-        if (el) el.style.zIndex = '100000';
-      },
-      didClose: () => setIsAlertShowing(false),
-    });
-  };
 
   useEffect(() => {
     const interval = setInterval(() => setDate(new Date()), 1000);
@@ -95,7 +69,7 @@ function Attendance({ onClose }) {
 
   const handleCheckIn = async () => {
     if (attendanceStatus.hasCheckedIn) {
-      Toast.fire({ icon: "warning", title: "You have already checked in today." });
+      toast.warning("You have already checked in today.");
       return;
     }
     setLoading(true);
@@ -113,18 +87,11 @@ function Attendance({ onClose }) {
       localStorage.setItem("attendanceEvent", Date.now().toString());
       fetchTodayStatus();
 
-      showAlert({
-        icon: "success",
-        title: "Check-in Successfully!",
-        text: response.data.locationTrackingActivated ? "Location tracking started." : undefined,
-        showConfirmButton: false,
-        timer: 2000,
-      });
+      toast.success(
+        `Checked in at ${response.data.time}.${response.data.locationTrackingActivated ? " Location tracking started." : ""}`
+      );
     } catch (error) {
-      Toast.fire({
-        icon: "error",
-        title: error.response?.data?.message || "Check-In Failed. Try again."
-      });
+      toast.error(error.response?.data?.message || "Check-in failed. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -132,11 +99,11 @@ function Attendance({ onClose }) {
 
   const handleCheckOut = async () => {
     if (!attendanceStatus.hasCheckedIn) {
-      Toast.fire({ icon: "error", title: "You must check in before checking out." });
+      toast.error("You must check in before checking out.");
       return;
     }
     if (attendanceStatus.hasCheckedOut) {
-      Toast.fire({ icon: "warning", title: "You have already checked out today." });
+      toast.warning("You have already checked out today.");
       return;
     }
     setLoading(true);
@@ -146,13 +113,9 @@ function Attendance({ onClose }) {
       if (response.data.locationTrackingDeactivated) {
         stopTracking();
       }
-      showAlert({
-        icon: "success",
-        title: "Check-out Successfully!",
-        text: `Working Hours: ${response.data.workingHours}h${response.data.locationTrackingDeactivated ? "\nLocation tracking stopped." : ""}`,
-        showConfirmButton: false,
-        timer: 2000,
-      });
+      toast.success(
+        `Checked out at ${response.data.time} · ${response.data.workingHours}h worked.${response.data.locationTrackingDeactivated ? " Location tracking stopped." : ""}`
+      );
 
       window.dispatchEvent(new CustomEvent("attendanceUpdate", {
         detail: { type: "checkout", userId: user._id }
@@ -162,10 +125,7 @@ function Attendance({ onClose }) {
 
       fetchTodayStatus();
     } catch (error) {
-      Toast.fire({
-        icon: "error",
-        title: error.response?.data?.message || "Check-Out Failed. Try again."
-      });
+      toast.error(error.response?.data?.message || "Check-out failed. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -204,7 +164,7 @@ function Attendance({ onClose }) {
 
   return (
     <div className="fixed bg-black/30 backdrop-blur-sm inset-0 z-[9999] flex items-center justify-center">
-      <div className={`relative w-[400px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-xl animate-fadeIn transition-all duration-200 ${isAlertShowing ? "blur-sm opacity-50 pointer-events-none" : ""}`}>
+      <div className={`relative w-[400px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-xl animate-dialog-in`}>
         {/* Brand strip — same as the dashboard profile header */}
         <div className="h-0.5 bg-gradient-to-r from-indigo-500 via-violet-500 to-blue-500" />
 

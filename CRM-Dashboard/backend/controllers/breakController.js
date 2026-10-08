@@ -3,6 +3,7 @@ import ProjectTask from "../model/ProjectTask.js";
 import HRTask from "../model/hrTaskModel.js";
 import mongoose from "mongoose";
 import { getIo } from "../socket.js";
+import { istDayStart } from "../utils/istDate.js";
 
 // Use a valid ObjectId string from your User collection or just a random valid ObjectId for testing
 const DUMMY_USER_ID = "64d3e4b7f2a4c2a1b1234567"; // 24 hex chars
@@ -119,8 +120,7 @@ export const getBreakLogs = async (req, res) => {
     const { userId } = req.params;
     const { date } = req.query;
 
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
+    const startOfDay = istDayStart(); // midnight India time
 
     const logs = await Break.find({ userId, startTime: { $gte: startOfDay } }).sort({ startTime: 1 });
     res.json(logs);

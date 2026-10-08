@@ -1,6 +1,7 @@
 // ProjectTaskCard.jsx — Employee dashboard card showing active project tasks with live timer and progress ring
 ﻿import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
+import { useConfirm } from "../context/ConfirmContext";
 import { CircleStop, ClipboardList, Pause, Play, TimerIcon, Trash2Icon } from "lucide-react";
 import Timer from "../timer/Timer";
 import { useEffect, useState } from "react";
@@ -127,6 +128,7 @@ import axios from "../services/axios";
 const ProjectTaskCard = ({ onSaveTask, showTimerModal, onOpenTimer, onCloseTimer }) => {
   const { user } = useAuth();
   const toast = useToast();
+  const confirm = useConfirm();
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [hrTasks, setHrTasks] = useState([]);
@@ -192,7 +194,14 @@ const ProjectTaskCard = ({ onSaveTask, showTimerModal, onOpenTimer, onCloseTimer
   // Delete task function
   const handleDeleteTask = async (taskId) => {
     const task = empTasks.find((t) => t._id === taskId);
-    if (!task || !confirm(`Are you sure you want to delete task "${task.title}"?`)) return;
+    if (!task) return;
+    const ok = await confirm({
+      tone: "danger",
+      title: "Delete task?",
+      message: `"${task.title}" will be permanently deleted.`,
+      confirmText: "Delete",
+    });
+    if (!ok) return;
     try {
       const res = await axios.delete(`/tasks/${taskId}`);
       if (res.data.success) {

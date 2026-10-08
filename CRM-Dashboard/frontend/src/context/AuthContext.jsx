@@ -46,8 +46,8 @@ export const AuthProvider = ({ children }) => {
   // Check attendance status and start location tracking if checked in
   const checkAttendanceAndStartTracking = async (userId) => {
     try {
-      const today = new Date().toISOString().split('T')[0];
-      const response = await api.get(`http://localhost:5000/api/attendance/status/${userId}/${today}`);
+      // Server works out "today" in India time and includes a session still open past midnight
+      const response = await api.get(`http://localhost:5000/api/attendance/status/${userId}`);
       
       if (response.data.hasCheckedIn && !response.data.hasCheckedOut) {
         // User is currently checked in, start location tracking

@@ -1,6 +1,7 @@
 import Location from '../model/Location.js';
 import User from '../model/User.js';
 import Attendance from '../model/Attendance.js';
+import { istDateKey, findOpenAttendance } from '../utils/istDate.js';
 
 // Calculate distance between two points using Haversine formula
 const calculateDistance = (lat1, lon1, lat2, lon2) => {
@@ -30,13 +31,8 @@ export const updateLocation = async (req, res) => {
     } = req.body;
     const userId = req.user._id;
 
-    // Check if user is currently checked in
-    const today = new Date().toISOString().split('T')[0];
-    const currentAttendance = await Attendance.findOne({
-      userId,
-      date: today,
-      status: "checked-in"
-    });
+    // Check if user is currently checked in (session may span midnight)
+    const currentAttendance = await findOpenAttendance(Attendance, userId);
 
     if (!currentAttendance) {
       
@@ -263,8 +259,8 @@ export const getAllEmployeeLocations = async (req, res) => {
   try {
     console.log('🔍 getAllEmployeeLocations called by user:', req.user?.name, 'Role:', req.user?.role);
     
-    // Get today's date for attendance check
-    const today = new Date().toISOString().split('T')[0];
+    // Get today's date (India time) for attendance check
+    const today = istDateKey();
     
     // Get latest location for each user (both active and inactive)
     const locations = await Location.aggregate([

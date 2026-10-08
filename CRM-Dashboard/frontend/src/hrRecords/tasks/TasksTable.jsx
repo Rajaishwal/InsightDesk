@@ -1,6 +1,7 @@
 // TasksTable.jsx — Table rendering HR-assigned tasks with status badge and timer totals
 import { Trash2Icon } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
+import { useConfirm } from "../../context/ConfirmContext";
 import axios from "../../services/axios";
 
 const STATUS_CHIP = {
@@ -15,6 +16,7 @@ const fmt = (ts) =>
 
 const TasksTable = ({ tasks, loading, setTasks }) => {
   const toast = useToast();
+  const confirm = useConfirm();
   if (loading)
     return <div className="text-center py-10 text-gray-500 font-medium">Loading tasks…</div>;
 
@@ -35,7 +37,13 @@ const TasksTable = ({ tasks, loading, setTasks }) => {
   const handleDelete = async (taskId) => {
     const task = tasks.find(t => t._id === taskId);
     if (!task) return;
-    if (!confirm(`Delete task "${task.title}"?`)) return;
+    const ok = await confirm({
+      tone: "danger",
+      title: "Delete task?",
+      message: `"${task.title}" will be permanently deleted for ${task.assignedToName || "this employee"}.`,
+      confirmText: "Delete",
+    });
+    if (!ok) return;
     try {
       await axios.delete(`http://localhost:5000/api/hr-tasks/${taskId}`);
       setTasks(prev => prev.filter(t => t._id !== taskId));

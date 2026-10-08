@@ -1,5 +1,6 @@
 // AdminDashboard.jsx — Admin/Manager dashboard: stat cards, attendance table, break tracking, ongoing projects, pie chart
 import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { useAutoRefresh } from "../hooks/useAutoRefresh";
 import EditProfileModal from "../components/EditProfileModal";
 import {
@@ -9,7 +10,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import api from "../services/axios";
 import { getCache, setCache } from "../utils/pageCache";
-import { Users, UserPlus, Briefcase, CheckCircle2, AlertCircle, XCircle, X, Clock, Coffee, Pencil, MapPin, RefreshCw } from "lucide-react";
+import { Users, UserPlus, Briefcase, CheckCircle2, AlertCircle, XCircle, X, Clock, Coffee, Pencil, MapPin, RefreshCw, FileBarChart } from "lucide-react";
 
 const PIE_COLORS = ["#7c3aed", "#06b6d4", "#f59e0b"];
 
@@ -320,13 +321,14 @@ const AdminDashboard = () => {
                           {cfg?.showBreak && (
                             <th className="pb-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Break Since</th>
                           )}
+                          <th className="pb-3 pl-4 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide">Report</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
                         {loading ? (
                           Array.from({ length: 4 }).map((_, i) => (
                             <tr key={i}>
-                              {Array.from({ length: 5 }).map((_, j) => (
+                              {Array.from({ length: 6 }).map((_, j) => (
                                 <td key={j} className="py-3 pr-4">
                                   <div className="h-4 bg-gray-100 rounded animate-pulse" style={{ width: j === 0 ? 120 : 80 }} />
                                 </td>
@@ -341,7 +343,7 @@ const AdminDashboard = () => {
                               ? logs.reduce((sum, b) => sum + (b.durationInSeconds || 0), 0)
                               : 0;
                             const isOverLimit = totalSecs > 60 * 60;
-                            const colSpan = 5 + (cfg?.showCheckOut ? 1 : 0) + (cfg?.showBreak ? 1 : 0);
+                            const colSpan = 6 + (cfg?.showCheckOut ? 1 : 0) + (cfg?.showBreak ? 1 : 0);
                             return (
                               <React.Fragment key={emp._id || i}>
                                 <tr
@@ -357,7 +359,18 @@ const AdminDashboard = () => {
                                           : emp.name?.charAt(0)?.toUpperCase()
                                         }
                                       </div>
-                                      <span className="font-medium text-gray-700 truncate max-w-[130px]">{emp.name}</span>
+                                      {emp.employeeId ? (
+                                        <Link
+                                          to={`/employees/${encodeURIComponent(emp.employeeId)}/report`}
+                                          onClick={(e) => e.stopPropagation()}
+                                          title={`View ${emp.name}'s report`}
+                                          className="font-medium text-gray-700 truncate max-w-[130px] hover:text-indigo-600 hover:underline underline-offset-2"
+                                        >
+                                          {emp.name}
+                                        </Link>
+                                      ) : (
+                                        <span className="font-medium text-gray-700 truncate max-w-[130px]">{emp.name}</span>
+                                      )}
                                     </div>
                                   </td>
                                   {/* Designation */}
@@ -398,6 +411,20 @@ const AdminDashboard = () => {
                                       </span>
                                     </td>
                                   )}
+                                  {/* Report col — always-visible entry to the Employee Report */}
+                                  <td className="py-3 pl-4 text-right">
+                                    {emp.employeeId ? (
+                                      <Link
+                                        to={`/employees/${encodeURIComponent(emp.employeeId)}/report`}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-indigo-200 px-2.5 py-1 text-[11px] font-semibold text-indigo-600 transition hover:bg-indigo-50"
+                                      >
+                                        <FileBarChart className="w-3 h-3" /> View report
+                                      </Link>
+                                    ) : (
+                                      <span className="text-gray-300">—</span>
+                                    )}
+                                  </td>
                                 </tr>
 
                                 {/* ── Break history accordion ── */}
@@ -470,7 +497,7 @@ const AdminDashboard = () => {
                           })
                         ) : (
                           <tr>
-                            <td colSpan={5} className="py-10 text-center text-gray-400 text-sm">No employees found</td>
+                            <td colSpan={6} className="py-10 text-center text-gray-400 text-sm">No employees found</td>
                           </tr>
                         )}
                       </tbody>

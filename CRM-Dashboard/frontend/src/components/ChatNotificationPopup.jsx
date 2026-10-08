@@ -31,8 +31,8 @@ export default function ChatNotificationPopup() {
                   {n.senderName?.[0]?.toUpperCase() || "?"}
                 </div>
             }
-            {/* Glass online dot */}
-            <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white online-glow-dot" />
+            {/* Online dot — centred on the avatar edge at 45° (r·(1−1/√2) = 14.645% of size), half in / half out */}
+            <span className="absolute bottom-[calc(14.645%_-_4px)] right-[calc(14.645%_-_4px)] w-2 h-2 rounded-full online-glow-dot" />
           </div>
 
           {/* Body */}

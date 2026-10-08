@@ -248,7 +248,7 @@ const ChatPanel = ({ onClose }) => {
                     >
                       <div className="relative flex-shrink-0">
                         <Avatar name={emp.name} photo={emp.photo} size="w-12 h-12" />
-                        <span className={`absolute bottom-0.5 right-0.5 w-3 h-3 rounded-full border-2 border-white ${isOnline(emp._id) ? "online-glow-dot" : "offline-glass-dot"}`} />
+                        <span className={`absolute bottom-[calc(14.645%_-_4px)] right-[calc(14.645%_-_4px)] w-2 h-2 rounded-full ${isOnline(emp._id) ? "online-glow-dot" : "offline-glass-dot"}`} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-[15px] font-medium text-gray-900 truncate">{emp.name}</p>
@@ -284,7 +284,7 @@ const ChatPanel = ({ onClose }) => {
                       {/* Avatar */}
                       <div className="relative flex-shrink-0">
                         <Avatar name={conv.name} photo={conv.photo} size="w-12 h-12" />
-                        <span className={`absolute bottom-0.5 right-0.5 w-3 h-3 rounded-full border-2 border-white ${isOnline(conv.userId) ? "online-glow-dot" : "offline-glass-dot"}`} />
+                        <span className={`absolute bottom-[calc(14.645%_-_4px)] right-[calc(14.645%_-_4px)] w-2 h-2 rounded-full ${isOnline(conv.userId) ? "online-glow-dot" : "offline-glass-dot"}`} />
                       </div>
 
                       {/* Content */}
@@ -340,7 +340,7 @@ const ChatPanel = ({ onClose }) => {
               <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100 bg-white shadow-sm flex-shrink-0">
                 <div className="relative">
                   <Avatar name={activeChat.name} photo={activeChat.photo} size="w-10 h-10" />
-                  <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${isOnline(activeChat._id) ? "online-glow-dot" : "offline-glass-dot"}`} />
+                  <span className={`absolute bottom-[calc(14.645%_-_4px)] right-[calc(14.645%_-_4px)] w-2 h-2 rounded-full ${isOnline(activeChat._id) ? "online-glow-dot" : "offline-glass-dot"}`} />
                 </div>
                 <div>
                   <p className="font-bold text-gray-800 text-sm">{activeChat.name}</p>

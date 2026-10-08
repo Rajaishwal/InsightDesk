@@ -8,6 +8,7 @@ const TYPES = [
 ];
 
 export const LEAVE_TYPE_KEYS = TYPES.map(t => t.key);
+export const LEAVE_TYPES = TYPES; // yearly / monthly accrual rules, shared with the Employee Report
 
 const SIZE  = 180;
 const THICK = 20;
@@ -17,7 +18,7 @@ const CY    = SIZE / 2;
 const CIRC  = 2 * Math.PI * R;
 const GAP   = -12; // badge overlaps the ring edge
 
-const normalizeType = (lt) => ({
+export const normalizeType = (lt) => ({
   "Sick Leave":      "Wellness Leave",
   "Casual Leave":    "Planned Leave",
   "Annual Leave":    "Planned Leave",

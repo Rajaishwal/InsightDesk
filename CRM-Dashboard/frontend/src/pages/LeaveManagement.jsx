@@ -5,6 +5,8 @@ import { getCache, setCache } from "../utils/pageCache";
 import LeaveDonutChart, { LEAVE_TYPE_KEYS } from "../components/LeaveDonutChart";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/axios";
+import { useToast } from "../context/ToastContext";
+import { useConfirm } from "../context/ConfirmContext";
 import { RefreshCw, X, CalendarDays, FileText, Tag } from "lucide-react";
 
 const LEAVE_META = {
@@ -58,17 +60,13 @@ export default function LeaveManagement() {
   const [showModal, setShowModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [cancellingId, setCancellingId] = useState(null);
-  const [toast, setToast] = useState(null); // { type: 'success'|'error', msg }
+  const toast = useToast();
+  const confirm = useConfirm();
   const [form, setForm] = useState({ startDate: "", endDate: "", leaveType: LEAVE_TYPE_KEYS[0], reason: "", halfDay: false });
 
   // Leave types that support half-day option (Polling Leave excluded)
   const HALF_DAY_TYPES = ["Planned Leave", "Wellness Leave", "Unplanned Leave (LOP)"];
   const [formErr, setFormErr] = useState("");
-
-  const showToast = (type, msg) => {
-    setToast({ type, msg });
-    setTimeout(() => setToast(null), 4000);
-  };
 
   const fetchLeaves = async (silent = false) => {
     try {
@@ -78,7 +76,7 @@ export default function LeaveManagement() {
       setLeaves(list);
       setCache("leaves", list);
     } catch {
-      if (!silent) showToast("error", "Failed to load leave requests.");
+      if (!silent) toast.error("Failed to load leave requests.");
     } finally {
       if (!silent) setLoading(false); else setRefreshing(false);
     }
@@ -151,7 +149,7 @@ export default function LeaveManagement() {
       });
       setShowModal(false);
       setForm({ startDate: "", endDate: "", leaveType: LEAVE_TYPE_KEYS[0], reason: "", halfDay: false });
-      showToast("success", "Leave application submitted successfully!");
+      toast.success("Leave application submitted successfully!");
       window.dispatchEvent(new CustomEvent("crm:leave:updated"));
       await fetchLeaves();
       await fetchStats();
@@ -163,15 +161,23 @@ export default function LeaveManagement() {
   };
 
   const handleCancel = async (leaveId) => {
+    const ok = await confirm({
+      tone: "danger",
+      title: "Cancel leave request?",
+      message: "Your leave request will be withdrawn. You can apply again later if needed.",
+      confirmText: "Yes, cancel it",
+      cancelText: "Keep it",
+    });
+    if (!ok) return;
     try {
       setCancellingId(leaveId);
       await api.delete(`http://localhost:5000/api/leaves/cancel/${leaveId}`);
-      showToast("success", "Leave request cancelled.");
+      toast.success("Leave request cancelled.");
       window.dispatchEvent(new CustomEvent("crm:leave:updated"));
       await fetchLeaves();
       await fetchStats();
     } catch (err) {
-      showToast("error", err.response?.data?.message || "Failed to cancel leave.");
+      toast.error(err.response?.data?.message || "Failed to cancel leave.");
     } finally {
       setCancellingId(null);
     }
@@ -181,14 +187,6 @@ export default function LeaveManagement() {
 
   return (
     <div className="page-container p-6 font-sans">
-      {/* Toast */}
-      {toast && (
-        <div className={`fixed top-5 right-5 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium transition-all
-          ${toast.type === "success" ? "bg-emerald-500 text-white" : "bg-red-500 text-white"}`}>
-          {toast.msg}
-          <button onClick={() => setToast(null)}><X size={14} /></button>
-        </div>
-      )}
 
       {/* Header */}
       <div className="flex items-center justify-between pl-5 mb-2">
@@ -258,7 +256,7 @@ export default function LeaveManagement() {
                     </td>
                     <td className="px-4 py-3 text-gray-400 text-xs">{fmt(leave.appliedAt)}</td>
                     <td className="px-4 py-3">
-                      {leave.status === "Pending" && (
+                      {leave.status === "Pending" ? (
                         <button
                           onClick={() => handleCancel(leave._id)}
                           disabled={cancellingId === leave._id}
@@ -266,6 +264,8 @@ export default function LeaveManagement() {
                         >
                           {cancellingId === leave._id ? "Cancelling..." : "Cancel"}
                         </button>
+                      ) : (
+                        <span className="text-gray-300" title={`Already ${leave.status.toLowerCase()} — can't be cancelled`}>—</span>
                       )}
                     </td>
                   </tr>

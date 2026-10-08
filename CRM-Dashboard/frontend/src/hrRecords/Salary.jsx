@@ -1,6 +1,7 @@
 // Salary.jsx — HR salary management: view, update, and track employee salary records
 import { useEffect, useState, useRef } from "react";
 import { useToast } from "../context/ToastContext";
+import { useConfirm } from "../context/ConfirmContext";
 import { useAuth } from "../context/AuthContext";
 import axios from "../services/axios";
 import { getCache, setCache } from "../utils/pageCache";
@@ -9,6 +10,7 @@ import { PlusCircle, Trash2, CheckCircle, X, Search, FileEdit, IndianRupee } fro
 const Salary = () => {
   const { user } = useAuth();
   const toast = useToast();
+  const confirm = useConfirm();
   const [salaries, setSalaries] = useState(getCache("salaries") || []);
   const [loading, setLoading]   = useState(!getCache("salaries"));
   const [searchTerm, setSearchTerm] = useState("");
@@ -169,9 +171,16 @@ const Salary = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Delete this salary record?")) return;
+    const ok = await confirm({
+      tone: "danger",
+      title: "Delete salary record?",
+      message: "This salary record will be permanently deleted.",
+      confirmText: "Delete",
+    });
+    if (!ok) return;
     try {
       await axios.delete(`http://localhost:5000/api/salary/${id}`);
+      toast.success("Salary record deleted.");
       fetchSalaries();
     } catch (err) {
       toast.error(err?.response?.data?.error || "Error deleting salary");

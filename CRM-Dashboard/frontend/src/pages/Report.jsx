@@ -4,6 +4,7 @@ import { RefreshCw, Plus, ChevronDown, ChevronUp, Ticket } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useSocket } from "../context/SocketContext";
 import api from "../services/axios";
+import { useToast } from "../context/ToastContext";
 import RaiseTicket from "../components/RaiseTicket";
 import TicketDrawer from "../components/TicketDrawer";
 
@@ -41,18 +42,13 @@ export default function Report() {
   const [refreshing, setRefreshing]   = useState(false);
   const [showModal, setShowModal]     = useState(false);
   const [activeTicket, setActiveTicket] = useState(null);
-  const [toast, setToast]             = useState(null);
+  const toast = useToast();
 
   // Admin filters
   const [filters, setFilters] = useState({ status: "all", priority: "all", category: "all" });
 
   // FAQ accordion
   const [openFaq, setOpenFaq] = useState(null);
-
-  const showToast = (type, msg) => {
-    setToast({ type, msg });
-    setTimeout(() => setToast(null), 4000);
-  };
 
   const fetchTickets = useCallback(async (silent = false) => {
     try {
@@ -62,11 +58,11 @@ export default function Report() {
       const res = await api.get(endpoint, { params });
       setTickets(res.data.tickets || []);
     } catch {
-      if (!silent) showToast("error", "Failed to load tickets.");
+      if (!silent) toast.error("Failed to load tickets.");
     } finally {
       if (!silent) setLoading(false); else setRefreshing(false);
     }
-  }, [isAdmin, filters]);
+  }, [isAdmin, filters, toast]);
 
   useEffect(() => { if (user) fetchTickets(); }, [user, fetchTickets]);
 
@@ -74,15 +70,15 @@ export default function Report() {
   useEffect(() => {
     if (!socket) return;
     const onReply = ({ ticketRef }) => {
-      showToast("success", `New reply on ${ticketRef}`);
+      toast.info(`New reply on ${ticketRef}`);
       fetchTickets(true);
     };
     const onStatus = ({ ticketRef, status }) => {
-      showToast("success", `Ticket ${ticketRef} marked ${status}`);
+      toast.info(`Ticket ${ticketRef} marked ${status}`);
       fetchTickets(true);
     };
     const onNew = ({ ticketId, userName }) => {
-      showToast("success", `New ticket from ${userName} (${ticketId})`);
+      toast.info(`New ticket from ${userName} (${ticketId})`);
       fetchTickets(true);
     };
     socket.on("ticket:reply",        onReply);
@@ -93,7 +89,7 @@ export default function Report() {
       socket.off("ticket:statusUpdate", onStatus);
       socket.off("ticket:new",          onNew);
     };
-  }, [socket, fetchTickets]);
+  }, [socket, fetchTickets, toast]);
 
   const handleTicketUpdate = (updated) => {
     setTickets(prev => prev.map(t => t._id === updated._id ? updated : t));
@@ -109,13 +105,6 @@ export default function Report() {
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
 
-      {/* Toast */}
-      {toast && (
-        <div className={`fixed top-5 right-5 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium
-          ${toast.type === "success" ? "bg-emerald-500 text-white" : "bg-red-500 text-white"}`}>
-          {toast.msg}
-        </div>
-      )}
 
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
@@ -247,7 +236,7 @@ export default function Report() {
           isOpen={showModal}
           onClose={() => setShowModal(false)}
           onSubmit={(ticket) => {
-            showToast("success", `Ticket ${ticket.ticketId} submitted!`);
+            toast.success(`Ticket ${ticket.ticketId} submitted!`);
             fetchTickets(true);
           }}
         />

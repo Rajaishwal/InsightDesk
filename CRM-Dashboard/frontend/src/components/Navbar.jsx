@@ -84,12 +84,14 @@ const Navbar = () => {
       const res = await axios.get(
         `http://localhost:5000/api/breaks/logs/${userId}`
       );
-      const today = new Date().toISOString().slice(0, 10);
+      // Compare India-time calendar days (toISOString is UTC — wrong day before 5:30 AM IST)
+      const istDay = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date(d));
+      const today = istDay(new Date());
       return res.data
         .filter(
           (b) =>
             b.endTime &&
-            new Date(b.startTime).toISOString().slice(0, 10) === today
+            istDay(b.startTime) === today
         )
         .reduce((sum, b) => sum + (b.durationInSeconds || 0), 0);
     } catch {

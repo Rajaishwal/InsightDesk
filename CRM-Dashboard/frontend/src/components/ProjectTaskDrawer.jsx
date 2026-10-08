@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { X, Plus, RefreshCw, GitCommitHorizontal, Play, Square, Clock } from "lucide-react";
 import api from "../services/axios";
+import { useToast } from "../context/ToastContext";
 import { useAuth } from "../context/AuthContext";
 
 const STATUS_STYLES = {
@@ -42,16 +43,11 @@ export default function ProjectTaskDrawer({ project, onClose, isManager }) {
   const [submitting, setSubmitting]       = useState(false);
   const [statusLoading, setStatusLoading] = useState(null);
   const [timerLoading, setTimerLoading]   = useState(null);
-  const [toast, setToast]                 = useState(null);
+  const toast = useToast();
   const [isCheckedIn, setIsCheckedIn]     = useState(false);
   const bottomRef = useRef(null);
 
   const myId = user?._id || user?.id;
-
-  const showToast = (type, msg) => {
-    setToast({ type, msg });
-    setTimeout(() => setToast(null), 4000);
-  };
 
   const fetchTasks = async () => {
     try {
@@ -59,7 +55,7 @@ export default function ProjectTaskDrawer({ project, onClose, isManager }) {
       const res = await api.get(`http://localhost:5000/api/project-tasks/${project.projectId}`);
       setTasks(res.data.tasks || []);
     } catch {
-      showToast("error", "Failed to load tasks");
+      toast.error("Failed to load tasks");
     } finally {
       setLoading(false);
     }
@@ -88,10 +84,10 @@ export default function ProjectTaskDrawer({ project, onClose, isManager }) {
       setForm({ title: "", description: "", isRevision: false });
       setAddOpen(false);
       await fetchTasks();
-      showToast("success", "Task added");
+      toast.success("Task added");
       setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 150);
     } catch (err) {
-      showToast("error", err.response?.data?.message || "Failed to add task");
+      toast.error(err.response?.data?.message || "Failed to add task");
     } finally {
       setSubmitting(false);
     }
@@ -107,10 +103,10 @@ export default function ProjectTaskDrawer({ project, onClose, isManager }) {
       setTasks(prev => prev.map(t => t._id === taskId ? updated : t));
       window.dispatchEvent(new CustomEvent("crm:task:updated"));
       if (isRevision && status === "Completed") {
-        showToast("success", "Revision complete — manager has been notified.");
+        toast.success("Revision complete — manager has been notified.");
       }
     } catch (err) {
-      showToast("error", err.response?.data?.message || "Failed to update status");
+      toast.error(err.response?.data?.message || "Failed to update status");
     } finally {
       setStatusLoading(null);
     }
@@ -122,7 +118,7 @@ export default function ProjectTaskDrawer({ project, onClose, isManager }) {
     const action  = running ? "stop" : "start";
     // Block starting a timer if the employee hasn't checked in today
     if (!running && !isCheckedIn) {
-      showToast("error", "You must check in before starting a timer.");
+      toast.error("You must check in before starting a timer.");
       return;
     }
     try {
@@ -131,9 +127,9 @@ export default function ProjectTaskDrawer({ project, onClose, isManager }) {
       setTasks(prev => prev.map(t => t._id === task._id ? res.data.task : t));
       // Notify dashboard so it re-fetches activeTimerProjectId and re-sorts the project list
       window.dispatchEvent(new CustomEvent("crm:task:updated"));
-      if (!running) showToast("success", "Timer started");
+      if (!running) toast.success("Timer started");
     } catch (err) {
-      showToast("error", err.response?.data?.message || `Failed to ${action} timer`);
+      toast.error(err.response?.data?.message || `Failed to ${action} timer`);
     } finally {
       setTimerLoading(null);
     }
@@ -396,13 +392,6 @@ export default function ProjectTaskDrawer({ project, onClose, isManager }) {
           )}
         </div>
 
-        {/* Toast */}
-        {toast && (
-          <div className={`absolute bottom-24 left-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-sm font-medium
-            ${toast.type === "success" ? "bg-emerald-500 text-white" : "bg-red-500 text-white"}`}>
-            {toast.msg}
-          </div>
-        )}
       </div>
     </div>
   );

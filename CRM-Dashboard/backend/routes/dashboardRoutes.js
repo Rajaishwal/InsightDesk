@@ -1,6 +1,7 @@
 
 
 import express from 'express';
+import { istDateKey } from '../utils/istDate.js';
 const router = express.Router();
 
 // Dashboard summary for a specific employee
@@ -27,7 +28,7 @@ router.get('/summary/:employeeId', async (req, res) => {
     lastMonth.setDate(today.getDate() - 30);
     const attendanceQuery = {
       employeeId,
-      date: { $gte: lastMonth.toISOString().slice(0,10), $lte: today.toISOString().slice(0,10) }
+      date: { $gte: istDateKey(lastMonth), $lte: istDateKey(today) }
     };
     const totalAttendance = await Attendance.countDocuments(attendanceQuery);
     console.log('DEBUG: Attendance query:', attendanceQuery);
@@ -80,7 +81,7 @@ router.get('/attendance-count-graph/:employeeId', async (req, res) => {
     // Count attendance for this employee
     const attendanceCount = await Attendance.countDocuments({
       employeeId,
-      date: { $gte: lastMonth.toISOString().slice(0,10), $lte: today.toISOString().slice(0,10) }
+      date: { $gte: istDateKey(lastMonth), $lte: istDateKey(today) }
     });
     res.json([{ name: userName, count: attendanceCount }]);
   } catch (err) {
@@ -203,10 +204,10 @@ router.get('/summary', async (req, res) => {
     const totalProjects = await Project.countDocuments({ $or: [ { statusFlag: true }, { statusFlag: { $exists: false } } ] });
 
     const today = new Date();
-    const todayStr = today.toISOString().slice(0, 10);
+    const todayStr = istDateKey(today);
     const lastMonth = new Date();
     lastMonth.setDate(today.getDate() - 30);
-    const totalAttendance = await Attendance.countDocuments({ date: { $gte: lastMonth.toISOString().slice(0,10), $lte: todayStr } });
+    const totalAttendance = await Attendance.countDocuments({ date: { $gte: istDateKey(lastMonth), $lte: todayStr } });
     const possibleAttendance = (employeeOnlyCount || totalEmployees) * 30;
     const attendanceRate = possibleAttendance ? Math.round((totalAttendance / possibleAttendance) * 100) : 0;
 
@@ -222,7 +223,7 @@ router.get('/summary', async (req, res) => {
 
     // Top performer (employee with most attendance in last 30 days)
     const topAttendance = await Attendance.aggregate([
-      { $match: { date: { $gte: lastMonth.toISOString().slice(0,10), $lte: today.toISOString().slice(0,10) } } },
+      { $match: { date: { $gte: istDateKey(lastMonth), $lte: istDateKey(today) } } },
       { $group: { _id: '$userName', count: { $sum: 1 } } },
       { $sort: { count: -1 } },
       { $limit: 1 }
@@ -252,7 +253,7 @@ router.get('/attendance-count-graph', async (req, res) => {
     const lastMonth = new Date();
     lastMonth.setDate(today.getDate() - 30);
     const attendanceStats = await Attendance.aggregate([
-      { $match: { date: { $gte: lastMonth.toISOString().slice(0,10), $lte: today.toISOString().slice(0,10) } } },
+      { $match: { date: { $gte: istDateKey(lastMonth), $lte: istDateKey(today) } } },
       { $group: { _id: '$userName', count: { $sum: 1 } } },
       { $sort: { count: -1 } }
     ]);

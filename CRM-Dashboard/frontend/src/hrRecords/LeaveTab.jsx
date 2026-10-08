@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../services/axios";
+import { useToast } from "../context/ToastContext";
+import { useConfirm } from "../context/ConfirmContext";
 import { CheckCircle, XCircle, Check, X, RefreshCw } from "lucide-react";
 
 const STATUS_CHIP = {
@@ -17,14 +19,9 @@ export default function LeaveTab() {
   const [pagination, setPagination] = useState({ totalPages: 1, currentPage: 1, totalRecords: 0 });
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [toast, setToast] = useState(null);
-  const [confirm, setConfirm] = useState(null); // { leaveId, action: 'Approved'|'Rejected', name }
+  const toast = useToast();
+  const confirm = useConfirm();
   const [actionLoading, setActionLoading] = useState(null); // leaveId being actioned
-
-  const showToast = (type, msg) => {
-    setToast({ type, msg });
-    setTimeout(() => setToast(null), 4000);
-  };
 
   const fetchLeaves = async (silent = false) => {
     try {
@@ -35,7 +32,7 @@ export default function LeaveTab() {
       setLeaves(res.data.leaves || []);
       setPagination(res.data.pagination || { totalPages: 1, currentPage: 1, totalRecords: 0 });
     } catch {
-      showToast("error", "Failed to load leave requests.");
+      toast.error("Failed to load leave requests.");
     } finally {
       if (!silent) setLoading(false); else setRefreshing(false);
     }
@@ -62,22 +59,40 @@ export default function LeaveTab() {
     setRefreshing(false);
   };
 
-  const confirmAction = (leave, action) => {
-    setConfirm({ leaveId: leave._id, action, name: leave.userName, leaveType: leave.leaveType, days: leave.totalDays });
-  };
+  const confirmAction = async (leave, action) => {
+    const approve = action === "Approved";
+    const ok = await confirm({
+      tone: approve ? "success" : "danger",
+      title: approve ? "Approve leave?" : "Reject leave?",
+      message: approve
+        ? "The employee will be notified that their leave is approved."
+        : "The employee will be notified that their leave is rejected.",
+      confirmText: approve ? "Yes, approve" : "Yes, reject",
+      details: (
+        <div className="flex items-center gap-3 rounded-xl bg-gray-50 px-4 py-3">
+          <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border-2 text-sm font-bold
+            ${approve ? "border-emerald-400 text-emerald-600" : "border-red-400 text-red-600"}`}>
+            {leave.userName?.charAt(0).toUpperCase()}
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-gray-800">{leave.userName}</p>
+            {leave.leaveType && (
+              <p className="text-xs text-gray-400">{leave.leaveType} · {leave.totalDays} {leave.totalDays === 1 ? "day" : "days"}</p>
+            )}
+          </div>
+        </div>
+      ),
+    });
+    if (!ok) return;
 
-  const executeAction = async () => {
-    if (!confirm) return;
     try {
-      setActionLoading(confirm.leaveId);
-      await api.put(`http://localhost:5000/api/leaves/hr/status/${confirm.leaveId}`, { status: confirm.action });
-      showToast("success", `Leave ${confirm.action.toLowerCase()} for ${confirm.name}.`);
-      setConfirm(null);
+      setActionLoading(leave._id);
+      await api.put(`http://localhost:5000/api/leaves/hr/status/${leave._id}`, { status: action });
+      toast.success(`Leave ${action.toLowerCase()} for ${leave.userName}.`);
       await fetchLeaves(true);
       await fetchStats();
     } catch (err) {
-      showToast("error", err.response?.data?.message || "Failed to update leave status.");
-      setConfirm(null);
+      toast.error(err.response?.data?.message || "Failed to update leave status.");
     } finally {
       setActionLoading(null);
     }
@@ -92,74 +107,6 @@ export default function LeaveTab() {
 
   return (
     <div className="leave-tab space-y-5">
-      {/* Toast */}
-      {toast && (
-        <div className={`fixed top-5 right-5 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium
-          ${toast.type === "success" ? "bg-emerald-500 text-white" : "bg-red-500 text-white"}`}>
-          {toast.msg}
-          <button onClick={() => setToast(null)}><X size={14} /></button>
-        </div>
-      )}
-
-      {/* Confirm dialog */}
-      {confirm && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-          <div className={`bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border
-            ${confirm.action === "Approved" ? "border-emerald-400" : "border-red-400"}`}>
-
-            {/* Header — white bg, colored text */}
-            <div className="px-6 pt-6 pb-5 text-center">
-              <div className={`w-12 h-12 rounded-full border-2 flex items-center justify-center mx-auto mb-3
-                ${confirm.action === "Approved" ? "border-emerald-400" : "border-red-400"}`}>
-                {confirm.action === "Approved"
-                  ? <CheckCircle className="w-6 h-6 text-emerald-500" />
-                  : <XCircle className="w-6 h-6 text-red-500" />}
-              </div>
-              <h3 className={`text-lg font-bold tracking-tight ${confirm.action === "Approved" ? "text-emerald-600" : "text-red-600"}`}>
-                {confirm.action === "Approved" ? "Approve Leave?" : "Reject Leave?"}
-              </h3>
-            </div>
-
-            {/* Body */}
-            <div className="px-6 pb-6">
-              {/* Employee info row */}
-              <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3 mb-5">
-                <div className={`w-9 h-9 rounded-full border-2 flex items-center justify-center text-sm font-bold flex-shrink-0
-                  ${confirm.action === "Approved" ? "border-emerald-400 text-emerald-600" : "border-red-400 text-red-600"}`}>
-                  {confirm.name?.charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-gray-800">{confirm.name}</p>
-                  {confirm.leaveType && (
-                    <p className="text-xs text-gray-400">{confirm.leaveType} · {confirm.days} {confirm.days === 1 ? "day" : "days"}</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Buttons */}
-              <div className="flex gap-2.5">
-                <button
-                  onClick={executeAction}
-                  disabled={!!actionLoading}
-                  className={`flex-1 py-2.5 rounded-full text-sm font-semibold border transition disabled:opacity-60
-                    ${confirm.action === "Approved"
-                      ? "border-emerald-400 text-emerald-600 hover:bg-emerald-50"
-                      : "border-red-400 text-red-600 hover:bg-red-50"}`}
-                >
-                  {actionLoading ? "Saving..." : confirm.action === "Approved" ? "Yes, Approve" : "Yes, Reject"}
-                </button>
-                <button
-                  onClick={() => setConfirm(null)}
-                  className="flex-1 py-2.5 rounded-full text-sm font-semibold border border-gray-200 hover:bg-gray-50 text-gray-500 transition"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-
-          </div>
-        </div>
-      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

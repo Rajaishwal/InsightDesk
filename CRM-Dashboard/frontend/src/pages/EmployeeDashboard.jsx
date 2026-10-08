@@ -1,6 +1,7 @@
 // EmployeeDashboard.jsx — Employee home dashboard: focus ring, project task cards, HR task board, calendar
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import api from "../services/axios";
 import { useAutoRefresh } from "../hooks/useAutoRefresh";
 import { getCache, setCache } from "../utils/pageCache";
@@ -46,6 +47,9 @@ export default function EmployeeDashboard() {
   const [tracklistProject, setTracklistProject] = useState(null);
   const [locationStatus, setLocationStatus] = useState(null);
   const [viewMonthOffset, setViewMonthOffset] = useState(0); // 0=current, -1=prev, -2=two months ago
+  const [monthLoading, setMonthLoading] = useState(false);
+  const monthNavSeq = useRef(0); // ignores responses from clicks that a newer click has superseded
+  const toast = useToast();
   const [calendarOverride, setCalendarOverride] = useState(null); // null = use main data
 
   useEffect(() => {
@@ -76,15 +80,29 @@ export default function EmployeeDashboard() {
   const handleMonthNav = async (dir) => {
     const newOffset = viewMonthOffset + dir;
     if (newOffset < -2 || newOffset > 0) return;
-    setViewMonthOffset(newOffset);
-    if (newOffset === 0) { setCalendarOverride(null); return; }
-    const d = new Date();
-    d.setMonth(d.getMonth() + newOffset);
-    const month = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const seq = ++monthNavSeq.current;
+    if (newOffset === 0) {
+      setViewMonthOffset(0);
+      setCalendarOverride(null);
+      setMonthLoading(false);
+      return;
+    }
+    // Day 1 of the target month — setMonth() on the 29th–31st would roll over into the wrong month
+    const now = new Date();
+    const target = new Date(now.getFullYear(), now.getMonth() + newOffset, 1);
+    const month = `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, "0")}`;
+    setMonthLoading(true);
     try {
       const r = await api.get(`/users/attendance-calendar?month=${month}`);
+      if (seq !== monthNavSeq.current) return;
+      // Move the arrows only once the month's data has arrived, so header and calendar never disagree
       setCalendarOverride(r.data);
-    } catch { }
+      setViewMonthOffset(newOffset);
+    } catch {
+      if (seq === monthNavSeq.current) toast.error("Couldn't load that month's attendance. Please try again.");
+    } finally {
+      if (seq === monthNavSeq.current) setMonthLoading(false);
+    }
   };
 
   // Task timer lives in <LiveTaskTimer /> — no polling here
@@ -144,7 +162,7 @@ export default function EmployeeDashboard() {
     },
     {
       label: "Total Attendance",
-      value: `${effPresentDays} days`,
+      value: `${effPresentDays} ${effPresentDays === 1 ? "day" : "days"}`,
       sub: `of ${effWorkingDays} working days · ${effMonthYear}`,
       Icon: Clock,
       iconBg: "bg-indigo-50", iconColor: "text-indigo-600",
@@ -278,18 +296,20 @@ export default function EmployeeDashboard() {
                 {/* Month navigation */}
                 <button
                   onClick={() => handleMonthNav(-1)}
-                  disabled={viewMonthOffset <= -2}
+                  disabled={viewMonthOffset <= -2 || monthLoading}
+                  aria-label="Previous month"
                   className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition"
                 >
                   <ChevronLeft className="w-4 h-4 text-gray-500" />
                 </button>
                 <div>
                   <h2 className="text-sm font-bold text-gray-800">Monthly Attendance</h2>
-                  <p className="text-[11px] text-gray-400 mt-0.5">{effMonthYear}</p>
+                  <p className="text-[11px] text-gray-400 mt-0.5">{monthLoading ? "Loading…" : effMonthYear}</p>
                 </div>
                 <button
                   onClick={() => handleMonthNav(1)}
-                  disabled={viewMonthOffset >= 0}
+                  disabled={viewMonthOffset >= 0 || monthLoading}
+                  aria-label="Next month"
                   className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition"
                 >
                   <ChevronRight className="w-4 h-4 text-gray-500" />

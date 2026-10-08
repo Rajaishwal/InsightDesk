@@ -3,6 +3,7 @@ import User from "../model/User.js";
 import ProjectTask from "../model/ProjectTask.js";
 import Break from "../models/Break.js";
 import Attendance from "../model/Attendance.js";
+import { findOpenAttendance } from "../utils/istDate.js";
 
 // 👉 HR assigns a task to employee route: POST /api/hr-tasks/
 export const assignTask = async (req, res) => {
@@ -82,8 +83,15 @@ export const updateHRTask = async (req, res) => {
   try {
     const taskId = req.params.id;
 
-    const updated = await HRTask.findByIdAndUpdate(taskId, req.body, { new: true });
-    if (!updated) return res.status(404).json({ success: false, message: "Task not found" });
+    const existing = await HRTask.findById(taskId).select('status');
+    if (!existing) return res.status(404).json({ success: false, message: "Task not found" });
+
+    // Keep completedAt in step with status — reports count completions by this date
+    const update = { ...req.body };
+    if (update.status === 'Completed' && existing.status !== 'Completed') update.completedAt = new Date();
+    else if (update.status && update.status !== 'Completed') update.completedAt = null;
+
+    const updated = await HRTask.findByIdAndUpdate(taskId, update, { new: true });
 
     res.status(200).json({ success: true, message: "Task updated", updated });
   } catch (error) {
@@ -113,10 +121,9 @@ export const startHrTimer = async (req, res) => {
     if (!task) return res.status(404).json({ message: 'Task not found' });
     if (task.status === 'Completed') return res.status(400).json({ message: 'Task already completed' });
 
-    // Timers only run inside a working session: checked in today, and not on a break
-    const today = new Date().toISOString().split('T')[0];
+    // Timers only run inside a working session: checked in (session may span midnight), and not on a break
     const [checkedIn, activeBreak] = await Promise.all([
-      Attendance.findOne({ userId, date: today, status: 'checked-in' }).lean(),
+      findOpenAttendance(Attendance, userId).lean(),
       Break.findOne({ userId, endTime: null }).lean(),
     ]);
     if (!checkedIn) {

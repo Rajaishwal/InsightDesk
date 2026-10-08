@@ -14,8 +14,15 @@ import {
   deleteUser,
 } from '../controllers/userController.js';
 import { protect, admin, hrOrAdmin } from '../middleware/authMiddleware.js';
+import { istDateKey, istParts, addDaysKey, dowOfKey } from '../utils/istDate.js';
 
 const router = express.Router();
+
+// "YYYY-MM-DD" built from the numbers. Never use new Date(y, m, d).toISOString() for this —
+// on an IST server local midnight is the previous day in UTC, so month bounds shift back a day.
+const ymd = (y, m0, d) => `${y}-${String(m0 + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+// Monday of the IST week containing the date key
+const mondayOf = (ds) => { const dow = dowOfKey(ds); return addDaysKey(ds, -(dow === 0 ? 6 : dow - 1)); };
 
 // PUT /api/users/profile
 router.put('/profile', protect, updateUserProfile);
@@ -29,13 +36,14 @@ router.get('/profile-stats', protect, async (req, res) => {
     const userId = req.user._id;
     const empId = req.user.employeeId;
     const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    const { year: curYear, month: curMonth } = istParts(now);
+    const startOfMonth = new Date(curYear, curMonth, 1);
+    const endOfMonth = new Date(curYear, curMonth + 1, 0, 23, 59, 59, 999);
 
     const [tasksInProgress, totalTasks, attendanceThisMonth, activeProjects, completedProjects, approvedLeaves] = await Promise.all([
       HRTask.countDocuments({ assignedTo: empId, status: { $in: ['In Progress', 'Assigned'] } }),
       HRTask.countDocuments({ assignedTo: empId }),
-      Attendance.find({ userId, date: { $gte: startOfMonth.toISOString().split('T')[0], $lte: endOfMonth.toISOString().split('T')[0] } }),
+      Attendance.find({ userId, date: { $gte: ymd(curYear, curMonth, 1), $lte: ymd(curYear, curMonth, endOfMonth.getDate()) } }),
       Project.countDocuments({ 'teamMembers.empId': req.user.employeeId, status: 'Ongoing', statusFlag: true }),
       Project.countDocuments({ 'teamMembers.empId': req.user.employeeId, status: 'Completed', statusFlag: true }),
       Leave.find({ userId, status: 'Approved', startDate: { $gte: startOfMonth }, endDate: { $lte: endOfMonth } }),
@@ -63,7 +71,7 @@ router.get('/profile-stats', protect, async (req, res) => {
 router.get('/admin-stats', protect, admin, async (_req, res) => {
   try {
     const now = new Date();
-    const today = now.toISOString().split('T')[0];
+    const today = istDateKey(now);
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
     const [totalEmployees, newJoined, onBreakCount] = await Promise.all([
@@ -145,15 +153,12 @@ router.get('/admin-stats', protect, admin, async (_req, res) => {
       teamMembers: p.teamMembers.map(m => ({ empId: m.empId, name: empNameMap[m.empId] || m.empId })),
     }));
 
-    // Employees on leave today
-    const todayStart = new Date(today);
-    todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date(today);
-    todayEnd.setHours(23, 59, 59, 999);
+    // Employees on leave today — leave dates are stored as UTC-midnight calendar dates
+    const todayLeaveDay = new Date(`${today}T00:00:00Z`);
     const onLeaveRaw = await Leave.find({
       status: 'Approved',
-      startDate: { $lte: todayEnd },
-      endDate: { $gte: todayStart },
+      startDate: { $lte: todayLeaveDay },
+      endDate: { $gte: todayLeaveDay },
     }).select('userName leaveType userId').lean();
 
     // Enrich on-leave data with user profile fields
@@ -262,20 +267,15 @@ router.get('/employee-dashboard', protect, async (req, res) => {
     const userId = req.user._id;
     const empId = req.user.employeeId;
     const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
-    const todayStr = now.toISOString().split('T')[0];
-    const startStr = new Date(year, month, 1).toISOString().split('T')[0];
+    const { year, month } = istParts(now);
+    const todayStr = istDateKey(now);
     const lastDay = new Date(year, month + 1, 0);
-    const endStr = lastDay.toISOString().split('T')[0];
     const daysInMonth = lastDay.getDate();
+    const startStr = ymd(year, month, 1);
+    const endStr = ymd(year, month, daysInMonth);
 
-    // Compute Monday of current week so the attendance query covers it even if it's in last month
-    const _dow = now.getDay();
-    const _daysSinceMon = _dow === 0 ? 6 : _dow - 1;
-    const _monDate = new Date(now);
-    _monDate.setDate(now.getDate() - _daysSinceMon);
-    const weekQueryStart = _monDate.toISOString().split('T')[0];
+    // Monday of the current (IST) week, so the attendance query covers it even if it's in last month
+    const weekQueryStart = mondayOf(todayStr);
     const attendanceStart = weekQueryStart < startStr ? weekQueryStart : startStr;
 
     const [attendance, projects, hrTasks, leaves] = await Promise.all([
@@ -288,8 +288,9 @@ router.get('/employee-dashboard', protect, async (req, res) => {
       Leave.find({
         userId,
         status: 'Approved',
-        startDate: { $lte: new Date(endStr + 'T23:59:59') },
-        endDate: { $gte: new Date(startStr + 'T00:00:00') },
+        // Leave dates are stored at UTC midnight, so compare against UTC bounds
+        startDate: { $lte: new Date(endStr + 'T23:59:59Z') },
+        endDate: { $gte: new Date(startStr + 'T00:00:00Z') },
       }).lean(),
     ]);
 
@@ -377,17 +378,10 @@ router.get('/employee-dashboard', protect, async (req, res) => {
     const taskCompletionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
     // Current-week stats for the Days Present card — denominator is always 5 (Mon–Fri)
-    const currentDow = now.getDay(); // 0=Sun, 1=Mon, …, 6=Sat
-    const daysSinceMon = currentDow === 0 ? 6 : currentDow - 1;
-    const monDate = new Date(now);
-    monDate.setDate(now.getDate() - daysSinceMon);
-    monDate.setHours(0, 0, 0, 0);
-    // Iterate Mon–Fri using attMap (safe — avoids Date-vs-string comparison bugs)
+    // Iterate Mon–Fri of the IST week using attMap (safe — avoids Date-vs-string comparison bugs)
     let weekPresentDays = 0, weekLeaveDays = 0;
     for (let i = 0; i < 5; i++) {
-      const d = new Date(monDate);
-      d.setDate(monDate.getDate() + i);
-      const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const ds = addDaysKey(weekQueryStart, i);
       if (attMap[ds]) weekPresentDays++;
       if (leaveDates.has(ds)) weekLeaveDays += halfDayDates.has(ds) ? 0.5 : 1;
     }
@@ -457,28 +451,27 @@ router.get('/attendance-calendar', protect, async (req, res) => {
   try {
     const userId = req.user._id;
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
+    const todayStr = istDateKey(now);
 
-    // Parse requested month (default = current)
+    // Parse requested month (default = current IST month)
     let year, month;
     if (req.query.month) {
       const parts = req.query.month.split('-').map(Number);
       year = parts[0]; month = parts[1] - 1; // 0-indexed
     } else {
-      year = now.getFullYear(); month = now.getMonth();
+      ({ year, month } = istParts(now));
     }
 
-    const startStr = new Date(year, month, 1).toISOString().split('T')[0];
-    const lastDay  = new Date(year, month + 1, 0);
-    const endStr   = lastDay.toISOString().split('T')[0];
-    const daysInMonth = lastDay.getDate();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const startStr = ymd(year, month, 1);
+    const endStr   = ymd(year, month, daysInMonth);
 
     const [attendance, leaves] = await Promise.all([
       Attendance.find({ userId, date: { $gte: startStr, $lte: endStr } }).sort({ date: 1 }).lean(),
       Leave.find({
         userId, status: 'Approved',
-        startDate: { $lte: new Date(endStr + 'T23:59:59') },
-        endDate:   { $gte: new Date(startStr + 'T00:00:00') },
+        startDate: { $lte: new Date(endStr + 'T23:59:59Z') },
+        endDate:   { $gte: new Date(startStr + 'T00:00:00Z') },
       }).lean(),
     ]);
 
