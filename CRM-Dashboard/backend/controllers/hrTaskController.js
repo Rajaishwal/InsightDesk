@@ -4,6 +4,7 @@ import ProjectTask from "../model/ProjectTask.js";
 import Break from "../models/Break.js";
 import Attendance from "../model/Attendance.js";
 import { findOpenAttendance } from "../utils/istDate.js";
+import { getIo } from "../socket.js";
 
 // 👉 HR assigns a task to employee route: POST /api/hr-tasks/
 export const assignTask = async (req, res) => {
@@ -78,20 +79,60 @@ export const getMyAssignedTasks = async (req, res) => {
   }
 };
 
+// Employees can only move their task to In Progress or Completed; Completed/Failed is final for them
+const EMPLOYEE_STATUSES = ['In Progress', 'Completed'];
+const FINAL_STATUSES = ['Completed', 'Failed'];
+
 // 👉 Update task (HR or Employee can update status)
 export const updateHRTask = async (req, res) => {
   try {
     const taskId = req.params.id;
+    const isAdmin = req.user?.role === 'admin';
 
-    const existing = await HRTask.findById(taskId).select('status');
+    const existing = await HRTask.findById(taskId);
     if (!existing) return res.status(404).json({ success: false, message: "Task not found" });
 
+    let update;
+    if (isAdmin) {
+      update = { ...req.body };
+    } else {
+      if (existing.assignedTo !== req.user?.employeeId) {
+        return res.status(403).json({ success: false, message: "You can only update tasks assigned to you." });
+      }
+      if (FINAL_STATUSES.includes(existing.status)) {
+        return res.status(409).json({ success: false, message: `This task is already ${existing.status.toLowerCase()} and can't be changed.` });
+      }
+      if (!EMPLOYEE_STATUSES.includes(req.body.status)) {
+        return res.status(400).json({ success: false, message: "Status can only be set to In Progress or Completed." });
+      }
+      update = { status: req.body.status }; // employees change status only — never title, assignee, etc.
+    }
+
     // Keep completedAt in step with status — reports count completions by this date
-    const update = { ...req.body };
     if (update.status === 'Completed' && existing.status !== 'Completed') update.completedAt = new Date();
     else if (update.status && update.status !== 'Completed') update.completedAt = null;
 
+    // A finished task can't keep a timer running — stop it and log the session (same as project tasks)
+    if (FINAL_STATUSES.includes(update.status)) {
+      const now = new Date();
+      for (const entry of existing.timers || []) {
+        if (!entry.timerStartedAt) continue;
+        const elapsed = Math.max(0, Math.floor((now - new Date(entry.timerStartedAt)) / 1000));
+        await HRTask.updateOne(
+          { _id: existing._id, 'timers.userId': entry.userId },
+          { $set: { 'timers.$.timerStartedAt': null, 'timers.$.totalTimeLogged': (entry.totalTimeLogged || 0) + elapsed } }
+        );
+        try {
+          await HRTask.updateOne(
+            { _id: existing._id, 'timers.userId': entry.userId },
+            { $push: { 'timers.$.sessions': { startTime: new Date(entry.timerStartedAt), endTime: now, duration: elapsed } } }
+          );
+        } catch (sessionErr) { console.warn('HR session log failed (non-critical):', sessionErr.message); }
+      }
+    }
+
     const updated = await HRTask.findByIdAndUpdate(taskId, update, { new: true });
+    getIo()?.emit("crm:task:updated");
 
     res.status(200).json({ success: true, message: "Task updated", updated });
   } catch (error) {

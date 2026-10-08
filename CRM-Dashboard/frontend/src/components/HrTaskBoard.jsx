@@ -1,8 +1,9 @@
 // HrTaskBoard.jsx — Employee panel showing HR-assigned tasks with timer controls and status updates
 import { useState, useEffect, useRef } from "react";
-import { Play, Pause, Square, CheckCircle2, Timer, ChevronDown } from "lucide-react";
+import { Play, Pause, Square, CheckCircle2, Timer, ChevronDown, Lock } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
+import { useConfirm } from "../context/ConfirmContext";
 import api from "../services/axios";
 
 const fmt = (s) => {
@@ -18,11 +19,14 @@ const CHIP = {
   "Failed":      "bg-red-50     text-red-700",
 };
 
-const STATUS_OPTIONS = ["Assigned", "In Progress", "Completed", "Failed"];
+// Employees only move a task forward; Completed (or Failed, set by HR) is final
+const STATUS_OPTIONS = ["In Progress", "Completed"];
+const FINAL_STATUSES = ["Completed", "Failed"];
 
 /* ── Status dropdown badge ── */
 function StatusBadge({ status, taskId, onStatusChange }) {
   const toast = useToast();
+  const confirm = useConfirm();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const ref = useRef(null);
@@ -34,15 +38,37 @@ function StatusBadge({ status, taskId, onStatusChange }) {
   }, []);
 
   const select = async (newStatus) => {
-    if (newStatus === status) { setOpen(false); return; }
     setOpen(false);
+    if (newStatus === status) return;
+    if (newStatus === "Completed") {
+      const ok = await confirm({
+        tone: "success",
+        title: "Mark task as completed?",
+        message: "Once completed, the status can't be changed again. A running timer will be stopped.",
+        confirmText: "Yes, complete",
+      });
+      if (!ok) return;
+    }
     setSaving(true);
     try {
-      await api.put(`/hr-tasks/${taskId}`, { status: newStatus });
-      onStatusChange(taskId, newStatus);
-    } catch { toast.error("Failed to update status"); }
-    finally { setSaving(false); }
+      const r = await api.put(`/hr-tasks/${taskId}`, { status: newStatus });
+      onStatusChange(taskId, newStatus, r.data?.updated);
+      window.dispatchEvent(new CustomEvent("crm:task:updated")); // refresh Today's Focus if a timer was stopped
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to update status");
+    } finally { setSaving(false); }
   };
+
+  // Finished tasks are locked — plain chip, no dropdown
+  if (FINAL_STATUSES.includes(status)) {
+    return (
+      <span
+        title={`${status} — can't be changed`}
+        className={`flex flex-shrink-0 items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${CHIP[status] || "bg-gray-100 text-gray-500"}`}>
+        <Lock className="w-2.5 h-2.5" />{status}
+      </span>
+    );
+  }
 
   return (
     <div ref={ref} className="relative flex-shrink-0">
@@ -112,9 +138,10 @@ function HrTaskRow({ task, userId, onTaskUpdate }) {
 
   const done = localStatus === "Completed" || localStatus === "Failed";
 
-  const handleStatusChange = (_id, newStatus) => {
+  const handleStatusChange = (_id, newStatus, updatedTask) => {
     setLocalStatus(newStatus);
-    onTaskUpdate({ ...task, status: newStatus });
+    // Prefer the server's copy — completing may have stopped the timer
+    onTaskUpdate(updatedTask || { ...task, status: newStatus });
   };
 
   return (
