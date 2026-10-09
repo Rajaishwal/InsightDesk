@@ -113,7 +113,7 @@ export default function EmployeeDashboard() {
 
   const {
     attendanceDaysThisMonth, totalWorkingDaysThisMonth,
-    presentDaysThisMonth, workingDaysThisMonth,
+    presentDaysThisMonth, workingDaysThisMonth, leaveDaysThisMonth = 0,
     activeProjects, completedProjects, totalProjects,
     activeTimerProjectId,
     completedTasks, totalTasks,
@@ -125,6 +125,7 @@ export default function EmployeeDashboard() {
   const effCalendarDays   = calendarOverride?.calendarDays         ?? calendarDays;
   const effPresentDays    = calendarOverride?.presentDaysThisMonth ?? presentDaysThisMonth;
   const effWorkingDays    = calendarOverride?.workingDaysThisMonth ?? workingDaysThisMonth;
+  const effLeaveDays      = calendarOverride?.leaveDaysThisMonth   ?? leaveDaysThisMonth;
   const effMonthYear      = calendarOverride?.monthYear            ?? monthYear;
 
   // Project with active timer first → then Ongoing → Pending → Completed
@@ -156,7 +157,7 @@ export default function EmployeeDashboard() {
     {
       label: "Total Attendance",
       value: `${effPresentDays} ${effPresentDays === 1 ? "day" : "days"}`,
-      sub: `of ${effWorkingDays} working days · ${effMonthYear}`,
+      sub: `of ${effWorkingDays} working days${effLeaveDays ? ` (${effLeaveDays} on leave)` : ""} · ${effMonthYear}`,
       Icon: Clock,
       iconBg: "bg-indigo-50", iconColor: "text-indigo-600",
       accent: "border-l-4 border-indigo-400",
@@ -365,16 +366,14 @@ export default function EmployeeDashboard() {
                     `}
                   >
                     {isHalfLeave ? (
-                      <>
-                        <span className="absolute left-[25%] -translate-x-1/2 text-[11px] font-bold text-emerald-700">{cell.day}</span>
-                        <span className="absolute right-[25%] translate-x-1/2 text-[9px] font-black text-blue-700 leading-none tracking-wide">HD</span>
-                      </>
-                    ) : cell.day}
-                    {cell.status === "leave" && cell.leaveType && (
-                      <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[7px] font-black text-blue-600 leading-none tracking-wide">
+                      // Half-day leave: just "HD" over the half-present / half-leave background — the date shows on hover
+                      <span className="text-[11px] font-black tracking-wide text-blue-700">HD</span>
+                    ) : cell.status === "leave" && cell.leaveType ? (
+                      // Leave day: just the leave type (PL / SL / LOP …) — the date shows in the hover strip
+                      <span className="text-[11px] font-black tracking-wide text-blue-700">
                         {LEAVE_ABBR[cell.leaveType] ?? cell.leaveType}
                       </span>
-                    )}
+                    ) : cell.day}
                     {isSunday && (
                       <span className="absolute top-0.5 right-0.5 text-[6px] text-rose-300 leading-none">☀</span>
                     )}

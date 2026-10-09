@@ -168,15 +168,16 @@ router.get('/employee/:employeeId', protect, admin, async (req, res) => {
       let status;
 
       if (isFuture) status = 'future';
+      else if (lv && !lv.halfDay && !isWeekend) status = 'leave'; // approved full-day leave wins over a check-in that day
       else if (att) {
         const lateNow = istMinutes(att.checkInTime) > lateAfterMin;
-        status = lateNow ? 'late' : 'present';
+        status = lv?.halfDay ? 'half-leave' : (lateNow ? 'late' : 'present'); // half-day leave: they worked the other half
         attendedDays++;
         checkInMinSum += istMinutes(att.checkInTime);
         if (att.checkOutTime) { hoursSum += att.workingHours || 0; hoursCount++; }
         else if (ds !== todayStr && String(att._id) !== String(openAtt?._id)) missedCheckouts++; // the live session isn't "missed"
         if (isWeekend) weekendDays++;
-        else { presentDays++; if (lateNow) lateDays++; }
+        else { presentDays++; if (lateNow && !lv?.halfDay) lateDays++; }
       } else if (todayNoShowYet && !isWeekend && !lv) status = 'today';
       else if (isWeekend) status = 'weekend';
       else if (lv) status = lv.halfDay ? 'half-leave' : 'leave';

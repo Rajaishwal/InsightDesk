@@ -7,7 +7,7 @@ import EditProfileModal from "../components/EditProfileModal";
 import MeterRing from "../components/MeterRing";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer,
+  ResponsiveContainer, Cell, LabelList,
 } from "recharts";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/axios";
@@ -15,6 +15,37 @@ import { getCache, setCache } from "../utils/pageCache";
 import { Users, UserPlus, Briefcase, CheckCircle2, AlertCircle, XCircle, X, Clock, Coffee, Pencil, MapPin, RefreshCw, FileBarChart } from "lucide-react";
 
 const PROJECT_STATUS_COLORS = ["#7c3aed", "#06b6d4", "#f59e0b"];
+
+// Joinings chart tooltip — the number leads, then the month, then who joined
+function JoinTooltip({ active, payload }) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0].payload;
+  return (
+    <div className="max-w-[230px] rounded-xl border border-gray-100 bg-white px-3 py-2.5 shadow-lg">
+      <p className="text-sm font-black text-gray-800">
+        {d.count} <span className="text-[11px] font-semibold text-gray-400">{d.count === 1 ? "employee" : "employees"} joined</span>
+      </p>
+      <p className="flex items-center gap-1.5 text-[11px] text-gray-500">
+        <span className="h-0.5 w-3 rounded-full" style={{ background: d.isCurrent ? "#7c3aed" : "#a78bfa" }} />
+        {d.label}{d.isCurrent ? " · this month" : ""}
+      </p>
+      {d.joiners.length > 0 && (
+        <ul className="mt-2 space-y-1.5 border-t border-gray-100 pt-2">
+          {d.joiners.slice(0, 5).map(e => (
+            <li key={e._id} className="flex items-center gap-2 text-[11px] text-gray-600">
+              <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-violet-100 text-[9px] font-bold text-violet-700">
+                {e.photo ? <img src={e.photo} alt="" className="h-full w-full object-cover" /> : e.name?.charAt(0)?.toUpperCase()}
+              </span>
+              <span className="truncate">{e.name}</span>
+              <span className="ml-auto font-mono text-[9px] text-gray-400">{e.employeeId}</span>
+            </li>
+          ))}
+          {d.joiners.length > 5 && <li className="text-[10px] text-gray-400">+{d.joiners.length - 5} more</li>}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 const AdminDashboard = () => {
   const { user } = useAuth();
@@ -77,6 +108,24 @@ const AdminDashboard = () => {
     const s = secs % 60;
     return m > 0 ? `${m}m ${s}s` : `${s}s`;
   };
+
+  // Monthly joinings: oldest → newest; attach the full month name and who joined (from the employee list)
+  const joinNow = new Date();
+  const joinData = (stats?.monthlyData || []).map((m, i, arr) => {
+    const monthStart = new Date(joinNow.getFullYear(), joinNow.getMonth() - (arr.length - 1 - i), 1);
+    const joiners = (stats?.recentEmployees || []).filter(e => {
+      const c = new Date(e.createdAt);
+      return c.getFullYear() === monthStart.getFullYear() && c.getMonth() === monthStart.getMonth();
+    });
+    return {
+      ...m,
+      label: monthStart.toLocaleDateString("en-GB", { month: "long", year: "numeric" }),
+      isCurrent: i === arr.length - 1,
+      joiners,
+    };
+  });
+  const joinTotal = joinData.reduce((s, d) => s + d.count, 0);
+  const joinBusiest = joinData.reduce((best, d) => (d.count > (best?.count || 0) ? d : best), null);
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
@@ -214,30 +263,64 @@ const AdminDashboard = () => {
         {/* Left — 2/3 */}
         <div className="lg:col-span-2 space-y-5">
 
-          {/* Bar Chart */}
+          {/* Monthly Employee Joinings — summary numbers + bar chart (hover shows who joined) */}
           <div className="bg-white rounded-2xl shadow-sm p-5">
-            <h3 className="text-sm font-semibold text-gray-700 mb-4">Monthly Employee Joinings</h3>
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={stats?.monthlyData || []} barSize={28} barGap={4}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold text-gray-700">Monthly Employee Joinings</h3>
+              <p className="text-[11px] text-gray-400 mt-0.5">New employees per month · last {joinData.length} months · hover a bar to see who joined</p>
+            </div>
+
+            {/* Summary */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+              {[
+                ["Joined", joinTotal, `in ${joinData.length} months`],
+                ["This month", joinData.at(-1)?.count ?? 0, joinData.at(-1)?.label || "—"],
+                ["Busiest", joinBusiest ? joinBusiest.month : "—", joinBusiest ? `${joinBusiest.count} joined` : "no joinings yet"],
+                ["Avg / month", joinData.length ? (joinTotal / joinData.length).toFixed(1) : "0", "new employees"],
+              ].map(([label, value, sub]) => (
+                <div key={label} className="rounded-xl bg-violet-50/50 border border-violet-100/70 px-3 py-2.5">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{label}</p>
+                  <p className="mt-1 text-lg font-black leading-none text-gray-800">{value}</p>
+                  <p className="mt-1 truncate text-[10px] text-gray-400" title={sub}>{sub}</p>
+                </div>
+              ))}
+            </div>
+
+            <ResponsiveContainer width="100%" height={230}>
+              <BarChart data={joinData} margin={{ top: 22, right: 8, left: -16, bottom: 0 }}>
+                <CartesianGrid vertical={false} stroke="#f1f5f9" />
                 <XAxis
                   dataKey="month"
-                  axisLine={false}
+                  axisLine={{ stroke: "#e5e7eb" }}
                   tickLine={false}
-                  tick={{ fontSize: 12, fill: "#9ca3af" }}
+                  height={34}
+                  interval={0}
+                  tick={({ x, y, payload, index }) => {
+                    const current = joinData[index]?.isCurrent;
+                    return (
+                      <g transform={`translate(${x},${y})`}>
+                        <text dy={12} textAnchor="middle" fontSize={11} fontWeight={current ? 700 : 500} fill={current ? "#6d28d9" : "#9ca3af"}>{payload.value}</text>
+                        {current && <text dy={25} textAnchor="middle" fontSize={8} fontWeight={700} letterSpacing="0.1em" fill="#a78bfa">NOW</text>}
+                      </g>
+                    );
+                  }}
                 />
                 <YAxis
                   allowDecimals={false}
+                  domain={[0, (max) => Math.max(4, max + 1)]}
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fontSize: 12, fill: "#9ca3af" }}
-                  width={24}
+                  tick={{ fontSize: 11, fill: "#9ca3af" }}
+                  width={32}
                 />
-                <Tooltip
-                  contentStyle={{ borderRadius: 8, border: "none", boxShadow: "0 2px 12px rgba(0,0,0,0.1)", fontSize: 13 }}
-                  cursor={{ fill: "#f5f3ff" }}
-                />
-                <Bar dataKey="count" name="Joined" fill="#7c3aed" radius={[6, 6, 0, 0]} />
+                <Tooltip cursor={false} content={<JoinTooltip />} />
+                {/* Track = lighter step of the same hue, so empty months still show their slot */}
+                <Bar dataKey="count" maxBarSize={24} radius={[4, 4, 0, 0]}
+                     background={{ fill: "#f5f3ff", radius: [4, 4, 0, 0] }} activeBar={{ fill: "#6d28d9" }}>
+                  {joinData.map(d => <Cell key={d.month} fill={d.isCurrent ? "#7c3aed" : "#a78bfa"} />)}
+                  <LabelList dataKey="count" position="top" formatter={(v) => (v ? v : "")}
+                             style={{ fontSize: 11, fontWeight: 700, fill: "#374151" }} />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>

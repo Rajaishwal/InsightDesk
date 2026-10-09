@@ -356,18 +356,26 @@ router.get('/employee-dashboard', protect, async (req, res) => {
         workingDays++;
         const att = attMap[ds];
         const onLeave = leaveDates.has(ds);
-        if (att) {
+        const halfDay = halfDayDates.has(ds);
+        if (att) { checkIn = att.checkInTime; checkOut = att.checkOutTime; workingHours = att.workingHours || 0; } // shown on hover either way
+        if (onLeave && !halfDay) {
+          // Approved full-day leave wins over a check-in on the same day
+          leaveDayCount += 1;
+          status = 'leave';
+        } else if (att) {
           presentDays++;
           totalWorkHours += att.workingHours || 0;
-          checkIn = att.checkInTime;
-          checkOut = att.checkOutTime;
-          workingHours = att.workingHours || 0;
-          const ci = new Date(att.checkInTime);
-          const late = ci.getHours() > 9 || (ci.getHours() === 9 && ci.getMinutes() > 30);
-          status = late ? 'late' : 'present';
+          if (halfDay) {
+            leaveDayCount += 0.5; // half-day leave — they worked the other half
+            status = 'half-leave';
+          } else {
+            const ci = new Date(att.checkInTime);
+            const late = ci.getHours() > 9 || (ci.getHours() === 9 && ci.getMinutes() > 30);
+            status = late ? 'late' : 'present';
+          }
         } else if (onLeave) {
-          leaveDayCount += halfDayDates.has(ds) ? 0.5 : 1;
-          status = halfDayDates.has(ds) ? 'half-leave' : 'leave';
+          leaveDayCount += 0.5;
+          status = 'half-leave';
         } else {
           status = 'absent';
         }
@@ -396,7 +404,8 @@ router.get('/employee-dashboard', protect, async (req, res) => {
     let weekPresentDays = 0, weekLeaveDays = 0;
     for (let i = 0; i < 5; i++) {
       const ds = addDaysKey(weekQueryStart, i);
-      if (attMap[ds]) weekPresentDays++;
+      const fullDayLeave = leaveDates.has(ds) && !halfDayDates.has(ds);
+      if (attMap[ds] && !fullDayLeave) weekPresentDays++; // a full-day leave counts as leave, not present
       if (leaveDates.has(ds)) weekLeaveDays += halfDayDates.has(ds) ? 0.5 : 1;
     }
     const weekWorkingDays = 5 - weekLeaveDays; // 5 = Mon–Fri, minus approved leave days
@@ -406,7 +415,8 @@ router.get('/employee-dashboard', protect, async (req, res) => {
       workingHoursThisMonth: Math.round(totalWorkHours * 10) / 10,
       totalWorkingDaysThisMonth: weekWorkingDays,     // always 5 minus leave days
       presentDaysThisMonth: presentDays,              // total present days in the current month
-      workingDaysThisMonth: workingDays,              // total working days elapsed this month (Mon–Fri, non-future)
+      workingDaysThisMonth: workingDays - leaveDayCount, // Mon–Fri elapsed this month minus approved leave (same rule as the weekly card)
+      leaveDaysThisMonth: leaveDayCount,
       activeProjects, completedProjects, totalProjects: projects.length,
       activeTimerProjectId,
       completedTasks, totalTasks,
@@ -523,14 +533,22 @@ router.get('/attendance-calendar', protect, async (req, res) => {
       } else {
         workingDays++;
         const att = attMap[ds];
-        if (att) {
+        const onLeave = leaveDates.has(ds);
+        const halfDay = halfDayDates.has(ds);
+        if (att) { checkIn = att.checkInTime; checkOut = att.checkOutTime; workingHours = att.workingHours || 0; }
+        if (onLeave && !halfDay) {
+          leaveDayCount += 1; // approved full-day leave wins over a check-in on the same day
+          status = 'leave';
+        } else if (att) {
           presentDays++;
-          checkIn = att.checkInTime; checkOut = att.checkOutTime; workingHours = att.workingHours || 0;
-          const ci = new Date(att.checkInTime);
-          status = (ci.getHours() > 9 || (ci.getHours() === 9 && ci.getMinutes() > 30)) ? 'late' : 'present';
-        } else if (leaveDates.has(ds)) {
-          leaveDayCount += halfDayDates.has(ds) ? 0.5 : 1;
-          status = halfDayDates.has(ds) ? 'half-leave' : 'leave';
+          if (halfDay) { leaveDayCount += 0.5; status = 'half-leave'; }
+          else {
+            const ci = new Date(att.checkInTime);
+            status = (ci.getHours() > 9 || (ci.getHours() === 9 && ci.getMinutes() > 30)) ? 'late' : 'present';
+          }
+        } else if (onLeave) {
+          leaveDayCount += 0.5;
+          status = 'half-leave';
         } else {
           status = 'absent';
         }
@@ -541,7 +559,8 @@ router.get('/attendance-calendar', protect, async (req, res) => {
     res.json({
       calendarDays,
       presentDaysThisMonth: presentDays,
-      workingDaysThisMonth: workingDays,
+      workingDaysThisMonth: workingDays - leaveDayCount, // minus approved leave
+      leaveDaysThisMonth: leaveDayCount,
       monthYear: new Date(year, month, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
     });
   } catch (err) {
