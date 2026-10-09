@@ -2,17 +2,19 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAutoRefresh } from "../hooks/useAutoRefresh";
+import { useCheckInStatus } from "../hooks/useCheckInStatus";
 import EditProfileModal from "../components/EditProfileModal";
+import MeterRing from "../components/MeterRing";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, PieChart, Pie, Cell, Legend,
+  ResponsiveContainer,
 } from "recharts";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/axios";
 import { getCache, setCache } from "../utils/pageCache";
 import { Users, UserPlus, Briefcase, CheckCircle2, AlertCircle, XCircle, X, Clock, Coffee, Pencil, MapPin, RefreshCw, FileBarChart } from "lucide-react";
 
-const PIE_COLORS = ["#7c3aed", "#06b6d4", "#f59e0b"];
+const PROJECT_STATUS_COLORS = ["#7c3aed", "#06b6d4", "#f59e0b"];
 
 const AdminDashboard = () => {
   const { user } = useAuth();
@@ -20,7 +22,8 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(!getCache("admin-stats"));
   const [activeFilter, setActiveFilter] = useState(null); // 'present'|'late'|'onLeave'|'absent'
   const [showEditModal, setShowEditModal] = useState(false);
-  const [locationStatus, setLocationStatus] = useState("checked-out");
+  // Live check-in status for the header location badge — was fetched once on load, so a check-in never showed until reload
+  const [locationStatus] = useCheckInStatus(user?._id);
   const [expandedBreakEmp, setExpandedBreakEmp] = useState(null);
   const [breakLogs, setBreakLogs] = useState({});
   const [refreshing, setRefreshing] = useState(false);
@@ -31,13 +34,6 @@ const AdminDashboard = () => {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
-
-  useEffect(() => {
-    if (!user?._id) return;
-    api.get(`/attendance/status/${user._id}`)
-      .then(r => setLocationStatus(r.data?.attendance?.status || "checked-out"))
-      .catch(() => {});
-  }, [user?._id]);
 
   const refreshStats = async () => {
     setRefreshing(true);
@@ -57,15 +53,23 @@ const AdminDashboard = () => {
       .catch(() => {});
   useAutoRefresh(silentRefresh, ["crm:attendance:updated", "crm:task:updated"]);
 
-  const toggleBreakExpand = async (userId) => {
-    if (expandedBreakEmp === userId) { setExpandedBreakEmp(null); return; }
-    setExpandedBreakEmp(userId);
-    if (breakLogs[userId]) return;
+  const loadBreakLogs = async (userId) => {
     try {
       const r = await api.get(`/breaks/logs/${userId}`);
       setBreakLogs(prev => ({ ...prev, [userId]: r.data }));
-    } catch { setBreakLogs(prev => ({ ...prev, [userId]: [] })); }
+    } catch { setBreakLogs(prev => ({ ...prev, [userId]: prev[userId] || [] })); }
   };
+
+  const toggleBreakExpand = (userId) => {
+    if (expandedBreakEmp === userId) { setExpandedBreakEmp(null); return; }
+    setExpandedBreakEmp(userId);
+    loadBreakLogs(userId); // always fresh — a break may have started or ended since last time
+  };
+
+  // Keep the open break history live when the dashboard refreshes (break start/end emits attendance updates)
+  useEffect(() => {
+    if (expandedBreakEmp) loadBreakLogs(expandedBreakEmp);
+  }, [stats]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fmtDuration = (secs) => {
     if (!secs) return "0m 0s";
@@ -73,12 +77,6 @@ const AdminDashboard = () => {
     const s = secs % 60;
     return m > 0 ? `${m}m ${s}s` : `${s}s`;
   };
-
-  const pieData = [
-    { name: "Ongoing",   value: stats?.ongoingProjects   || 0 },
-    { name: "Completed", value: stats?.completedProjects || 0 },
-    { name: "Pending",   value: stats?.pendingProjects   || 0 },
-  ].filter(d => d.value > 0);
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
@@ -247,8 +245,8 @@ const AdminDashboard = () => {
           {/* Employee Table — transforms based on attendance filter */}
           {(() => {
             const filterCfg = {
-              present: { label: "Present Employees",  dot: "bg-green-500",  lastCol: "Check-In",  showCheckOut: true  },
-              late:    { label: "Late Employees",      dot: "bg-yellow-400", lastCol: "Check-In",  showCheckOut: true  },
+              present: { label: "Present Employees",  dot: "bg-green-500",  lastCol: "Check-In",  showCheckOut: true, showBreakSummary: true },
+              late:    { label: "Late Employees",      dot: "bg-yellow-400", lastCol: "Check-In",  showCheckOut: true, showBreakSummary: true },
               onLeave: { label: "Employees on Leave",  dot: "bg-blue-500",   lastCol: "Leave Type",showCheckOut: false },
               absent:  { label: "Absent Employees",    dot: "bg-red-500",    lastCol: null,        showCheckOut: false },
               onBreak: { label: "Employees on Break",  dot: "bg-amber-400",  lastCol: "Check-In",  showCheckOut: false, showBreak: true },
@@ -321,6 +319,9 @@ const AdminDashboard = () => {
                           {cfg?.showBreak && (
                             <th className="pb-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Break Since</th>
                           )}
+                          {cfg?.showBreakSummary && (
+                            <th className="pb-3 pl-4 text-xs font-semibold text-gray-400 uppercase tracking-wide">Breaks Today</th>
+                          )}
                           <th className="pb-3 pl-4 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide">Report</th>
                         </tr>
                       </thead>
@@ -337,18 +338,20 @@ const AdminDashboard = () => {
                           ))
                         ) : rows.length > 0 ? (
                           rows.map((emp, i) => {
-                            const isExpanded = cfg?.showBreak && expandedBreakEmp === emp._id;
+                            // On Break list: always expandable. Present/Late: expandable once the employee has taken a break today
+                            const canExpand = !!emp._id && (cfg?.showBreak || (cfg?.showBreakSummary && emp.breakCount > 0));
+                            const isExpanded = canExpand && expandedBreakEmp === emp._id;
                             const logs = breakLogs[emp._id] || null;
                             const totalSecs = logs
                               ? logs.reduce((sum, b) => sum + (b.durationInSeconds || 0), 0)
                               : 0;
                             const isOverLimit = totalSecs > 60 * 60;
-                            const colSpan = 6 + (cfg?.showCheckOut ? 1 : 0) + (cfg?.showBreak ? 1 : 0);
+                            const colSpan = 6 + (cfg?.showCheckOut ? 1 : 0) + (cfg?.showBreak ? 1 : 0) + (cfg?.showBreakSummary ? 1 : 0);
                             return (
                               <React.Fragment key={emp._id || i}>
                                 <tr
-                                  onClick={cfg?.showBreak ? () => toggleBreakExpand(emp._id) : undefined}
-                                  className={`transition-colors ${cfg?.showBreak ? "cursor-pointer" : ""} ${isExpanded ? "bg-amber-50" : "hover:bg-gray-50"}`}
+                                  onClick={canExpand ? () => toggleBreakExpand(emp._id) : undefined}
+                                  className={`transition-colors ${canExpand ? "cursor-pointer" : ""} ${isExpanded ? "bg-amber-50" : "hover:bg-gray-50"}`}
                                 >
                                   {/* Name */}
                                   <td className="py-3 pr-4">
@@ -409,6 +412,23 @@ const AdminDashboard = () => {
                                         <Coffee className="w-3 h-3" />{fmtTime(emp.breakStartTime)}
                                         <span className="ml-1 text-amber-400">▾</span>
                                       </span>
+                                    </td>
+                                  )}
+                                  {/* Breaks Today col (Present / Late) — count · total, opens the history */}
+                                  {cfg?.showBreakSummary && (
+                                    <td className="py-3 pl-4 text-xs">
+                                      {emp.breakCount > 0 ? (
+                                        <span className={`flex items-center gap-1 whitespace-nowrap ${emp.breakSecs > 60 * 60 ? "text-red-500" : "text-amber-600"}`}>
+                                          <Coffee className="w-3 h-3" />
+                                          {emp.breakCount} · {fmtDuration(emp.breakSecs)}
+                                          {emp.onBreakNow && (
+                                            <span className="ml-1 rounded-full border border-amber-300 px-1.5 text-[10px] font-semibold text-amber-600">on break</span>
+                                          )}
+                                          <span className={`ml-1 text-amber-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}>▾</span>
+                                        </span>
+                                      ) : (
+                                        <span className="text-gray-300">—</span>
+                                      )}
                                     </td>
                                   )}
                                   {/* Report col — always-visible entry to the Employee Report */}
@@ -512,33 +532,40 @@ const AdminDashboard = () => {
         {/* Right — 1/3 */}
         <div className="space-y-5">
 
-          {/* Project Overview */}
+          {/* Project Overview — ring tiles (same look as the Employee Report) */}
           <div className="bg-white rounded-2xl shadow-sm p-5">
-            <h3 className="text-sm font-semibold text-gray-700 mb-4">Project Overview</h3>
-            <div className="space-y-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-gray-700">Project Overview</h3>
+              <span className="text-[11px] text-gray-400">{stats?.totalProjects || 0} total</span>
+            </div>
+            <ul className="space-y-2">
               {[
-                { label: "Ongoing",   count: stats?.ongoingProjects   || 0, color: "bg-violet-500" },
-                { label: "Completed", count: stats?.completedProjects || 0, color: "bg-cyan-500"   },
-                { label: "Pending",   count: stats?.pendingProjects   || 0, color: "bg-amber-400"  },
-              ].map(({ label, count, color }) => {
-                const total = stats?.totalProjects || 1;
-                const pct = Math.round((count / total) * 100);
+                { label: "Ongoing",   count: stats?.ongoingProjects   || 0, fill: PROJECT_STATUS_COLORS[0], track: "#ede9fe", note: "In progress right now" },
+                { label: "Completed", count: stats?.completedProjects || 0, fill: PROJECT_STATUS_COLORS[1], track: "#cffafe", note: "Delivered" },
+                { label: "Pending",   count: stats?.pendingProjects   || 0, fill: PROJECT_STATUS_COLORS[2], track: "#fef3c7", note: "Not started yet" },
+              ].map(({ label, count, fill, track, note }) => {
+                const total = stats?.totalProjects || 0;
+                const pct = total ? count / total : 0;
                 return (
-                  <div key={label}>
-                    <div className="flex justify-between text-sm mb-1.5">
-                      <span className="text-gray-500">{label}</span>
-                      <span className="font-semibold text-gray-700">{count}</span>
+                  <li key={label}
+                    className="flex items-center gap-4 rounded-xl border p-3 transition hover:shadow-sm"
+                    style={{ borderColor: `${fill}26`, background: `${fill}08` }}>
+                    <MeterRing pct={pct} fill={fill} track={track} label={`${count} of ${total} projects ${label.toLowerCase()}`}>
+                      <span className="text-[11px] font-black text-gray-700">{total ? `${Math.round(pct * 100)}%` : "—"}</span>
+                      <span className="mt-0.5 text-[8px] font-semibold text-gray-400">of {total}</span>
+                    </MeterRing>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-gray-800">{label}</p>
+                      <p className="text-[11px] text-gray-400">{note}</p>
                     </div>
-                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full ${color} rounded-full transition-all duration-700`}
-                        style={{ width: `${pct}%` }}
-                      />
+                    <div className="flex-shrink-0 text-right">
+                      <p className={`text-lg font-black leading-none ${count ? "text-gray-800" : "text-gray-300"}`}>{count}</p>
+                      <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-gray-400">{count === 1 ? "project" : "projects"}</p>
                     </div>
-                  </div>
+                  </li>
                 );
               })}
-            </div>
+            </ul>
           </div>
 
           {/* Today's Attendance */}
@@ -625,38 +652,6 @@ const AdminDashboard = () => {
                 );
               })() : (
               <p className="text-sm text-gray-400 text-center py-4">No ongoing projects</p>
-            )}
-          </div>
-
-          {/* Projects Pie Chart */}
-          <div className="bg-white rounded-2xl shadow-sm p-5">
-            <h3 className="text-sm font-semibold text-gray-700 mb-2">Projects Status</h3>
-            {!loading && pieData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={170}>
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={42}
-                    outerRadius={65}
-                    paddingAngle={4}
-                    dataKey="value"
-                  >
-                    {pieData.map((entry, index) => (
-                      <Cell key={entry.name} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{ borderRadius: 8, border: "none", boxShadow: "0 2px 8px rgba(0,0,0,0.1)", fontSize: 12 }}
-                  />
-                  <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: "12px", paddingTop: "4px" }} />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-40 flex items-center justify-center text-gray-300 text-sm">
-                {loading ? "Loading…" : "No project data"}
-              </div>
             )}
           </div>
 

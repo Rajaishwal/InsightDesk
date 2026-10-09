@@ -1,7 +1,7 @@
 import Location from '../model/Location.js';
 import User from '../model/User.js';
 import Attendance from '../model/Attendance.js';
-import { istDateKey, findOpenAttendance } from '../utils/istDate.js';
+import { findOpenAttendance, OPEN_SESSION_MAX_HOURS } from '../utils/istDate.js';
 
 // Calculate distance between two points using Haversine formula
 const calculateDistance = (lat1, lon1, lat2, lon2) => {
@@ -259,8 +259,9 @@ export const getAllEmployeeLocations = async (req, res) => {
   try {
     console.log('🔍 getAllEmployeeLocations called by user:', req.user?.name, 'Role:', req.user?.role);
     
-    // Get today's date (India time) for attendance check
-    const today = istDateKey();
+    // "Currently checked in" = an open session from the last OPEN_SESSION_MAX_HOURS — not just today's date,
+    // so someone who checked in before midnight and is still working stays Active
+    const openSince = new Date(Date.now() - OPEN_SESSION_MAX_HOURS * 3600 * 1000);
     
     // Get latest location for each user (both active and inactive)
     const locations = await Location.aggregate([
@@ -294,12 +295,14 @@ export const getAllEmployeeLocations = async (req, res) => {
                 $expr: {
                   $and: [
                     { $eq: ['$userId', '$$userId'] },
-                    { $eq: ['$date', today] },
+                    { $gte: ['$checkInTime', openSince] },
                     { $eq: ['$status', 'checked-in'] }
                   ]
                 }
               }
-            }
+            },
+            { $sort: { checkInTime: -1 } },
+            { $limit: 1 }
           ],
           as: 'todayAttendance'
         }

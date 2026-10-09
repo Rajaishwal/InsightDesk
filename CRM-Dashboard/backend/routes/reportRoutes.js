@@ -7,8 +7,6 @@ import Project from '../model/Project.js';
 import ProjectTask from '../model/ProjectTask.js';
 import ProjectActivity from '../model/ProjectActivity.js';
 import HRTask from '../model/hrTaskModel.js';
-import Salary from '../model/Salary.js';
-import Payslip from '../model/Payslip.js';
 import Break from '../models/Break.js';
 import { protect, admin } from '../middleware/authMiddleware.js';
 import { istDateKey, utcDateKey, addDaysKey, dowOfKey, istDayStart, istDayEnd, findOpenAttendance } from '../utils/istDate.js';
@@ -17,7 +15,6 @@ const router = express.Router();
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_SPAN_DAYS = 100;
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 // Day keys are IST calendar days (same as Attendance.date); leave dates are UTC-midnight calendar dates
 const dayKey = istDateKey;
@@ -66,7 +63,7 @@ router.get('/employee/:employeeId', protect, admin, async (req, res) => {
     const lateAfterMin = lateCutoffFor(emp.shiftTiming);
 
     // ── Fetch everything in parallel ──────────────────────────────────────
-    const [attendance, leaves, breaks, projects, projectTasks, hrTasks, salaries, payslips, activity, todayAtt, openBreak, openAtt] = await Promise.all([
+    const [attendance, leaves, breaks, projects, projectTasks, hrTasks, activity, todayAtt, openBreak, openAtt] = await Promise.all([
       Attendance.find({ userId, date: { $gte: from, $lte: to } }).lean(),
       Leave.find({
         userId,
@@ -80,8 +77,6 @@ router.get('/employee/:employeeId', protect, admin, async (req, res) => {
       }).select('projectId title status manager').lean(),
       ProjectTask.find({ $or: [{ 'timers.userId': userId }, { createdBy: userId }] }).lean(),
       HRTask.find({ assignedTo: emp.employeeId }).lean(),
-      Salary.find({ $or: [{ userId: emp.employeeId }, { userEmail: emp.email }] }).lean(),
-      Payslip.find({ employeeId: emp.employeeId }).sort({ date: -1 }).limit(6).lean(),
       ProjectActivity.find({ userId, createdAt: { $gte: fromDate, $lte: toDate } })
         .select('projectId projectName taskTitle action fromStatus toStatus createdAt')
         .sort({ createdAt: -1 }).limit(15).lean(),
@@ -243,28 +238,43 @@ router.get('/employee/:employeeId', protect, admin, async (req, res) => {
     for (const a of activity) if (!lastActivityByProject[a.projectId]) lastActivityByProject[a.projectId] = a.createdAt;
     const projectRows = projects.map(p => {
       const mine = projectTasks.filter(t => t.projectId === p.projectId);
+
+      // When the employee's work on this project started / last happened, and how many work sessions it took
+      let startedAt = null, lastWorkedAt = null, sessionCount = 0;
+      const earlier = (a, b) => (!a || new Date(b) < new Date(a) ? b : a);
+      const later = (a, b) => (!a || new Date(b) > new Date(a) ? b : a);
+      for (const t of mine) {
+        startedAt = earlier(startedAt, t.createdAt);
+        const entry = (t.timers || []).find(x => x.userId?.toString() === uidStr);
+        for (const s of entry?.sessions || []) {
+          if ((s.duration || 0) > MAX_SESSION_SEC) continue; // stuck timers don't count as work
+          sessionCount++;
+          startedAt = earlier(startedAt, s.startTime);
+          lastWorkedAt = later(lastWorkedAt, s.endTime);
+        }
+      }
+      // A completed project "finished" when its last task was completed
+      const doneTimes = mine.map(doneAt).filter(Boolean);
+      const completedAt = p.status === 'Completed' && doneTimes.length
+        ? doneTimes.reduce((a, b) => later(a, b))
+        : null;
+
       return {
         projectId: p.projectId, title: p.title, status: p.status, manager: p.manager,
         tasksTotal: mine.length,
         tasksDone: mine.filter(t => t.status === 'Completed').length,
+        tasksOngoing: mine.filter(t => t.status === 'Ongoing').length,
         periodSec: projectSec[p.projectId] || 0,
         totalSec: projectSecAll[p.projectId] || 0,
-        lastActivity: lastActivityByProject[p.projectId] || null,
+        sessionCount, startedAt, completedAt,
+        lastWorkedAt: lastWorkedAt || lastActivityByProject[p.projectId] || null,
       };
-    }).sort((a, b) => b.periodSec - a.periodSec || (a.status === 'Ongoing' ? -1 : 1));
-
-    // ── Salary & payslips ─────────────────────────────────────────────────
-    const salaryOrder = (s) => s.year * 12 + MONTHS.indexOf(s.month);
-    const salaryHistory = salaries
-      .sort((a, b) => salaryOrder(b) - salaryOrder(a))
-      .slice(0, 6)
-      .map(s => ({
-        month: s.month, year: s.year, status: s.status, paymentDate: s.paymentDate || null,
-        basicPay: s.basicPay || 0,
-        allowances: Object.values(s.allowances || {}).reduce((a, b) => a + (b || 0), 0),
-        deductions: Object.values(s.deductions || {}).reduce((a, b) => a + (b || 0), 0),
-        netPay: s.netPay ?? null,
-      }));
+    }).sort((a, b) => {
+      // Ongoing first (most time this period), then completed (most recently finished)
+      if ((a.status === 'Completed') !== (b.status === 'Completed')) return a.status === 'Completed' ? 1 : -1;
+      if (a.status === 'Completed') return new Date(b.completedAt || 0) - new Date(a.completedAt || 0);
+      return b.periodSec - a.periodSec || b.totalSec - a.totalSec;
+    });
 
     // ── Live status ───────────────────────────────────────────────────────
     let live = { state: 'offline', since: null };
@@ -303,7 +313,6 @@ router.get('/employee/:employeeId', protect, admin, async (req, res) => {
       projects: projectRows,
       tasks: recentTasks,
       leaves,
-      salary: { history: salaryHistory, payslips },
       activity,
       excludedSessions,
     });

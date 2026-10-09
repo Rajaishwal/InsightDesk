@@ -1,4 +1,4 @@
-// EmployeeReport.jsx — Admin-only one-page report on a single employee: attendance, focus, projects, tasks, leave, salary
+// EmployeeReport.jsx — Admin-only one-page report on a single employee: attendance, focus, projects, tasks, leave, activity
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import {
@@ -6,11 +6,12 @@ import {
 } from "recharts";
 import {
   ArrowLeft, CalendarDays, Clock, Timer, Target, CheckSquare, Plane, Layers, ListChecks,
-  IndianRupee, Activity, AlertTriangle, Mail, Phone, Briefcase, ChevronDown,
+  Activity, AlertTriangle, Mail, Phone, Briefcase, ChevronDown, Check,
 } from "lucide-react";
 import api from "../services/axios";
 import { useAuth } from "../context/AuthContext";
 import { LEAVE_TYPES, normalizeType } from "../components/LeaveDonutChart";
+import MeterRing from "../components/MeterRing";
 
 /* ── Formatting ─────────────────────────────────────────────────────────── */
 const pad = (n) => String(n).padStart(2, "0");
@@ -44,7 +45,6 @@ const fmtAgo = (ts) => {
   if (mins < 1440) return `${Math.round(mins / 60)}h ago`;
   return new Date(ts).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 };
-const inr = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 });
 
 /* ── Period presets ─────────────────────────────────────────────────────── */
 const PERIODS = [
@@ -259,6 +259,133 @@ function FocusChart({ days }) {
   );
 }
 
+/* ── Projects: task-completion ring + time, grouped Ongoing / Completed ──── */
+const fmtShortDate = (ts) => ts ? new Date(ts).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "—";
+const fmtSpan = (from, to) => {
+  const ms = new Date(to) - new Date(from);
+  if (!(ms > 0)) return null;
+  const days = Math.floor(ms / 86400000);
+  if (days >= 1) return `${days} day${days === 1 ? "" : "s"}`;
+  const h = Math.max(1, Math.round(ms / 3600000));
+  return `${h} hour${h === 1 ? "" : "s"}`;
+};
+
+function TaskRing({ done, total, completed }) {
+  const pct = total ? done / total : 0;
+  return (
+    <MeterRing pct={pct} fill={completed ? "#10b981" : "#6366f1"} track={completed ? "#d1fae5" : "#e0e7ff"}
+               label={`${done} of ${total} tasks done`}>
+      {completed
+        ? <Check className="h-4 w-4 text-emerald-600" strokeWidth={3} />
+        : <span className="text-[11px] font-black text-gray-700">{total ? `${Math.round(pct * 100)}%` : "—"}</span>}
+      <span className="mt-0.5 text-[8px] font-semibold text-gray-400">{done}/{total}</span>
+    </MeterRing>
+  );
+}
+
+/* ── Leave: one tile per leave type (ring = share of earned days used) + requests in the period ── */
+const fmtDays = (n) => `${n} day${n === 1 ? "" : "s"}`;
+const fmtLeaveDate = (ts, opts = { day: "numeric", month: "short" }) =>
+  new Date(ts).toLocaleDateString("en-GB", { ...opts, timeZone: "UTC" }); // leave dates are UTC-midnight calendar dates
+
+function LeaveTile({ t }) {
+  const pct = t.available ? t.used / t.available : 0;
+  const rule = t.monthly > 0 ? `Earns ${t.monthly}/month · max ${t.yearly} a year` : `${t.yearly} a year, available up front`;
+  return (
+    <li className="flex items-center gap-4 rounded-xl border p-3.5 transition hover:shadow-sm"
+        style={{ borderColor: `${t.color}26`, background: `${t.color}08` }}>
+      <MeterRing pct={pct} fill={t.color} track={t.light} label={`${t.used} of ${t.available} days used`}>
+        <span className="text-[11px] font-black text-gray-700">{t.available ? `${Math.round(Math.min(1, pct) * 100)}%` : "—"}</span>
+        <span className="mt-0.5 text-[8px] font-semibold text-gray-400">used</span>
+      </MeterRing>
+
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-gray-800">{t.key}</p>
+        <p className="mt-0.5 text-[11px] leading-snug text-gray-400">{rule}</p>
+        <p className="text-[11px] leading-snug text-gray-400">
+          <span className="font-bold text-gray-600">{t.used}</span> used of <span className="font-bold text-gray-600">{t.available}</span> earned so far
+        </p>
+      </div>
+
+      <div className="flex-shrink-0 text-right">
+        <p className="text-lg font-black leading-none text-gray-800">{t.remaining}d</p>
+        <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-gray-400">left</p>
+        <p className="mt-0.5 text-[10px] text-gray-400">{t.used}d used</p>
+      </div>
+    </li>
+  );
+}
+
+function LeaveRequestTile({ l }) {
+  const type = LEAVE_TYPES.find(x => x.key === normalizeType(l.leaveType));
+  const color = type?.color || "#6366f1";
+  const multiDay = l.endDate.slice(0, 10) !== l.startDate.slice(0, 10);
+  return (
+    <li className="flex items-center gap-4 rounded-xl border border-gray-100 bg-white p-3 transition hover:shadow-sm">
+      {/* Calendar-leaf date */}
+      <div className="flex h-[52px] w-[52px] flex-shrink-0 flex-col items-center justify-center rounded-xl" style={{ background: `${color}1a` }}>
+        <span className="text-lg font-black leading-none text-gray-800">{fmtLeaveDate(l.startDate, { day: "numeric" })}</span>
+        <span className="mt-0.5 text-[9px] font-bold uppercase tracking-widest text-gray-500">{fmtLeaveDate(l.startDate, { month: "short" })}</span>
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-gray-800">
+          <span className="h-2 w-2 flex-shrink-0 rounded-full" style={{ background: color }} />
+          {l.leaveType}
+        </p>
+        <p className="mt-0.5 truncate text-[11px] text-gray-400" title={l.reason || undefined}>
+          {multiDay && `${fmtLeaveDate(l.startDate)} – ${fmtLeaveDate(l.endDate)} · `}
+          {l.halfDay ? "Half day" : fmtDays(l.totalDays)}
+          {l.reason && ` · "${l.reason}"`}
+        </p>
+      </div>
+
+      <Chip tone={l.status}>{l.status}</Chip>
+    </li>
+  );
+}
+
+function ProjectTile({ p }) {
+  const completed = p.status === "Completed";
+  const took = completed && p.startedAt && p.completedAt ? fmtSpan(p.startedAt, p.completedAt) : null;
+  const bigSec = completed ? p.totalSec : p.periodSec;
+  return (
+    <li className={`flex items-center gap-4 rounded-xl border p-3.5 transition hover:shadow-sm
+      ${completed ? "border-emerald-100 bg-emerald-50/30" : "border-indigo-100 bg-indigo-50/30"}`}>
+      <TaskRing done={p.tasksDone} total={p.tasksTotal} completed={completed} />
+
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-[10px] font-bold tracking-widest text-gray-400">{p.projectId}</span>
+          <Chip tone={p.status}>{p.status}</Chip>
+        </div>
+        <p className="mt-0.5 truncate text-sm font-semibold text-gray-800" title={p.title}>{p.title}</p>
+        <p className="mt-1 text-[11px] leading-snug text-gray-400">
+          {completed
+            ? <>Finished {fmtShortDate(p.completedAt)}{took && <> · took {took}</>}{p.startedAt && <> (from {fmtShortDate(p.startedAt)})</>}</>
+            : <>
+                {p.tasksOngoing > 0 ? `${p.tasksOngoing} in progress`
+                  : p.tasksTotal > 0 && p.tasksDone === p.tasksTotal ? "Your tasks done"
+                  : "Not started"}
+                {p.lastWorkedAt && <> · worked {fmtAgo(p.lastWorkedAt)}</>}
+              </>}
+          {p.manager && <> · Manager {p.manager}</>}
+        </p>
+      </div>
+
+      <div className="flex-shrink-0 text-right">
+        <p className={`text-lg font-black leading-none ${bigSec ? "text-gray-800" : "text-gray-300"}`}>{bigSec ? fmtHM(bigSec) : "—"}</p>
+        <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-gray-400">{completed ? "total work" : "this period"}</p>
+        <p className="mt-0.5 text-[10px] text-gray-400">
+          {completed
+            ? `${p.sessionCount} session${p.sessionCount === 1 ? "" : "s"}`
+            : `${fmtHM(p.totalSec)} all-time`}
+        </p>
+      </div>
+    </li>
+  );
+}
+
 /* ── Page ───────────────────────────────────────────────────────────────── */
 export default function EmployeeReport() {
   const { employeeId } = useParams();
@@ -318,11 +445,8 @@ export default function EmployeeReport() {
     </div>
   );
 
-  const { employee: emp, live, kpis: k, period: p, days, projects, tasks, leaves, salary, activity, excludedSessions = [] } = data;
-  // Scale bars to at least 1h so a few seconds don't render as a full bar
-  const maxProjectSec = Math.max(3600, ...projects.map(x => x.periodSec));
+  const { employee: emp, live, kpis: k, period: p, days, projects, tasks, leaves, activity, excludedSessions = [] } = data;
   const periodLeaves = leaves.filter(l => l.startDate.slice(0, 10) <= p.to && l.endDate.slice(0, 10) >= p.from);
-  const latestSalary = salary.history[0];
 
   return (
     <div className="space-y-5 bg-gray-50 p-5">
@@ -468,31 +592,25 @@ export default function EmployeeReport() {
 
         {/* ── Projects + Tasks ── */}
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-          <Card title="Projects" Icon={Layers} right={<span className="text-[11px] text-gray-400">time logged in period</span>}>
+          <Card title="Projects" Icon={Layers}
+                right={projects.length > 0 && (
+                  <span className="text-[11px] text-gray-400">
+                    {fmtHM(projects.reduce((s, x) => s + x.totalSec, 0))} total work
+                  </span>
+                )}>
             {projects.length === 0 ? <Empty>Not assigned to any project.</Empty> : (
-              <ul className="space-y-3">
-                {projects.map(pr => (
-                  <li key={pr.projectId}>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-[10px] font-bold tracking-widest text-gray-400">{pr.projectId}</span>
-                      <span className="min-w-0 flex-1 truncate text-sm font-semibold text-gray-800" title={pr.title}>{pr.title}</span>
-                      <Chip tone={pr.status}>{pr.status}</Chip>
+              <div className="space-y-4">
+                {[["Ongoing", projects.filter(x => x.status !== "Completed")], ["Completed", projects.filter(x => x.status === "Completed")]]
+                  .filter(([, list]) => list.length > 0)
+                  .map(([group, list]) => (
+                    <div key={group}>
+                      <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-gray-400">{group} · {list.length}</p>
+                      <ul className="space-y-2">
+                        {list.map(pr => <ProjectTile key={pr.projectId} p={pr} />)}
+                      </ul>
                     </div>
-                    <div className="mt-1.5 flex items-center gap-3">
-                      <div className="h-2 flex-1 rounded-full bg-indigo-50">
-                        {pr.periodSec > 0 && (
-                          <div className="h-2 rounded-full bg-indigo-500" style={{ width: `${Math.max(2, (pr.periodSec / maxProjectSec) * 100)}%` }} />
-                        )}
-                      </div>
-                      <span className="w-16 text-right text-xs font-bold text-gray-700">{fmtHM(pr.periodSec)}</span>
-                    </div>
-                    <p className="mt-1 text-[11px] text-gray-400">
-                      {pr.tasksDone}/{pr.tasksTotal} tasks done · {fmtHM(pr.totalSec)} all-time · Manager {pr.manager || "—"}
-                      {pr.lastActivity && ` · active ${fmtAgo(pr.lastActivity)}`}
-                    </p>
-                  </li>
-                ))}
-              </ul>
+                  ))}
+              </div>
             )}
           </Card>
 
@@ -530,113 +648,53 @@ export default function EmployeeReport() {
           </Card>
         </div>
 
-        {/* ── Leave + Salary ── */}
+        {/* ── Leave + Recent activity ── */}
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-          <Card title={`Leave balance · ${p.to.slice(0, 4)}`} Icon={Plane}>
-            <ul className="space-y-3">
-              {leaveRows.map(t => (
-                <li key={t.key}>
-                  <div className="flex items-baseline justify-between text-xs">
-                    <span className="font-semibold text-gray-700">{t.key}</span>
-                    <span className="text-gray-400"><span className="font-bold text-gray-700">{t.used}</span> used · <span className="font-bold text-gray-700">{t.remaining}</span> left of {t.available}</span>
-                  </div>
-                  {/* Meter: track is a lighter step of the same hue */}
-                  <div className="mt-1 h-1.5 rounded-full" style={{ background: t.light }}>
-                    <div className="h-1.5 rounded-full" style={{ width: `${t.available ? Math.min(100, (t.used / t.available) * 100) : 0}%`, background: t.color }} />
-                  </div>
-                </li>
-              ))}
+          <Card title={`Leave balance · ${p.to.slice(0, 4)}`} Icon={Plane}
+                right={<span className="text-[11px] text-gray-400">{leaveRows.reduce((s, t) => s + t.used, 0)} days used this year</span>}>
+            <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-gray-400">By leave type · {leaveRows.length}</p>
+            <ul className="space-y-2">
+              {leaveRows.map(t => <LeaveTile key={t.key} t={t} />)}
             </ul>
-            <p className="mb-2 mt-5 text-[10px] font-bold uppercase tracking-widest text-gray-400">Leave in this period</p>
+
+            <p className="mb-2 mt-5 text-[10px] font-bold uppercase tracking-widest text-gray-400">Leave in this period · {periodLeaves.length}</p>
             {periodLeaves.length === 0 ? <p className="text-sm text-gray-400">No leave requests in this period.</p> : (
-              <ul className="divide-y divide-gray-50">
-                {periodLeaves.map(l => (
-                  <li key={l._id} className="flex items-center gap-3 py-2 text-xs">
-                    <span className="w-32 flex-shrink-0 font-semibold text-gray-700">
-                      {new Date(l.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
-                      {l.endDate.slice(0, 10) !== l.startDate.slice(0, 10) && ` – ${new Date(l.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-gray-500">{l.leaveType} · {l.totalDays}d{l.halfDay ? " (half)" : ""}</span>
-                    <Chip tone={l.status}>{l.status}</Chip>
-                  </li>
-                ))}
+              <ul className="space-y-2">
+                {periodLeaves.map(l => <LeaveRequestTile key={l._id} l={l} />)}
               </ul>
             )}
           </Card>
 
-          <Card title="Salary & payslips" Icon={IndianRupee} right={<span className="text-[11px] text-gray-400">admin only</span>}>
-            {!latestSalary ? <Empty>No salary records for this employee yet.</Empty> : (
-              <>
-                <div className="flex flex-wrap items-end justify-between gap-3">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Net pay · {latestSalary.month} {latestSalary.year}</p>
-                    <p className="mt-1 text-3xl font-black leading-none text-gray-800">{latestSalary.netPay == null ? "—" : inr.format(latestSalary.netPay)}</p>
-                  </div>
-                  <Chip tone={latestSalary.status}>{latestSalary.status}</Chip>
-                </div>
-                <div className="mt-4 grid grid-cols-3 gap-3">
-                  {[["Basic", latestSalary.basicPay], ["Allowances", latestSalary.allowances], ["Deductions", -latestSalary.deductions]].map(([label, v]) => (
-                    <div key={label} className="rounded-lg bg-gray-50 px-3 py-2">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{label}</p>
-                      <p className="mt-0.5 text-sm font-bold text-gray-700">{v < 0 ? `− ${inr.format(-v)}` : inr.format(v)}</p>
-                    </div>
-                  ))}
-                </div>
-                {salary.history.length > 1 && (
-                  <>
-                    <p className="mb-1 mt-5 text-[10px] font-bold uppercase tracking-widest text-gray-400">Recent months</p>
-                    <ul className="divide-y divide-gray-50 tabular-nums">
-                      {salary.history.slice(1).map(s => (
-                        <li key={`${s.month}-${s.year}`} className="flex items-center gap-3 py-1.5 text-xs">
-                          <span className="flex-1 text-gray-600">{s.month} {s.year}</span>
-                          <span className="font-bold text-gray-700">{s.netPay == null ? "—" : inr.format(s.netPay)}</span>
-                          <Chip tone={s.status}>{s.status}</Chip>
-                        </li>
-                      ))}
-                    </ul>
-                  </>
-                )}
-              </>
-            )}
-            <p className="mb-1 mt-5 text-[10px] font-bold uppercase tracking-widest text-gray-400">Payslips</p>
-            {salary.payslips.length === 0 ? <p className="text-sm text-gray-400">No payslips generated yet.</p> : (
-              <ul className="divide-y divide-gray-50">
-                {salary.payslips.map(ps => (
-                  <li key={ps._id} className="flex items-center gap-3 py-1.5 text-xs">
-                    <span className="flex-1 text-gray-600">{ps.month}</span>
-                    <span className="font-bold text-gray-700">{inr.format(ps.amount)}</span>
-                    <Chip tone={ps.status}>{ps.status}</Chip>
+          {/* ── Recent activity (sits beside Leave) ── */}
+          <Card title="Recent activity" Icon={Activity}
+                right={activity.length > 0 && (
+                  <span className="text-[11px] text-gray-400">
+                    {activity.length >= 15 ? "latest 15 events" : `${activity.length} event${activity.length === 1 ? "" : "s"} in period`}
+                  </span>
+                )}>
+            {activity.length === 0 ? <Empty>No project activity in this period.</Empty> : (
+              <ol className="relative ml-1.5 space-y-3 border-l border-gray-100 pl-5">
+                {(showAllActivity ? activity : activity.slice(0, 8)).map(a => (
+                  <li key={a._id} className="relative">
+                    <span className="absolute -left-[25px] top-1.5 h-2 w-2 rounded-full bg-indigo-400 ring-2 ring-white" />
+                    <p className="text-sm text-gray-700">
+                      <span className="font-semibold">{ACTIVITY_LABEL[a.action] || a.action}</span>
+                      {a.action === "status_changed" && a.fromStatus && ` ${a.fromStatus} → ${a.toStatus}`}
+                      {a.taskTitle && <span className="text-gray-500"> · {a.taskTitle}</span>}
+                    </p>
+                    <p className="text-[11px] text-gray-400">{a.projectName || a.projectId} · {fmtAgo(a.createdAt)}</p>
                   </li>
                 ))}
-              </ul>
+              </ol>
+            )}
+            {activity.length > 8 && (
+              <button onClick={() => setShowAllActivity(v => !v)}
+                className="mt-4 rounded-full border border-gray-200 px-4 py-1.5 text-xs font-semibold text-gray-500 transition hover:bg-gray-50">
+                {showAllActivity ? "Show less" : `Show all ${activity.length}`}
+              </button>
             )}
           </Card>
         </div>
-
-        {/* ── Activity ── */}
-        <Card title="Recent activity" Icon={Activity}>
-          {activity.length === 0 ? <Empty>No project activity in this period.</Empty> : (
-            <ol className="relative ml-1.5 space-y-3 border-l border-gray-100 pl-5">
-              {(showAllActivity ? activity : activity.slice(0, 8)).map(a => (
-                <li key={a._id} className="relative">
-                  <span className="absolute -left-[25px] top-1.5 h-2 w-2 rounded-full bg-indigo-400 ring-2 ring-white" />
-                  <p className="text-sm text-gray-700">
-                    <span className="font-semibold">{ACTIVITY_LABEL[a.action] || a.action}</span>
-                    {a.action === "status_changed" && a.fromStatus && ` ${a.fromStatus} → ${a.toStatus}`}
-                    {a.taskTitle && <span className="text-gray-500"> · {a.taskTitle}</span>}
-                  </p>
-                  <p className="text-[11px] text-gray-400">{a.projectName || a.projectId} · {fmtAgo(a.createdAt)}</p>
-                </li>
-              ))}
-            </ol>
-          )}
-          {activity.length > 8 && (
-            <button onClick={() => setShowAllActivity(v => !v)}
-              className="mt-4 rounded-full border border-gray-200 px-4 py-1.5 text-xs font-semibold text-gray-500 transition hover:bg-gray-50">
-              {showAllActivity ? "Show less" : `Show all ${activity.length}`}
-            </button>
-          )}
-        </Card>
       </div>
     </div>
   );

@@ -14,7 +14,7 @@ import {
   deleteUser,
 } from '../controllers/userController.js';
 import { protect, admin, hrOrAdmin } from '../middleware/authMiddleware.js';
-import { istDateKey, istParts, addDaysKey, dowOfKey } from '../utils/istDate.js';
+import { istDateKey, istParts, addDaysKey, dowOfKey, istDayStart } from '../utils/istDate.js';
 
 const router = express.Router();
 
@@ -205,11 +205,24 @@ router.get('/admin-stats', protect, admin, async (_req, res) => {
     const presentUsersMap = {};
     presentUsersData.forEach(u => { presentUsersMap[u._id.toString()] = u; });
 
+    // Today's breaks per present employee — so break history stays reachable after a break ends
+    const todayBreaks = await Break.find({ userId: { $in: presentUserIds }, startTime: { $gte: istDayStart(today) } })
+      .select('userId startTime endTime durationInSeconds').lean();
+    const breakSummary = {};
+    for (const b of todayBreaks) {
+      const key = b.userId.toString();
+      const s = breakSummary[key] || (breakSummary[key] = { breakCount: 0, breakSecs: 0, onBreakNow: false });
+      s.breakCount++;
+      s.breakSecs += b.endTime ? (b.durationInSeconds || 0) : Math.max(0, Math.floor((now - new Date(b.startTime)) / 1000));
+      if (!b.endTime) s.onBreakNow = true;
+    }
+
     const presentEmployees = todayAtt.map(a => {
       const u = presentUsersMap[a.userId?.toString()] || {};
       const ci = new Date(a.checkInTime);
       const isLate = ci.getHours() > 9 || (ci.getHours() === 9 && ci.getMinutes() > 30);
       return {
+        _id: a.userId, // user id — needed to load this employee's break history
         name: a.userName,
         employeeId: u.employeeId || '',
         designation: u.designation || '',
@@ -218,6 +231,7 @@ router.get('/admin-stats', protect, admin, async (_req, res) => {
         checkInTime: a.checkInTime,
         checkOutTime: a.checkOutTime || null,
         isLate,
+        ...(breakSummary[a.userId?.toString()] || { breakCount: 0, breakSecs: 0, onBreakNow: false }),
       };
     });
 

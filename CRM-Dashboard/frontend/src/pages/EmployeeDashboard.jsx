@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import api from "../services/axios";
 import { useAutoRefresh } from "../hooks/useAutoRefresh";
+import { useCheckInStatus } from "../hooks/useCheckInStatus";
 import { getCache, setCache } from "../utils/pageCache";
 import { Calendar, Clock, Layers, CheckSquare, User, Pencil, ListChecks, MapPin, ChevronLeft, ChevronRight } from "lucide-react";
 import EditProfileModal from "../components/EditProfileModal";
@@ -45,7 +46,8 @@ export default function EmployeeDashboard() {
   const [hoveredDay, setHoveredDay] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [tracklistProject, setTracklistProject] = useState(null);
-  const [locationStatus, setLocationStatus] = useState(null);
+  // Live check-in status for the header location badge (re-checks every minute, on events and tab focus)
+  const [locationStatus] = useCheckInStatus(user?._id);
   const [viewMonthOffset, setViewMonthOffset] = useState(0); // 0=current, -1=prev, -2=two months ago
   const [monthLoading, setMonthLoading] = useState(false);
   const monthNavSeq = useRef(0); // ignores responses from clicks that a newer click has superseded
@@ -58,22 +60,9 @@ export default function EmployeeDashboard() {
       .catch(() => setLoading(false));
   }, []);
 
-  useEffect(() => {
-    if (!user?._id) return;
-    api.get(`/attendance/status/${user._id}`)
-      .then(r => setLocationStatus(r.data?.attendance?.status || "checked-out"))
-      .catch(() => setLocationStatus("checked-out"));
-  }, [user?._id]);
-
   // Silent background refresh — swaps data in-place, no loading flash
-  const silentRefresh = () => Promise.all([
-    api.get("/users/employee-dashboard").then(r => { setData(r.data); setCache("emp-dashboard", r.data); }).catch(() => { }),
-    user?._id
-      ? api.get(`/attendance/status/${user._id}`)
-        .then(r => setLocationStatus(r.data?.attendance?.status || "checked-out"))
-        .catch(() => { })
-      : Promise.resolve(),
-  ]);
+  const silentRefresh = () =>
+    api.get("/users/employee-dashboard").then(r => { setData(r.data); setCache("emp-dashboard", r.data); }).catch(() => { });
   useAutoRefresh(silentRefresh, ["crm:attendance:updated", "crm:task:updated"]);
 
   // Month navigation — fetch calendar for a specific month offset (0=current, -1, -2)
