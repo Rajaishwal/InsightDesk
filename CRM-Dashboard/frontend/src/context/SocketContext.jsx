@@ -12,6 +12,9 @@ export const SocketProvider = ({ children }) => {
   const [onlineUsers, setOnlineUsers] = useState([]);
   // messages keyed by the other user's _id string
   const [messages, setMessages] = useState({});
+  // The conversation currently open in the chat panel (other user's _id) — messages from them are read on arrival
+  const openChatRef = useRef(null);
+  const setOpenChat = (otherId) => { openChatRef.current = otherId ? String(otherId) : null; };
   // total unread badge count
   const [unreadCount, setUnreadCount] = useState(0);
   // per-sender unread counts  { senderId: number }
@@ -63,6 +66,13 @@ export const SocketProvider = ({ children }) => {
 
       // Increment unread only for messages sent to me by someone else
       if (msg.senderId !== user._id) {
+        // Already looking at this conversation? Then it's read right away — no badge, no pop-up
+        const viewing = openChatRef.current === String(msg.senderId) && document.visibilityState === "visible";
+        if (viewing) {
+          socket.emit("mark_read", { senderId: msg.senderId, receiverId: user._id });
+          setUnreadFrom((prev) => ({ ...prev, [msg.senderId]: 0 }));
+          return;
+        }
         setUnreadCount((c) => c + 1);
         setUnreadFrom((prev) => ({
           ...prev,
@@ -163,6 +173,7 @@ export const SocketProvider = ({ children }) => {
         editMessage,
         deleteMessage,
         markRead,
+        setOpenChat,
         loadHistory,
         isOnline,
         setUnreadCount,

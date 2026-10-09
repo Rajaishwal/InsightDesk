@@ -34,7 +34,7 @@ const Avatar = ({ name, photo, size = "w-9 h-9" }) => {
 
 const ChatPanel = ({ onClose }) => {
   const { user } = useAuth();
-  const { messages, sendMessage, editMessage, deleteMessage, markRead, loadHistory, isOnline, unreadFrom } =
+  const { messages, sendMessage, editMessage, deleteMessage, markRead, loadHistory, isOnline, unreadFrom, setOpenChat } =
     useSocket();
 
   const [conversations, setConversations] = useState([]);
@@ -81,6 +81,30 @@ const ChatPanel = ({ onClose }) => {
       .catch(() => {});
     inputRef.current?.focus();
   }, [activeChat?._id]);
+
+  // Tell the socket layer which conversation is open, so messages from that person are read on arrival
+  useEffect(() => {
+    setOpenChat?.(activeChat?._id || null);
+    return () => setOpenChat?.(null);
+  }, [activeChat?._id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Back on this tab with the chat open → mark anything that arrived meanwhile as read
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && activeChat?._id && unreadFrom[activeChat._id]) markRead(activeChat._id);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [activeChat?._id, unreadFrom]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Keep the conversation list (last message, time, order, badges) live as messages arrive
+  const messageTotal = Object.values(messages).reduce((n, list) => n + list.length, 0);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      api.get("/messages/conversations").then((r) => setConversations(r.data)).catch(() => {});
+    }, 400);
+    return () => clearTimeout(t);
+  }, [messageTotal]);
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {

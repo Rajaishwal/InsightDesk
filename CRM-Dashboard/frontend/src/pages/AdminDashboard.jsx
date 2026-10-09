@@ -131,7 +131,7 @@ const AdminDashboard = () => {
     <div className="p-6 bg-gray-50 min-h-screen">
 
       {/* ── Profile Card ── */}
-      <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-slate-100 rounded-2xl shadow-sm border border-indigo-100 overflow-hidden mb-0">
+      <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-slate-100 rounded-2xl shadow-sm border border-indigo-100 overflow-hidden mb-5">
         <div className="flex items-center justify-between px-7 py-5">
 
           {/* Left: avatar + info */}
@@ -204,57 +204,67 @@ const AdminDashboard = () => {
         </div>
       </div>
 
-      {/* ── Stat Cards — Card.jsx style ── */}
-      <div className="bg-white rounded-b-2xl shadow-sm border border-t-0 border-gray-100 mb-6 overflow-hidden">
-        <div className="grid grid-cols-4 divide-x divide-gray-100">
-          {[
-            {
-              label: "Total Employees",
-              value: loading ? "—" : (stats?.totalEmployees ?? 0),
-              Icon: Users,
-              iconBg: "bg-green-100",
-              iconColor: "text-green-600",
-              border: "border-t-4 border-green-400",
-            },
-            {
-              label: "New Joined",
-              value: loading ? "—" : (stats?.newJoined ?? 0),
-              Icon: UserPlus,
-              iconBg: "bg-blue-100",
-              iconColor: "text-blue-600",
-              border: "border-t-4 border-blue-400",
-            },
-            {
-              label: "Total Projects",
-              value: loading ? "—" : (stats?.totalProjects ?? 0),
-              Icon: Briefcase,
-              iconBg: "bg-violet-100",
-              iconColor: "text-violet-600",
-              border: "border-t-4 border-violet-400",
-            },
-            {
-              label: "On Break",
-              value: loading ? "—" : (stats?.onBreakCount ?? 0),
-              Icon: Coffee,
-              iconBg: "bg-amber-100",
-              iconColor: "text-amber-600",
-              border: "border-t-4 border-amber-400",
-              clickable: true,
-            },
-          ].map(({ label, value, Icon, iconBg, iconColor, border, clickable }) => (
+      {/* ── Stat Cards — same style as the Employee Dashboard cards ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {[
+          {
+            label: "Total Employees",
+            value: loading ? "—" : (stats?.totalEmployees ?? 0),
+            sub: `${stats?.presentCount ?? 0} present today`,
+            Icon: Users,
+            iconBg: "bg-emerald-50", iconColor: "text-emerald-600",
+            accent: "border-l-4 border-l-emerald-400",
+          },
+          {
+            label: "New Joined",
+            value: loading ? "—" : (stats?.newJoined ?? 0),
+            sub: `this month · ${new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric" })}`,
+            Icon: UserPlus,
+            iconBg: "bg-blue-50", iconColor: "text-blue-600",
+            accent: "border-l-4 border-l-blue-400",
+          },
+          {
+            label: "Total Projects",
+            value: loading ? "—" : (stats?.totalProjects ?? 0),
+            sub: `${stats?.ongoingProjects ?? 0} ongoing · ${stats?.completedProjects ?? 0} completed`,
+            Icon: Briefcase,
+            iconBg: "bg-violet-50", iconColor: "text-violet-600",
+            accent: "border-l-4 border-l-violet-400",
+          },
+          {
+            label: "On Break",
+            value: loading ? "—" : (stats?.onBreakCount ?? 0),
+            sub: activeFilter === "onBreak" ? "showing in the table below" : "right now · click to see who",
+            Icon: Coffee,
+            iconBg: "bg-amber-50", iconColor: "text-amber-600",
+            accent: "border-l-4 border-l-amber-400",
+            clickable: true,
+          },
+        ].map(({ label, value, sub, Icon, iconBg, iconColor, accent, clickable }) => {
+          const active = clickable && activeFilter === "onBreak";
+          return (
             <div
               key={label}
-              onClick={clickable ? () => setActiveFilter(activeFilter === "onBreak" ? null : "onBreak") : undefined}
-              className={`flex flex-col items-center py-7 px-4 ${border} ${clickable ? "cursor-pointer transition hover:bg-amber-50" : ""} ${activeFilter === "onBreak" && clickable ? "bg-amber-50 ring-1 ring-amber-300" : ""}`}
+              onClick={clickable ? () => setActiveFilter(active ? null : "onBreak") : undefined}
+              role={clickable ? "button" : undefined}
+              aria-pressed={clickable ? active : undefined}
+              className={`bg-white rounded-xl shadow-sm border border-gray-100 p-4 ${accent}
+                ${clickable ? "cursor-pointer transition hover:shadow-md hover:bg-amber-50/40" : ""}
+                ${active ? "ring-1 ring-amber-300 bg-amber-50/60" : ""}`}
             >
-              <div className={`w-12 h-12 rounded-full ${iconBg} flex items-center justify-center mb-3`}>
-                <Icon className={`w-5 h-5 ${iconColor}`} />
+              <div className="flex items-start justify-between">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{label}</p>
+                  <p className="text-2xl font-black text-gray-800 mt-1 leading-none">{value}</p>
+                  <p className="text-[11px] text-gray-400 mt-1.5 truncate" title={sub}>{sub}</p>
+                </div>
+                <div className={`${iconBg} p-2.5 rounded-xl flex-shrink-0 ml-2`}>
+                  {Icon && <Icon className={`w-5 h-5 ${iconColor}`} />}
+                </div>
               </div>
-              <div className="text-3xl font-bold text-gray-800">{value}</div>
-              <div className="text-sm text-gray-400 font-medium mt-1">{label}</div>
             </div>
-          ))}
-        </div>
+          );
+        })}
       </div>
 
       {/* ── Main Grid ── */}
