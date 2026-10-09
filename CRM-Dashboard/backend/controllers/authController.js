@@ -2,6 +2,7 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import User from "../model/User.js";
+import { istParts } from "../utils/istDate.js";
 
 const signToken = (id) => jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || "30d" });
 
@@ -24,8 +25,8 @@ export const registerUser = async (req, res) => {
       return res.status(409).json({ message: "Employee ID already in use" });
     }
 
-    // Generate a default password (employee can change it later)
-    const defaultPassword = `${employeeId}@2025`;
+    // Default password = <EmployeeID>@<current year, India time> e.g. IDE006@2026 (employee changes it after first login)
+    const defaultPassword = `${employeeId}@${istParts().year}`;
     
     // ✅ Fix: use requested role, fallback to employee if invalid
     const validRoles = ["admin", "employee"];
@@ -48,9 +49,10 @@ export const registerUser = async (req, res) => {
       role: user.role 
     };
 
-    return res.status(201).json({ 
-      token: signToken(user._id), 
+    return res.status(201).json({
+      token: signToken(user._id),
       ...safe,
+      defaultPassword, // shown once to the admin so they can hand it over
       message: `Employee registered successfully. Default password: ${defaultPassword}. Please change it after first login.`
     });
   } catch (err) {
