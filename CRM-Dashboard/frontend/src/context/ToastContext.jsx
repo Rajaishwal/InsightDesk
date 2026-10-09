@@ -12,6 +12,8 @@ const TONES = {
 };
 
 const MAX_VISIBLE = 4;
+// ChatNotificationPopup portals into this element so chat pop-ups share the toasts' top-right column
+export const CHAT_NOTIF_SLOT_ID = "notification-chat-slot";
 let _id = 0;
 
 export function ToastProvider({ children }) {
@@ -39,9 +41,10 @@ export function ToastProvider({ children }) {
     <ToastContext.Provider value={toast}>
       {children}
 
-      {/* ── Toast stack ── */}
+      {/* ── Top-right notification stack: chat pop-ups (portal slot, newest on top) above toasts — one column, never overlapping ── */}
       <div className="fixed top-5 right-5 z-[100000] flex flex-col gap-2.5 pointer-events-none"
            style={{ maxWidth: "360px", width: "calc(100vw - 40px)" }}>
+        <div id={CHAT_NOTIF_SLOT_ID} className="flex flex-col-reverse gap-2.5 empty:hidden" />
         {toasts.map(t => {
           const tone = TONES[t.type] || TONES.info;
           const { Icon } = tone;

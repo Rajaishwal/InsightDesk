@@ -74,7 +74,7 @@ const Sidebar = () => {
                 <NavLink
                   to={to}
                   className={({ isActive }) =>
-                    `relative flex items-center gap-3 pl-4 pr-4 py-2.5 rounded-l-full text-sm font-medium transition-colors
+                    `relative flex items-center gap-3 pl-4 pr-4 py-2.5 rounded-l-full text-[15px] font-medium transition-colors
                     ${isActive
                       ? "text-indigo-700 font-semibold"
                       : "text-white/80 hover:text-white"
@@ -98,7 +98,7 @@ const Sidebar = () => {
                       )}
 
                       {/* Icon + label sit above the animated background */}
-                      <Icon size={18} className="relative z-10 shrink-0" />
+                      <Icon size={20} className="relative z-10 shrink-0" />
                       <span className="relative z-10">{label}</span>
                     </>
                   )}
