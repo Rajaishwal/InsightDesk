@@ -4,6 +4,7 @@ import { Play, Pause, Square, CheckCircle2, Timer, ChevronDown, Lock } from "luc
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { useConfirm } from "../context/ConfirmContext";
+import { useCapToFirstN } from "../hooks/useCapToFirstN";
 import api from "../services/axios";
 
 const fmt = (s) => {
@@ -249,6 +250,9 @@ export default function HrTaskBoard() {
     return !at || Date.now() - new Date(at).getTime() < 86_400_000;
   });
 
+  // Show 3 tasks, the rest scroll (same as the dashboard Projects list)
+  const [listRef, listMaxH] = useCapToFirstN(3, [loading, visibleHr.length]);
+
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 space-y-4">
 
@@ -273,9 +277,23 @@ export default function HrTaskBoard() {
           </div>
           {visibleHr.length === 0
             ? <div className="text-center py-5 text-sm text-gray-400 bg-gray-50 rounded-xl">No tasks assigned yet</div>
-            : visibleHr.map(t => (
-                <HrTaskRow key={t._id} task={t} userId={userId} onTaskUpdate={onTaskUpdate} />
-              ))
+            : (
+              <>
+                {/* Scrolls only when capped — otherwise the status dropdown under the last row would be clipped */}
+                <div
+                  ref={listRef}
+                  className={`space-y-2 ${listMaxH ? "overflow-y-auto pr-1 [scrollbar-width:thin]" : ""}`}
+                  style={listMaxH ? { maxHeight: listMaxH } : undefined}
+                >
+                  {visibleHr.map(t => (
+                    <HrTaskRow key={t._id} task={t} userId={userId} onTaskUpdate={onTaskUpdate} />
+                  ))}
+                </div>
+                {visibleHr.length > 3 && (
+                  <p className="text-center text-[10px] font-semibold text-gray-400">Scroll for {visibleHr.length - 3} more</p>
+                )}
+              </>
+            )
           }
         </div>
       )}

@@ -18,6 +18,7 @@ import HrProjectAssignment from './hrRecords/HrProjectAssignment';
 import Salary from './hrRecords/Salary';
 import PaySlips from './pages/PaySlips';
 import EmployeeReport from './pages/EmployeeReport';
+import MobileBlock from './components/MobileBlock';
 import ChatNotificationPopup from './components/ChatNotificationPopup';
 
 
@@ -27,8 +28,8 @@ function App() {
   return (
     <>
       <ChatNotificationPopup />
-      <div id="mobile-block" className='block md:hidden text-center text-red-600 text-xl p-6'>
-        This CRM application is not available on mobile devices.
+      <div id="mobile-block" className="block md:hidden">
+        <MobileBlock />
       </div>
 
       <div id="desktop-app" className="hidden md:flex min-h-screen">

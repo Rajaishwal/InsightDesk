@@ -12,6 +12,7 @@ import api from "../services/axios";
 import { useAuth } from "../context/AuthContext";
 import { LEAVE_TYPES, normalizeType } from "../components/LeaveDonutChart";
 import MeterRing from "../components/MeterRing";
+import { useCapToFirstN, capClass, capStyle } from "../hooks/useCapToFirstN";
 
 /* ── Formatting ─────────────────────────────────────────────────────────── */
 const pad = (n) => String(n).padStart(2, "0");
@@ -114,6 +115,11 @@ const Stat = ({ label, value, sub, Icon, accent }) => (
 );
 
 const Empty = ({ children }) => <p className="py-6 text-center text-sm text-gray-400">{children}</p>;
+
+// Shown under a list capped to its first 3 items
+const ScrollHint = ({ total, shown = 3 }) => total > shown
+  ? <p className="mt-2 text-center text-[10px] font-semibold text-gray-400">Scroll for {total - shown} more</p>
+  : null;
 
 /* ── Live status chip ───────────────────────────────────────────────────── */
 function LiveStatus({ live }) {
@@ -425,6 +431,13 @@ export default function EmployeeReport() {
     });
   }, [data]);
 
+  // Long lists show 3 items, the rest scroll (same as the dashboards)
+  const [projectsRef, projectsMaxH] = useCapToFirstN(3, [data], "li"); // tiles sit inside Ongoing / Completed groups
+  const [tasksRef, tasksMaxH] = useCapToFirstN(3, [data]);
+  const [leaveTypesRef, leaveTypesMaxH] = useCapToFirstN(3, [data]);
+  const [periodLeavesRef, periodLeavesMaxH] = useCapToFirstN(3, [data]);
+  const [logRef, logMaxH] = useCapToFirstN(7, [data, showLog], "tbody tr"); // daily log: one week visible
+
   if (!isAdmin) return <Navigate to="/" replace />;
 
   if (error && !data) return (
@@ -562,9 +575,11 @@ export default function EmployeeReport() {
             <ChevronDown className={`ml-auto h-4 w-4 text-gray-400 transition-transform ${showLog ? "rotate-180" : ""}`} />
           </button>
           {showLog && (
-            <div className="overflow-x-auto border-t border-gray-100">
+            <>
+            {/* Shows one week (7 rows); the rest scroll under a pinned header */}
+            <div ref={logRef} className={`overflow-x-auto border-t border-gray-100 ${capClass(logMaxH)}`} style={capStyle(logMaxH)}>
               <table className="w-full text-xs">
-                <thead className="bg-gray-50 text-[10px] uppercase tracking-wider text-gray-400">
+                <thead className="sticky top-0 z-10 bg-gray-50 text-[10px] uppercase tracking-wider text-gray-400">
                   <tr>{["Date", "Status", "Check-in", "Check-out", "At work", "Focus", "Breaks"].map(h => <th key={h} className="px-4 py-2 text-left font-bold">{h}</th>)}</tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50 tabular-nums">
@@ -587,6 +602,8 @@ export default function EmployeeReport() {
                 </tbody>
               </table>
             </div>
+            <div className="pb-2"><ScrollHint total={days.filter(d => d.status !== "future").length} shown={7} /></div>
+            </>
           )}
         </section>
 
@@ -599,18 +616,21 @@ export default function EmployeeReport() {
                   </span>
                 )}>
             {projects.length === 0 ? <Empty>Not assigned to any project.</Empty> : (
-              <div className="space-y-4">
-                {[["Ongoing", projects.filter(x => x.status !== "Completed")], ["Completed", projects.filter(x => x.status === "Completed")]]
-                  .filter(([, list]) => list.length > 0)
-                  .map(([group, list]) => (
-                    <div key={group}>
-                      <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-gray-400">{group} · {list.length}</p>
-                      <ul className="space-y-2">
-                        {list.map(pr => <ProjectTile key={pr.projectId} p={pr} />)}
-                      </ul>
-                    </div>
-                  ))}
-              </div>
+              <>
+                <div ref={projectsRef} className={`space-y-4 ${capClass(projectsMaxH)}`} style={capStyle(projectsMaxH)}>
+                  {[["Ongoing", projects.filter(x => x.status !== "Completed")], ["Completed", projects.filter(x => x.status === "Completed")]]
+                    .filter(([, list]) => list.length > 0)
+                    .map(([group, list]) => (
+                      <div key={group}>
+                        <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-gray-400">{group} · {list.length}</p>
+                        <ul className="space-y-2">
+                          {list.map(pr => <ProjectTile key={pr.projectId} p={pr} />)}
+                        </ul>
+                      </div>
+                    ))}
+                </div>
+                <ScrollHint total={projects.length} />
+              </>
             )}
           </Card>
 
@@ -630,7 +650,8 @@ export default function EmployeeReport() {
               ))}
             </div>
             {tasks.length === 0 ? <Empty>No task activity in this period.</Empty> : (
-              <ul className="divide-y divide-gray-50">
+              <>
+              <ul ref={tasksRef} className={`divide-y divide-gray-50 ${capClass(tasksMaxH)}`} style={capStyle(tasksMaxH)}>
                 {tasks.map(t => (
                   <li key={t.id} className="flex items-center gap-3 py-2">
                     <div className="min-w-0 flex-1">
@@ -644,6 +665,8 @@ export default function EmployeeReport() {
                   </li>
                 ))}
               </ul>
+              <ScrollHint total={tasks.length} />
+              </>
             )}
           </Card>
         </div>
@@ -653,15 +676,19 @@ export default function EmployeeReport() {
           <Card title={`Leave balance · ${p.to.slice(0, 4)}`} Icon={Plane}
                 right={<span className="text-[11px] text-gray-400">{leaveRows.reduce((s, t) => s + t.used, 0)} days used this year</span>}>
             <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-gray-400">By leave type · {leaveRows.length}</p>
-            <ul className="space-y-2">
+            <ul ref={leaveTypesRef} className={`space-y-2 ${capClass(leaveTypesMaxH)}`} style={capStyle(leaveTypesMaxH)}>
               {leaveRows.map(t => <LeaveTile key={t.key} t={t} />)}
             </ul>
+            <ScrollHint total={leaveRows.length} />
 
             <p className="mb-2 mt-5 text-[10px] font-bold uppercase tracking-widest text-gray-400">Leave in this period · {periodLeaves.length}</p>
             {periodLeaves.length === 0 ? <p className="text-sm text-gray-400">No leave requests in this period.</p> : (
-              <ul className="space-y-2">
-                {periodLeaves.map(l => <LeaveRequestTile key={l._id} l={l} />)}
-              </ul>
+              <>
+                <ul ref={periodLeavesRef} className={`space-y-2 ${capClass(periodLeavesMaxH)}`} style={capStyle(periodLeavesMaxH)}>
+                  {periodLeaves.map(l => <LeaveRequestTile key={l._id} l={l} />)}
+                </ul>
+                <ScrollHint total={periodLeaves.length} />
+              </>
             )}
           </Card>
 

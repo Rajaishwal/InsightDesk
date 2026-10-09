@@ -21,8 +21,8 @@ const fmtHM = (sec) => {
 
 export default function LiveTaskTimer({ checkedOut = false }) {
   const [taskCompletedSec, setTaskCompletedSec] = useState(0);
-  const [taskRunningAt, setTaskRunningAt]       = useState(null);
-  const [now, setNow]                           = useState(new Date());
+  const [taskRunningAt, setTaskRunningAt] = useState(null);
+  const [now, setNow] = useState(new Date());
 
   const fetchTime = () =>
     api.get("/project-tasks/my-time-today")
@@ -30,7 +30,7 @@ export default function LiveTaskTimer({ checkedOut = false }) {
         setTaskCompletedSec(r.data.completedSeconds || 0);
         setTaskRunningAt(r.data.isRunning ? new Date(r.data.runningStartedAt) : null);
       })
-      .catch(() => {});
+      .catch(() => { });
 
   // Fetch once on mount
   useEffect(() => { fetchTime(); }, []);
@@ -45,17 +45,17 @@ export default function LiveTaskTimer({ checkedOut = false }) {
   useAutoRefresh(fetchTime, ["crm:task:updated", "attendance:updated"]);
 
   /* ── Derived values ── */
-  const runningSec    = (!checkedOut && taskRunningAt) ? Math.floor((now - taskRunningAt) / 1000) : 0;
+  const runningSec = (!checkedOut && taskRunningAt) ? Math.floor((now - taskRunningAt) / 1000) : 0;
   const actualTaskSec = checkedOut ? 0 : taskCompletedSec + runningSec;
-  const remainingSec  = Math.max(0, TARGET_SEC - actualTaskSec);
-  const taskPct       = Math.min(100, Math.round((actualTaskSec / TARGET_SEC) * 100));
+  const remainingSec = Math.max(0, TARGET_SEC - actualTaskSec);
+  const taskPct = Math.min(100, Math.round((actualTaskSec / TARGET_SEC) * 100));
 
-  const arcColor  = actualTaskSec >= TARGET_SEC ? "#10b981"
-                  : actualTaskSec >= 5 * 3600   ? "#f59e0b" : "#6366f1";
+  const arcColor = actualTaskSec >= TARGET_SEC ? "#10b981"
+    : actualTaskSec >= 5 * 3600 ? "#f59e0b" : "#6366f1";
   const textColor = actualTaskSec >= TARGET_SEC ? "text-emerald-600"
-                  : actualTaskSec >= 5 * 3600   ? "text-amber-500" : "text-indigo-600";
+    : actualTaskSec >= 5 * 3600 ? "text-amber-500" : "text-indigo-600";
 
-  const r    = 46;
+  const r = 46;
   const circ = 2 * Math.PI * r;
 
   return (
@@ -105,15 +105,14 @@ export default function LiveTaskTimer({ checkedOut = false }) {
       </div>
 
       {/* Remaining time */}
-      <div className={`rounded-xl p-3 text-center mb-3 ${
-        checkedOut                  ? "bg-gray-50" :
+      <div className={`rounded-xl p-3 text-center mb-3 ${checkedOut ? "bg-gray-50" :
         actualTaskSec >= TARGET_SEC ? "bg-emerald-50" :
-        actualTaskSec >= 5 * 3600  ? "bg-amber-50"   : "bg-indigo-50/60"
-      }`}>
+          actualTaskSec >= 5 * 3600 ? "bg-amber-50" : "bg-indigo-50/60"
+        }`}>
         {checkedOut ? (
           <p className="text-sm font-semibold text-gray-400">Check in to start your focus</p>
         ) : actualTaskSec >= TARGET_SEC ? (
-          <p className="text-sm font-black text-emerald-600">✓ Daily target reached!</p>
+          <p className="text-sm font-black text-emerald-600">✓ Billable Hours Achieved!</p>
         ) : (
           <>
             <p className={`text-lg font-black uppercase tracking-wide ${textColor}`}>{fmtHM(remainingSec)}</p>
@@ -126,11 +125,11 @@ export default function LiveTaskTimer({ checkedOut = false }) {
       <div className="flex items-center justify-between text-[10px]">
         <span className="text-gray-400 font-semibold uppercase tracking-wide">Task Timer</span>
         {!checkedOut && taskRunningAt
-            ? <span className="text-indigo-500 font-semibold flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse inline-block" />
-                Running now
-              </span>
-            : <span className="text-gray-300">No active timer</span>
+          ? <span className="text-indigo-500 font-semibold flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse inline-block" />
+            Running now
+          </span>
+          : <span className="text-gray-300">No active timer</span>
         }
       </div>
     </div>

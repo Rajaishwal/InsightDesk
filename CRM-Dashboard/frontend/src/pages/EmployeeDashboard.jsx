@@ -5,6 +5,7 @@ import { useToast } from "../context/ToastContext";
 import api from "../services/axios";
 import { useAutoRefresh } from "../hooks/useAutoRefresh";
 import { useCheckInStatus } from "../hooks/useCheckInStatus";
+import { useCapToFirstN } from "../hooks/useCapToFirstN";
 import { getCache, setCache } from "../utils/pageCache";
 import { Calendar, Clock, Layers, CheckSquare, User, Pencil, ListChecks, MapPin, ChevronLeft, ChevronRight } from "lucide-react";
 import EditProfileModal from "../components/EditProfileModal";
@@ -53,6 +54,9 @@ export default function EmployeeDashboard() {
   const monthNavSeq = useRef(0); // ignores responses from clicks that a newer click has superseded
   const toast = useToast();
   const [calendarOverride, setCalendarOverride] = useState(null); // null = use main data
+
+  // Projects list shows 3 cards, the rest scroll — height measured from the real cards so it always fits exactly
+  const [projectListRef, projectListMaxH] = useCapToFirstN(3, [data]);
 
   useEffect(() => {
     api.get("/users/employee-dashboard")
@@ -432,7 +436,12 @@ export default function EmployeeDashboard() {
                 <p className="text-sm text-gray-400">No projects assigned</p>
               </div>
             ) : (
-              <div className="space-y-2">
+              <>
+              <div
+                ref={projectListRef}
+                className={`space-y-2 ${projectListMaxH ? "overflow-y-auto pr-1 [scrollbar-width:thin]" : ""}`}
+                style={projectListMaxH ? { maxHeight: projectListMaxH } : undefined}
+              >
                 {sortedProjects.map((proj) => {
                   const hasActiveTimer = proj.projectId === activeTimerProjectId;
                   return (
@@ -473,6 +482,12 @@ export default function EmployeeDashboard() {
                   );
                 })}
               </div>
+              {sortedProjects.length > 3 && (
+                <p className="mt-2 text-center text-[10px] font-semibold text-gray-400">
+                  Scroll for {sortedProjects.length - 3} more
+                </p>
+              )}
+              </>
             )}
           </div>
 
