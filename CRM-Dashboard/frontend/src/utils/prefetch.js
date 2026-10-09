@@ -36,27 +36,6 @@ async function prefetchSalaries() {
   } catch { /* silent */ }
 }
 
-async function prefetchStaffWorkload() {
-  if (getCache("workload-global")) return;
-  try {
-    const [summary, attGraph, statusSummary] = await Promise.all([
-      api.get("/dashboard/summary"),
-      api.get("/dashboard/attendance-count-graph"),
-      api.get("/dashboard/project-status-summary"),
-    ]);
-    setCache("workload-global", {
-      totalEmployees:      summary.data.totalEmployees,
-      presentToday:        summary.data.presentToday || 0,
-      totalProjects:       summary.data.totalProjects,
-      attendanceRate:      summary.data.attendanceRate,
-      projectProgress:     summary.data.projectProgress,
-      topPerformer:        summary.data.topPerformer,
-      attendanceGraph:     attGraph.data,
-      projectStatusSummary: statusSummary.data,
-    });
-  } catch { /* silent */ }
-}
-
 /* ─── employee pages ─── */
 async function prefetchEmployeeDashboard() {
   if (getCache("emp-dashboard")) return;
@@ -93,7 +72,6 @@ export async function prefetchAll(user) {
     await Promise.all([
       prefetchAdminDashboard(),
       prefetchSalaries(),
-      prefetchStaffWorkload(),
       prefetchPayslips(user),
     ]);
   } else {

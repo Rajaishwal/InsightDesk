@@ -6,7 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import { prefetchAll } from "../utils/prefetch";
 import {
   LayoutDashboard, Users, FolderOpen,
-  Users2, CalendarCheck2, BarChart,
+  CalendarCheck2, BarChart,
   IndianRupeeIcon, User2Icon, FolderCheck,
   UserRoundCogIcon,
 } from "lucide-react";
@@ -30,7 +30,6 @@ const Sidebar = () => {
     { to: "/hrproject", label: "Employee Project", icon: FolderCheck },
     { to: "/salary", label: "Employee Salary", icon: UserRoundCogIcon },
     { to: "/payslip", label: "Payslips & Salary", icon: IndianRupeeIcon },
-    { to: "/workload", label: "Staff Workload", icon: Users2 },
     { to: "/support", label: "Support", icon: BarChart },
   ];
 

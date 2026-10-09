@@ -10,7 +10,6 @@ import NotFound from './pages/NotFound';
 import Projects from './pages/Projects';
 import Report from './pages/Report';
 import HrRecord from './pages/HrRecord';
-import StaffWorkload from './pages/StaffWorkload';
 import { useLocation } from 'react-router-dom';
 import Signup from './pages/Signup';
 import Profile from './pages/Profile';
@@ -54,7 +53,6 @@ function App() {
               <Route path='/hrproject' element={<ProtectedRoute><HrProjectAssignment/> </ProtectedRoute>} />
               <Route path='/profile' element={<ProtectedRoute><Profile/> </ProtectedRoute>} />
               <Route path='/timesheet' element={<ProtectedRoute><LeaveManagement/> </ProtectedRoute>} />
-              <Route path='/workload' element={<ProtectedRoute><StaffWorkload/> </ProtectedRoute>} />
               <Route path='/payslip' element={<ProtectedRoute><PaySlips /> </ProtectedRoute>} />
               <Route path='/salary' element={<ProtectedRoute><Salary/> </ProtectedRoute>} />
               <Route path='/employees/:employeeId/report' element={<ProtectedRoute><EmployeeReport /></ProtectedRoute>} />
