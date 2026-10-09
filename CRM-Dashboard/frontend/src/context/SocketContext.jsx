@@ -66,8 +66,10 @@ export const SocketProvider = ({ children }) => {
 
       // Increment unread only for messages sent to me by someone else
       if (msg.senderId !== user._id) {
-        // Already looking at this conversation? Then it's read right away — no badge, no pop-up
-        const viewing = openChatRef.current === String(msg.senderId) && document.visibilityState === "visible";
+        // This person's chat is open → it's read right away: no badge, no pop-up.
+        // (No tab-visibility check — Chrome on Windows reports a covered/minimised window as "hidden",
+        //  which made pop-ups appear for the chat you had open.)
+        const viewing = openChatRef.current === String(msg.senderId);
         if (viewing) {
           socket.emit("mark_read", { senderId: msg.senderId, receiverId: user._id });
           setUnreadFrom((prev) => ({ ...prev, [msg.senderId]: 0 }));

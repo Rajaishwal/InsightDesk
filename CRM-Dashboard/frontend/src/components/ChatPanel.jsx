@@ -88,15 +88,6 @@ const ChatPanel = ({ onClose }) => {
     return () => setOpenChat?.(null);
   }, [activeChat?._id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Back on this tab with the chat open → mark anything that arrived meanwhile as read
-  useEffect(() => {
-    const onVisible = () => {
-      if (document.visibilityState === "visible" && activeChat?._id && unreadFrom[activeChat._id]) markRead(activeChat._id);
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [activeChat?._id, unreadFrom]); // eslint-disable-line react-hooks/exhaustive-deps
-
   // Keep the conversation list (last message, time, order, badges) live as messages arrive
   const messageTotal = Object.values(messages).reduce((n, list) => n + list.length, 0);
   useEffect(() => {
