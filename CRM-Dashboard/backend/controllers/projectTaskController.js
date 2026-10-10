@@ -16,6 +16,16 @@ const logActivity = async (data) => {
   }
 };
 
+// A project's status follows its tasks only up to "Ongoing": work on a Pending project moves it to Ongoing.
+// "Completed" is never set automatically — HR/admin marks it once every task is done, and from then on it's locked.
+const markProjectOngoing = async (project) => {
+  if (project?.status === 'Pending') {
+    project.status = 'Ongoing';
+    await project.save();
+  }
+};
+const PROJECT_CLOSED = 'This project is completed and closed — its tasks can no longer change.';
+
 // GET /api/project-tasks/stats/all
 export const getProjectStats = async (req, res) => {
   try {
@@ -75,6 +85,9 @@ export const addProjectTask = async (req, res) => {
 
     const project = await Project.findOne({ projectId: projectId.toUpperCase() });
     if (!project) return res.status(404).json({ message: 'Project not found' });
+    if (project.status === 'Completed') {
+      return res.status(409).json({ message: 'This project is completed and closed — no new tasks can be added.' });
+    }
 
     const task = await ProjectTask.create({
       projectId: projectId.toUpperCase(),
@@ -85,12 +98,6 @@ export const addProjectTask = async (req, res) => {
       createdByName: user.name,
       createdByRole: user.role,
     });
-
-    // A new Pending task means the project is no longer fully Completed
-    if (project.status === 'Completed') {
-      project.status = 'Ongoing';
-      await project.save();
-    }
 
     await logActivity({
       projectId:   task.projectId,
@@ -127,6 +134,9 @@ export const updateTaskStatus = async (req, res) => {
     if (task.status === 'Completed') {
       return res.status(403).json({ message: 'Completed tasks cannot be reopened' });
     }
+
+    const project = await Project.findOne({ projectId: task.projectId });
+    if (project?.status === 'Completed') return res.status(409).json({ message: PROJECT_CLOSED });
 
     // Only the task creator (or admin/manager) can mark a task as Completed
     if (status === 'Completed') {
@@ -177,25 +187,7 @@ export const updateTaskStatus = async (req, res) => {
     // Re-assign so the rest of the handler (project sync, logActivity) uses freshTask
     Object.assign(task, freshTask.toObject());
 
-    const project = await Project.findOne({ projectId: task.projectId });
-
-    // Recompute project status from ALL tasks every time a task status changes:
-    // • All tasks Completed → project Completed
-    // • Any task Pending/Ongoing → project Ongoing (project has work in progress)
-    // • No tasks → leave project status unchanged
-    // freshTask.save() has already run above, so the DB reflects the new status.
-    if (project) {
-      const allTasks = await ProjectTask.find({ projectId: task.projectId });
-      if (allTasks.length > 0) {
-        const newProjectStatus = allTasks.every(t => t.status === 'Completed')
-          ? 'Completed'
-          : 'Ongoing';
-        if (project.status !== newProjectStatus) {
-          project.status = newProjectStatus;
-          await project.save();
-        }
-      }
-    }
+    await markProjectOngoing(project);
 
     await logActivity({
       projectId:   task.projectId,
@@ -225,6 +217,9 @@ export const startTimer = async (req, res) => {
 
     const task = await ProjectTask.findById(taskId);
     if (!task) return res.status(404).json({ message: 'Task not found' });
+
+    const project = await Project.findOne({ projectId: task.projectId });
+    if (project?.status === 'Completed') return res.status(409).json({ message: PROJECT_CLOSED });
 
     // Timers only run inside a working session: checked in (session may span midnight), and not on a break
     const [checkedIn, activeBreak] = await Promise.all([
@@ -262,20 +257,7 @@ export const startTimer = async (req, res) => {
     if (task.status === 'Pending') task.status = 'Ongoing';
     await task.save();
 
-    const project = await Project.findOne({ projectId: task.projectId });
-
-    // Recompute project status — starting a timer can move a task from Pending → Ongoing,
-    // which means a "Completed" project must revert to "Ongoing"
-    if (project) {
-      const allTasks = await ProjectTask.find({ projectId: task.projectId });
-      if (allTasks.length > 0) {
-        const newProjectStatus = allTasks.every(t => t.status === 'Completed') ? 'Completed' : 'Ongoing';
-        if (project.status !== newProjectStatus) {
-          project.status = newProjectStatus;
-          await project.save();
-        }
-      }
-    }
+    await markProjectOngoing(project);
 
     await logActivity({
       projectId:   task.projectId,

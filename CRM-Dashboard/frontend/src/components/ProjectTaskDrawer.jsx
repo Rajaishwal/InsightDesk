@@ -1,6 +1,6 @@
 // ProjectTaskDrawer.jsx — Slide-out drawer showing task timeline, timers, and status for a single project
 import { useState, useEffect, useRef } from "react";
-import { X, Plus, RefreshCw, GitCommitHorizontal, Play, Square, Clock } from "lucide-react";
+import { X, Plus, RefreshCw, GitCommitHorizontal, Play, Square, Clock, Lock } from "lucide-react";
 import api from "../services/axios";
 import { useToast } from "../context/ToastContext";
 import { useAuth } from "../context/AuthContext";
@@ -67,7 +67,7 @@ export default function ProjectTaskDrawer({ project, onClose, isManager }) {
     try {
       const res = await api.get(`http://localhost:5000/api/attendance/status/${myId}`);
       setIsCheckedIn(res.data.hasCheckedIn && !res.data.hasCheckedOut);
-    } catch {}
+    } catch { /* leave isCheckedIn false — the server re-checks when a timer starts */ }
   };
 
   useEffect(() => { fetchTasks(); fetchAttendanceStatus(); }, [project.projectId]);
@@ -325,9 +325,13 @@ export default function ProjectTaskDrawer({ project, onClose, isManager }) {
           )}
         </div>
 
-        {/* Add Task */}
+        {/* Add Task — a completed project is closed, so no new tasks */}
         <div className="border-t border-gray-100 bg-white flex-shrink-0">
-          {!addOpen ? (
+          {project.status === "Completed" ? (
+            <div className="flex items-center justify-center gap-2 py-4 text-sm font-semibold text-emerald-600">
+              <Lock size={14} /> Project completed — this tracklist is closed
+            </div>
+          ) : !addOpen ? (
             <button
               onClick={() => setAddOpen(true)}
               className="w-full flex items-center justify-center gap-2 py-4 text-sm font-semibold text-indigo-600 hover:bg-indigo-50 transition"

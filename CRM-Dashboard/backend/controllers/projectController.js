@@ -1,4 +1,6 @@
+import mongoose from "mongoose";
 import Project from "../model/Project.js";
+import ProjectTask from "../model/ProjectTask.js";
 import User from "../model/User.js";
 
 // Utility: Generate Project ID
@@ -200,34 +202,52 @@ export const getProjectById = async (req, res) => {
 };
 
 // Update project
+// Status rules: only HR/admin change it; "Completed" is allowed only once every task in the project's
+// tracklist is done (the team has finished), and a Completed project is locked for good.
 export const updateProject = async (req, res) => {
   try {
     const { id } = req.params;
     console.log('✏️ Update request received:', { id, body: req.body });
 
-    // Try updating by projectId first
-    let project = await Project.findOneAndUpdate(
-      { projectId: id },
-      { ...req.body, lastUpdatedBy: req.user._id },
-      { new: true }
-    );
+    // Find by projectId first, then by _id
+    const existing = await Project.findOne({ projectId: id })
+      || (mongoose.isValidObjectId(id) ? await Project.findById(id) : null);
 
-    // If not found, try updating by _id
-    if (!project) {
-      project = await Project.findByIdAndUpdate(
-        id,
-        { ...req.body, lastUpdatedBy: req.user._id },
-        { new: true }
-      );
-    }
-
-    if (!project) {
+    if (!existing) {
       console.error('❌ Project not found for update:', id);
       return res.status(404).json({
         success: false,
         message: 'Project not found.'
       });
     }
+
+    const { status } = req.body;
+    if (status !== undefined && status !== existing.status) {
+      if (req.user.role === 'employee') {
+        return res.status(403).json({ success: false, message: "Only HR/admin can change a project's status." });
+      }
+      if (existing.status === 'Completed') {
+        return res.status(409).json({ success: false, message: 'This project is completed and locked — its status can no longer be changed.' });
+      }
+      if (status === 'Completed') {
+        const [total, done] = await Promise.all([
+          ProjectTask.countDocuments({ projectId: existing.projectId }),
+          ProjectTask.countDocuments({ projectId: existing.projectId, status: 'Completed' }),
+        ]);
+        if (total === 0) {
+          return res.status(409).json({ success: false, message: 'This project has no tasks yet — it can be completed once the team has finished its tasks.' });
+        }
+        if (done < total) {
+          return res.status(409).json({ success: false, message: `${total - done} of ${total} tasks are still open — the team has to complete them first.` });
+        }
+      }
+    }
+
+    const project = await Project.findByIdAndUpdate(
+      existing._id,
+      { ...req.body, lastUpdatedBy: req.user._id },
+      { new: true, runValidators: true }
+    );
 
     console.log('✅ Project updated successfully:', project.projectId || project._id);
 
