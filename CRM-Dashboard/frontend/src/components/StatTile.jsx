@@ -6,6 +6,7 @@ const TONES = {
   amber:   { bar: "border-l-amber-400",   iconBg: "bg-amber-50",   icon: "text-amber-600",   on: "ring-1 ring-amber-300 bg-amber-50/50" },
   emerald: { bar: "border-l-emerald-400", iconBg: "bg-emerald-50", icon: "text-emerald-600", on: "ring-1 ring-emerald-300 bg-emerald-50/50" },
   rose:    { bar: "border-l-rose-400",    iconBg: "bg-rose-50",    icon: "text-rose-600",    on: "ring-1 ring-rose-300 bg-rose-50/50" },
+  slate:   { bar: "border-l-slate-300",   iconBg: "bg-slate-100",  icon: "text-slate-500",   on: "ring-1 ring-slate-300 bg-slate-50" },
 };
 
 export default function StatTile({ label, value, sub, Icon, tone = "violet", active = false, onClick }) {

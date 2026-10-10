@@ -1,405 +1,291 @@
-// LocationTab.jsx — HR tab showing employee location history and live location pins
-﻿import React, { useState, useEffect } from "react";
+// LocationTab.jsx — HR view of each tracked employee's current location: one full-width bar per employee with
+// status (active / on break / offline), address, how fresh it is, and a Maps link.
+import { useState, useEffect } from "react";
+import {
+  MapPin, MapPinOff, Clock, ExternalLink, RefreshCw, Trash2,
+  Users, Navigation, Coffee, Moon, AlertTriangle,
+} from "lucide-react";
 import { useToast } from "../../context/ToastContext";
+import { useConfirm } from "../../context/ConfirmContext";
 import api from "../../services/axios";
 import LocationFilters from "./LocationFilters";
+import StatTile from "../../components/StatTile";
+import PersonAvatar from "../../components/PersonAvatar";
+import { useAutoRefresh } from "../../hooks/useAutoRefresh";
+
+const TZ = "Asia/Kolkata";
+const STALE_MINS = 35; // the tracker saves at least every 30 min while someone is checked in
+
+const ago = (d) => {
+  const s = Math.max(0, Math.floor((Date.now() - new Date(d).getTime()) / 1000));
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
+  const days = Math.floor(s / 86400);
+  return days === 1 ? "yesterday" : `${days} days ago`;
+};
+const fullTime = (d) =>
+  new Date(d).toLocaleString("en-GB", { timeZone: TZ, day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true });
+const mapsLink = (lat, lng) => `https://www.google.com/maps?q=${lat},${lng}`;
+
+// Long reverse-geocoded address → a readable street line + area line
+const splitAddress = (loc) => {
+  const parts = (loc?.address || "").split(",").map((p) => p.trim()).filter(Boolean);
+  const area = [loc?.city, loc?.state].filter(Boolean).join(", ");
+  if (!parts.length) return { street: area || "Address unavailable", area: "", full: area };
+  return { street: parts.slice(0, 2).join(", "), area: area || parts.slice(2, 4).join(", "), full: loc.address };
+};
+
+const STATUS = {
+  active:  { label: "Active",   chip: "bg-emerald-50 text-emerald-700 ring-emerald-200", dot: "bg-emerald-500" },
+  break:   { label: "On break", chip: "bg-amber-50 text-amber-700 ring-amber-200",       dot: "bg-amber-500" },
+  offline: { label: "Offline",  chip: "bg-gray-50 text-gray-500 ring-gray-200",          dot: "bg-gray-300" },
+};
+const statusOf = (emp) => (emp.attendanceStatus !== "checked-in" ? "offline" : emp.onBreak ? "break" : "active");
+
+const FILTERS = {
+  all:     { label: "All tracked employees", test: () => true },
+  in:      { label: "Checked in",            test: (e) => statusOf(e) !== "offline" },
+  break:   { label: "On break",              test: (e) => statusOf(e) === "break" },
+  offline: { label: "Offline",               test: (e) => statusOf(e) === "offline" },
+};
+
+const EDGE = { active: "border-l-emerald-400", break: "border-l-amber-400", offline: "border-l-gray-300" };
+
+// One employee as a full-width horizontal bar: who · current location · last update · Maps
+function LocationRow({ emp }) {
+  const s = statusOf(emp);
+  const st = STATUS[s];
+  const cur = emp.currentLocation;
+  const loc = emp.latestLocationData;
+  const lat = loc?.coordinates?.latitude ?? cur?.latitude;
+  const lng = loc?.coordinates?.longitude ?? cur?.longitude;
+  const updated = cur?.lastUpdated || emp.lastLocationUpdate;
+  const minsSince = updated ? (Date.now() - new Date(updated).getTime()) / 60000 : null;
+  const stale = s !== "offline" && minsSince != null && minsSince > STALE_MINS;
+  const addr = splitAddress(loc);
+
+  return (
+    <div className={`overflow-hidden rounded-2xl border border-l-4 border-gray-100 ${EDGE[s]} bg-white shadow-sm transition hover:shadow-md`}>
+      <div className="flex flex-col gap-4 px-5 py-4 lg:grid lg:grid-cols-[minmax(200px,1fr)_minmax(260px,1.5fr)_minmax(180px,0.9fr)_auto] lg:items-center lg:gap-6">
+        {/* Who */}
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="relative flex-shrink-0">
+            <PersonAvatar person={emp} size={42} />
+            <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full ring-2 ring-white ${st.dot}`} />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <p className="truncate text-sm font-semibold text-gray-900">{emp.name}</p>
+              <span className={`inline-flex flex-shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${st.chip}`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${st.dot} ${s === "active" ? "animate-pulse" : ""}`} />
+                {st.label}
+              </span>
+            </div>
+            <p className="truncate text-[11px] text-gray-400">{[emp.employeeId, emp.designation || emp.email].filter(Boolean).join(" · ")}</p>
+          </div>
+        </div>
+
+        {/* Where */}
+        <div className="flex min-w-0 items-start gap-2.5">
+          <span className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-indigo-50">
+            <MapPin className="h-3.5 w-3.5 text-indigo-500" />
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-gray-800" title={addr.full || undefined}>{addr.street}</p>
+            <p className="truncate text-xs text-gray-500">
+              {addr.area}
+              {lat != null && (
+                <span className="font-mono text-[10.5px] text-gray-400">
+                  {addr.area ? " · " : ""}{Number(lat).toFixed(5)}, {Number(lng).toFixed(5)}
+                  {loc?.accuracy ? ` · ±${Math.round(loc.accuracy)} m` : ""}
+                </span>
+              )}
+            </p>
+          </div>
+        </div>
+
+        {/* When */}
+        <div className="flex min-w-0 items-start gap-2.5">
+          <span className={`mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg ${stale ? "bg-amber-50" : "bg-gray-50"}`}>
+            {stale ? <AlertTriangle className="h-3.5 w-3.5 text-amber-500" /> : <Clock className="h-3.5 w-3.5 text-gray-400" />}
+          </span>
+          <div className="min-w-0">
+            <p className="text-sm text-gray-700">
+              {updated ? <>Updated <span className="font-semibold" title={fullTime(updated)}>{ago(updated)}</span></> : "Never updated"}
+            </p>
+            <p className={`truncate text-[11px] ${stale ? "text-amber-600" : "text-gray-400"}`}
+              title={stale ? "Checked in, but no location update — their tab may be closed or location turned off" : undefined}>
+              {stale ? "Tab closed or location off?" : s === "offline" ? "last known location" : updated ? fullTime(updated) : ""}
+            </p>
+          </div>
+        </div>
+
+        {/* Action */}
+        <div className="flex items-center lg:justify-end">
+          {lat != null && (
+            <a href={mapsLink(lat, lng)} target="_blank" rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-600 hover:text-white">
+              <Navigation className="h-3.5 w-3.5" /> Open in Maps <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SkeletonRows() {
+  return Array.from({ length: 3 }, (_, i) => (
+    <div key={i} className="flex animate-pulse items-center gap-6 rounded-2xl border border-l-4 border-gray-100 border-l-gray-200 bg-white px-5 py-4 shadow-sm">
+      <div className="flex w-56 items-center gap-3"><div className="h-10 w-10 rounded-full bg-gray-100" /><div className="h-3.5 w-28 rounded bg-gray-100" /></div>
+      <div className="h-3.5 flex-1 rounded bg-gray-100" />
+      <div className="h-3.5 w-36 rounded bg-gray-100" />
+      <div className="h-7 w-28 rounded-full bg-gray-100" />
+    </div>
+  ));
+}
 
 const LocationTab = () => {
   const toast = useToast();
-  const [employeeLocations, setEmployeeLocations] = useState([]);
-  const [locationsLoading, setLocationsLoading] = useState(false);
-  const [locationFilters, setLocationFilters] = useState({
-    searchTerm: '',
-    sortBy: 'lastUpdated',
-    sortOrder: 'desc'
-  });
-  const [showLocationHistory, setShowLocationHistory] = useState({});
-  const [locationHistoryData, setLocationHistoryData] = useState({});
-  const [historyLoading, setHistoryLoading] = useState({});
-  const [autoRefreshOnEvents, setAutoRefreshOnEvents] = useState(true);
+  const confirm = useConfirm();
+  const [employees, setEmployees] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
+  const [filters, setFilters] = useState({ searchTerm: "", sortBy: "lastUpdated" });
+  const [view, setView] = useState("all");
 
-  // Fetch all employee locations
-  const fetchEmployeeLocations = async () => {
+  const fetchLocations = async ({ silent = false } = {}) => {
+    silent ? setRefreshing(true) : setLoading(true);
     try {
-      setLocationsLoading(true);
-      console.log('Fetching employee locations...');
-      const response = await api.get("http://localhost:5000/api/location/all-employees");
-      console.log('Employee locations response:', response.data);
-      
-      if (response.data.success) {
-        setEmployeeLocations(response.data.employees);
-        console.log('Set employee locations:', response.data.employees);
-      } else {
-        console.error('Failed to fetch locations:', response.data.message);
-        toast.error("Failed to fetch employee locations: " + response.data.message);
-      }
-    } catch (error) {
-      console.error("Error fetching employee locations:", error);
-      if (error.response?.status === 403) {
-        toast.error("Access denied. No permission to view employee locations.");
-      } else if (error.response?.status === 401) {
-        toast.error("Authentication required. Please log in again.");
-      } else {
-        toast.error("Failed to fetch employee locations: " + (error?.response?.data?.message || error.message));
-      }
+      const { data } = await api.get("/location/all-employees");
+      if (!data.success) throw new Error(data.message);
+      setEmployees(data.employees || []);
+      setError(null);
+    } catch (err) {
+      const msg = !err?.response && err?.request ? "Can't reach the server — make sure the backend is running."
+        : err?.response?.status === 403 ? "You don't have permission to view employee locations."
+        : "Couldn't load employee locations.";
+      // Keep showing the last good data on a failed background refresh
+      if (!silent || !employees.length) setError(msg);
     } finally {
-      setLocationsLoading(false);
+      setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  // Filter and sort employees
-  const getFilteredLocations = () => {
-    let filtered = employeeLocations.filter(emp => {
-      const term = locationFilters.searchTerm.toLowerCase();
-      return (
-        emp.name.toLowerCase().includes(term) ||
-        emp.email.toLowerCase().includes(term) ||
-        emp.employeeId.toLowerCase().includes(term)
-      );
-    });
-
-    const { sortBy, sortOrder } = locationFilters;
-    filtered.sort((a, b) => {
-      let aVal, bVal;
-      if (sortBy === "name") {
-        aVal = a.name.toLowerCase();
-        bVal = b.name.toLowerCase();
-      } else {
-        aVal = new Date(a.currentLocation?.lastUpdated || 0);
-        bVal = new Date(b.currentLocation?.lastUpdated || 0);
-      }
-
-      if (sortOrder === "asc") return aVal > bVal ? 1 : -1;
-      return aVal < bVal ? 1 : -1;
-    });
-
-    return filtered;
-  };
-
-  // Fetch location history for one employee
-  const fetchEmployeeLocationHistory = async (userId) => {
-    try {
-      setHistoryLoading(prev => ({ ...prev, [userId]: true }));
-      console.log('Fetching location history for user:', userId);
-      
-      const response = await api.get(`http://localhost:5000/api/location/history?userId=${userId}&limit=10`);
-      console.log('Location history response:', response.data);
-      
-      if (response.data.success) {
-        console.log('Location history data:', response.data.locations);
-        setLocationHistoryData(prev => ({ ...prev, [userId]: response.data.locations }));
-      } else {
-        console.log('Failed to fetch location history:', response.data.message);
-        setLocationHistoryData(prev => ({ ...prev, [userId]: [] }));
-        toast.warning(`No location history found for this employee: ${response.data.message}`);
-      }
-    } catch (error) {
-      console.error("Error fetching location history:", error);
-      setLocationHistoryData(prev => ({ ...prev, [userId]: [] }));
-      toast.error(`Failed to fetch history for employee ${userId}.`);
-    } finally {
-      setHistoryLoading(prev => ({ ...prev, [userId]: false }));
-    }
-  };
-
-  // Toggle history dropdown
-  const toggleLocationHistory = async (userId) => {
-    const isOpen = showLocationHistory[userId];
-    setShowLocationHistory(prev => ({ ...prev, [userId]: !isOpen }));
-
-    if (!isOpen && !locationHistoryData[userId]) {
-      await fetchEmployeeLocationHistory(userId);
-    }
-  };
-
-  // Refresh all locations
-  const refreshLocations = () => fetchEmployeeLocations();
-
-  // Clear only inactive employee location data
-  const clearAllInactiveData = async () => {
-    // if (!window.confirm('Are you sure you want to clear all inactive employee location data? This action cannot be undone.')) {
-    //   return;
-    // }
-
-    try {
-      // First, identify inactive employees locally
-      const activeEmployees = employeeLocations.filter(emp => {
-        const status = getLocationStatus(emp.currentLocation, emp.attendanceStatus);
-        return status.status === 'active';
-      });
-
-      // Update the table immediately to show only active employees
-      setEmployeeLocations(activeEmployees);
-      
-      // Then call the backend to clean up the database
-      const response = await api.delete('http://localhost:5000/api/location/clear-inactive');
-      if (response.data.success) {
-        toast.success(`Cleared ${response.data.deletedCount} inactive records from ${response.data.clearedUsers} users.`);
-        // Clear any open history data for removed employees
-        setLocationHistoryData({});
-        setShowLocationHistory({});
-      } else {
-        toast.error('Failed to clear inactive data: ' + response.data.message);
-        // If backend failed, refresh to get accurate data
-        await fetchEmployeeLocations();
-      }
-    } catch (error) {
-      console.error('Error clearing inactive data:', error);
-      toast.error('Failed to clear inactive data: ' + (error?.response?.data?.message || error.message));
-      // If there was an error, refresh to get accurate data
-      await fetchEmployeeLocations();
-    }
-  };
-
-  // Generate Google Maps link
-  const getGoogleMapsLink = (lat, lng) => {
-    return `https://www.google.com/maps?q=${lat},${lng}`;
-  };
-
-  // Auto-refresh every 30s
+  // Load, then refresh quietly every 30s and whenever someone checks in / out / takes a break
   useEffect(() => {
-    fetchEmployeeLocations();
-    const interval = setInterval(() => fetchEmployeeLocations(), 30000);
-    return () => clearInterval(interval);
-  }, []);
+    fetchLocations();
+    const id = setInterval(() => fetchLocations({ silent: true }), 30000);
+    return () => clearInterval(id);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useAutoRefresh(() => fetchLocations({ silent: true }), ["crm:attendance:updated"]);
 
-  // Auto-refresh on events
-  useEffect(() => {
-    if (!autoRefreshOnEvents) return;
-    const handleEvent = () => fetchEmployeeLocations();
-    window.addEventListener("attendanceUpdate", handleEvent);
-    window.addEventListener("storage", (e) => e.key === "attendanceEvent" && handleEvent());
-    return () => {
-      window.removeEventListener("attendanceUpdate", handleEvent);
-      window.removeEventListener("storage", handleEvent);
-    };
-  }, [autoRefreshOnEvents]);
-
-
-  // Get location status
-  const getLocationStatus = (currentLocation, attendanceStatus) => {
-    // Active = employee is checked in AND we have a location on record
-    if (attendanceStatus === 'checked-in' && currentLocation) {
-      return { status: 'active', color: 'bg-white text-green-500 border-green-500 border-2 border-solid', text: 'Active' };
+  const clearInactive = async () => {
+    const ok = await confirm({
+      title: "Clear location data of offline employees?",
+      message: "This deletes the saved location of everyone who isn't checked in right now, so they drop off this list. Checked-in employees aren't affected. This can't be undone.",
+      confirmText: "Clear data",
+      tone: "danger",
+    });
+    if (!ok) return;
+    try {
+      const { data } = await api.delete("/location/clear-inactive");
+      if (!data.success) throw new Error(data.message);
+      toast.success(`Cleared ${data.deletedCount} location records from ${data.clearedUsers} ${data.clearedUsers === 1 ? "employee" : "employees"}.`);
+      fetchLocations({ silent: true });
+    } catch (err) {
+      toast.error("Couldn't clear location data: " + (err?.response?.data?.message || err.message));
     }
-    return { status: 'inactive', color: 'bg-white text-red-500 border-red-500 border-2 border-solid', text: 'Inactive' };
   };
 
-  // Stats
-  const totalEmployees = employeeLocations.length;
-  const activeLocations = employeeLocations.filter(emp => {
-    const status = getLocationStatus(emp.currentLocation, emp.attendanceStatus);
-    return status.status === 'active';
-  }).length;
-  const inactiveLocations = totalEmployees - activeLocations;
+  const counts = Object.fromEntries(Object.entries(FILTERS).map(([k, f]) => [k, employees.filter(f.test).length]));
+  const term = filters.searchTerm.trim().toLowerCase();
+  const visible = employees
+    .filter(FILTERS[view].test)
+    .filter((e) => !term || [e.name, e.email, e.employeeId].some((v) => (v || "").toLowerCase().includes(term)))
+    .sort((a, b) =>
+      filters.sortBy === "name"
+        ? (a.name || "").localeCompare(b.name || "")
+        : new Date(b.currentLocation?.lastUpdated || 0) - new Date(a.currentLocation?.lastUpdated || 0)
+    );
+  const pick = (k) => setView((v) => (v === k && k !== "all" ? "all" : k));
 
   return (
-    <div className="locations-tab space-y-6 p-4">
-
-      {/* Header */}
-      <div className="tab-header flex flex-col md:flex-row justify-between items-center gap-4">
-        <h2 className="text-2xl font-semibold flex items-center gap-2">📍 Employee Locations</h2>
-        <div className="header-actions flex flex-wrap gap-2">
-          <button
-            onClick={refreshLocations}
-            disabled={locationsLoading}
-            className="px-3 py-2 rounded bg-blue-100 text-blue-800 font-medium hover:bg-blue-200 transition disabled:opacity-50 text-sm"
-          >
-            {locationsLoading ? "🔄 Refreshing..." : "🔄 Refresh"}
+    <div className="space-y-5">
+      {/* Section header */}
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">Employee locations</h2>
+          <p className="mt-0.5 text-sm text-gray-500">Where each employee was last seen while checked in · updates every 30 seconds.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={() => fetchLocations({ silent: true })} disabled={refreshing}
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 shadow-sm transition hover:bg-gray-50 disabled:opacity-60">
+            <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} /> Refresh
           </button>
-          <button
-            onClick={clearAllInactiveData}
-            disabled={locationsLoading}
-            className="px-3 py-2 rounded bg-red-100 text-red-800 font-medium hover:bg-red-200 transition disabled:opacity-50 text-sm"
-          >
-            🗑️ Clear All
+          <button type="button" onClick={clearInactive} disabled={loading}
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600 shadow-sm transition hover:bg-rose-50 disabled:opacity-60">
+            <Trash2 className="h-3.5 w-3.5" /> Clear offline data
           </button>
         </div>
       </div>
 
-      {/* Filters */}
-      <LocationFilters filters={locationFilters} setFilters={setLocationFilters} />
-
-      {/* Stats */}
-      <div className="location-stats grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
-        <div className="stat-card bg-gray-50 shadow rounded-lg p-4 flex flex-col items-center">
-          <h4 className="text-gray-500 text-sm font-medium">Total Employees</h4>
-          <span className="text-2xl font-semibold">{totalEmployees}</span>
-        </div>
-        <div className="stat-card bg-gray-50 shadow rounded-lg p-4 flex flex-col items-center">
-          <h4 className="text-gray-500 text-sm font-medium">Active Locations</h4>
-          <span className="text-2xl font-semibold text-green-600">{activeLocations}</span>
-        </div>
-        <div className="stat-card bg-gray-50 shadow rounded-lg p-4 flex flex-col items-center">
-          <h4 className="text-gray-500 text-sm font-medium">Inactive Locations</h4>
-          <span className="text-2xl font-semibold text-red-600">{inactiveLocations}</span>
-        </div>
+      {/* Summary tiles (click to filter) */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatTile tone="violet" Icon={Users} label="Tracked" value={loading ? "—" : counts.all}
+          sub="employees with a saved location" active={view === "all"} onClick={() => pick("all")} />
+        <StatTile tone="emerald" Icon={Navigation} label="Checked in" value={loading ? "—" : counts.in}
+          sub="location being tracked now" active={view === "in"} onClick={() => pick("in")} />
+        <StatTile tone="amber" Icon={Coffee} label="On break" value={loading ? "—" : counts.break}
+          sub="checked in, on a break" active={view === "break"} onClick={() => pick("break")} />
+        <StatTile tone="slate" Icon={Moon} label="Offline" value={loading ? "—" : counts.offline}
+          sub="showing last known location" active={view === "offline"} onClick={() => pick("offline")} />
       </div>
 
-      {/* Employee Locations Table */}
-      {locationsLoading ? (
-        <div className="loading-state flex flex-col items-center justify-center py-20 gap-4">
-          <div className="w-14 h-14 border-4 border-blue-200 border-t-blue-500 rounded-full animate-spin"></div>
-          <p className="text-gray-600 text-lg font-medium">Loading employee locations...</p>
+      <LocationFilters filters={filters} setFilters={setFilters} />
+
+      {/* Cards */}
+      {error && !employees.length ? (
+        <div className="rounded-2xl border border-gray-100 bg-white px-5 py-12 text-center shadow-sm">
+          <MapPinOff className="mx-auto h-8 w-8 text-red-300" />
+          <p className="mt-2 text-sm font-medium text-gray-700">{error}</p>
+          <button type="button" onClick={() => fetchLocations()} className="mt-3 text-xs font-semibold text-indigo-600 hover:underline">Try again</button>
         </div>
-      ) : (
-        <div className="employee-table-container">
-          {getFilteredLocations().length > 0 ? (
-            <div className="overflow-x-auto bg-white rounded-lg shadow">
-              <table className="min-w-full table-auto">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Employee
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Email
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Employee ID
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Last Location
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Last Updated
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Map
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      History
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {getFilteredLocations().map(emp => {
-                    const locationStatus = getLocationStatus(emp.currentLocation, emp.attendanceStatus);
-                    return (
-                      <React.Fragment key={emp._id}>
-                        <tr className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="font-medium text-gray-900">{emp.name}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-500">{emp.email}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-mono text-gray-700">{emp.employeeId}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${locationStatus.color}`}>
-                              {locationStatus.text}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 max-w-[260px]">
-                            {emp.currentLocation ? (
-                              <div className="space-y-0.5">
-                                <div className="text-xs font-mono text-gray-500">
-                                  {emp.currentLocation.latitude.toFixed(6)}, {emp.currentLocation.longitude.toFixed(6)}
-                                </div>
-                                {emp.latestLocationData?.address ? (
-                                  <div className="text-xs text-gray-700 leading-snug line-clamp-2" title={emp.latestLocationData.address}>
-                                    {emp.latestLocationData.address}
-                                  </div>
-                                ) : emp.latestLocationData?.city ? (
-                                  <div className="text-xs text-gray-600">
-                                    {[emp.latestLocationData.city, emp.latestLocationData.state, emp.latestLocationData.country].filter(Boolean).join(", ")}
-                                  </div>
-                                ) : (
-                                  <div className="text-xs text-gray-400 italic">Address unavailable</div>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-sm text-gray-400">No location available</span>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-700">
-                              {emp.currentLocation
-                                ? new Date(emp.currentLocation.lastUpdated).toLocaleString()
-                                : "-"}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            {emp.currentLocation && (
-                              <a
-                                href={getGoogleMapsLink(emp.currentLocation.latitude, emp.currentLocation.longitude)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center justify-center w-8 h-8 text-white rounded-full hover:bg-blue-100 transition-colors"
-                                title="View on Map"
-                              >
-                                📍
-                              </a>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <button
-                              onClick={() => toggleLocationHistory(emp._id)}
-                              className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded hover:bg-gray-200 transition"
-                            >
-                              {showLocationHistory[emp._id] ? "Hide" : "Show"}
-                            </button>
-                          </td>
-                        </tr>
-                        {showLocationHistory[emp._id] && (
-                          <tr>
-                            <td colSpan="8" className="px-6 py-4 bg-gray-50">
-                              <div className="text-sm">
-                                {historyLoading[emp._id] ? (
-                                  <p className="text-center text-gray-500">Loading history...</p>
-                                ) : locationHistoryData[emp._id]?.length > 0 ? (
-                                  <div className="space-y-1 max-h-32 overflow-y-auto">
-                                    {locationHistoryData[emp._id].map((loc, index) => {
-                                      const lat = loc.coordinates?.latitude ?? loc.latitude;
-                                      const lng = loc.coordinates?.longitude ?? loc.longitude;
-                                      return (
-                                        <div key={index} className="pb-2 mb-2 border-b border-gray-100 last:border-0 last:mb-0">
-                                          <div className="flex items-center justify-between gap-2">
-                                            <span className="text-gray-500 font-mono text-[11px] flex-shrink-0">
-                                              {lat != null && lng != null
-                                                ? `${Number(lat).toFixed(6)}, ${Number(lng).toFixed(6)}`
-                                                : "No coordinates"}
-                                            </span>
-                                            <span className="text-[11px] text-gray-400 flex-shrink-0">
-                                              {new Date(loc.timestamp).toLocaleString()}
-                                            </span>
-                                          </div>
-                                          {loc.address && (
-                                            <p className="text-[11px] text-gray-600 mt-0.5 leading-snug">
-                                              {loc.address}
-                                            </p>
-                                          )}
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                ) : (
-                                  <p className="text-center text-gray-500">No history available</p>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </React.Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+      ) : loading ? (
+        <div className="space-y-3"><SkeletonRows /></div>
+      ) : visible.length === 0 ? (
+        <div className="rounded-2xl border border-gray-100 bg-white px-5 py-12 text-center shadow-sm">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gray-50">
+            <MapPinOff className="h-6 w-6 text-gray-300" />
+          </div>
+          {employees.length === 0 ? (
+            <>
+              <p className="mt-3 text-sm font-medium text-gray-700">No locations yet</p>
+              <p className="mt-0.5 text-xs text-gray-400">Employees appear here once they check in with location access allowed.</p>
+            </>
           ) : (
-            <div className="no-data text-center py-16 text-gray-500">
-              <p className="text-lg font-semibold">No employee location data found</p>
-              <small className="text-gray-400">Employees need to log in and enable location tracking</small>
-            </div>
+            <>
+              <p className="mt-3 text-sm font-medium text-gray-700">No one matches</p>
+              <button type="button" onClick={() => { setView("all"); setFilters((f) => ({ ...f, searchTerm: "" })); }}
+                className="mt-2 text-xs font-semibold text-indigo-600 hover:underline">Show everyone</button>
+            </>
           )}
         </div>
+      ) : (
+        <>
+          <p className="text-xs text-gray-400">
+            {FILTERS[view].label} · <span className="font-semibold text-gray-600">{visible.length}</span>
+          </p>
+          <div className="space-y-3">
+            {visible.map((emp) => (
+              <LocationRow key={emp._id} emp={emp} />
+            ))}
+          </div>
+        </>
       )}
-
     </div>
   );
 };

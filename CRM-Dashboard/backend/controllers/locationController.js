@@ -1,6 +1,7 @@
 import Location from '../model/Location.js';
 import User from '../model/User.js';
 import Attendance from '../model/Attendance.js';
+import Break from '../models/Break.js';
 import { findOpenAttendance, OPEN_SESSION_MAX_HOURS } from '../utils/istDate.js';
 
 // Calculate distance between two points using Haversine formula
@@ -257,122 +258,54 @@ export const getLocationHistory = async (req, res) => {
 // HR/Admin: Get all employees' current locations
 export const getAllEmployeeLocations = async (req, res) => {
   try {
-    console.log('🔍 getAllEmployeeLocations called by user:', req.user?.name, 'Role:', req.user?.role);
-    
     // "Currently checked in" = an open session from the last OPEN_SESSION_MAX_HOURS — not just today's date,
     // so someone who checked in before midnight and is still working stays Active
     const openSince = new Date(Date.now() - OPEN_SESSION_MAX_HOURS * 3600 * 1000);
-    
-    // Get latest location for each user (both active and inactive)
-    const locations = await Location.aggregate([
-      {
-        $sort: { userId: 1, timestamp: -1 }
-      },
-      {
-        $group: {
-          _id: '$userId',
-          latestLocation: { $first: '$$ROOT' }
-        }
-      },
-      {
-        $lookup: {
-          from: 'users',
-          localField: '_id',
-          foreignField: '_id',
-          as: 'user'
-        }
-      },
-      {
-        $unwind: '$user'
-      },
-      {
-        $lookup: {
-          from: 'attendances',
-          let: { userId: '$_id' },
-          pipeline: [
-            {
-              $match: {
-                $expr: {
-                  $and: [
-                    { $eq: ['$userId', '$$userId'] },
-                    { $gte: ['$checkInTime', openSince] },
-                    { $eq: ['$status', 'checked-in'] }
-                  ]
-                }
-              }
-            },
-            { $sort: { checkInTime: -1 } },
-            { $limit: 1 }
-          ],
-          as: 'todayAttendance'
-        }
-      },
-      {
-        $project: {
-          _id: '$latestLocation._id',
-          userId: '$latestLocation.userId',
-          userName: '$user.name',
-          userEmail: '$user.email',
-          employeeId: '$user.employeeId',
-          coordinates: '$latestLocation.coordinates',
-          address: '$latestLocation.address',
-          city: '$latestLocation.city',
-          state: '$latestLocation.state',
-          country: '$latestLocation.country',
-          timestamp: '$latestLocation.timestamp',
-          isActive: '$latestLocation.isActive',
-          attendanceStatus: {
-            $cond: {
-              if: { $gt: [{ $size: '$todayAttendance' }, 0] },
-              then: { $arrayElemAt: ['$todayAttendance.status', 0] },
-              else: 'not-checked-in'
-            }
-          }
-        }
-      },
-      {
-        $sort: { timestamp: -1 }
-      }
+
+    // Employees whose location is being tracked
+    const employees = await User.find(
+      { currentLocation: { $exists: true, $ne: null } },
+      'name email employeeId designation role photo currentLocation'
+    ).lean();
+    const ids = employees.map((u) => u._id);
+
+    const [latest, openSessions, openBreaks] = await Promise.all([
+      // Latest saved location (address etc.) per employee
+      Location.aggregate([
+        { $match: { userId: { $in: ids } } },
+        { $sort: { userId: 1, timestamp: -1 } },
+        { $group: { _id: '$userId', loc: { $first: '$$ROOT' } } },
+      ]),
+      // Check-in status comes from attendance itself (not from location history, which may have been cleared)
+      Attendance.find({ userId: { $in: ids }, status: 'checked-in', checkInTime: { $gte: openSince } })
+        .select('userId checkInTime').lean(),
+      Break.find({ userId: { $in: ids }, endTime: null }).select('userId startTime').lean(),
     ]);
+    const latestBy = Object.fromEntries(latest.map((l) => [String(l._id), l.loc]));
+    const sessionBy = Object.fromEntries(openSessions.map((a) => [String(a.userId), a]));
+    const breakBy = Object.fromEntries(openBreaks.map((b) => [String(b.userId), b]));
 
-    console.log('📍 Location aggregation result:', locations.length, 'records');
-
-    // Format the response to include user details in currentLocation
-    // Only get users who have currentLocation data (active location tracking)
-    const employees = await User.find({ 
-      currentLocation: { $exists: true, $ne: null } 
-    }, 'name email employeeId currentLocation')
-      .lean();
-
-    console.log('👥 Users with active location found:', employees.length);
-
-    // Merge location data with user data
-    const employeeLocations = employees.map(user => {
-      const locationData = locations.find(loc => loc.userId.toString() === user._id.toString());
-      
-      const result = {
+    const employeeLocations = employees.map((user) => {
+      const uid = String(user._id);
+      const loc = latestBy[uid] || null;
+      const session = sessionBy[uid];
+      return {
         _id: user._id,
         name: user.name,
         email: user.email,
         employeeId: user.employeeId,
+        designation: user.designation,
+        role: user.role,
+        photo: user.photo,
         currentLocation: user.currentLocation,
-        lastLocationUpdate: locationData ? locationData.timestamp : null,
-        latestLocationData: locationData || null,
-        isLocationActive: locationData ? locationData.isActive : false,
-        attendanceStatus: locationData ? locationData.attendanceStatus : 'not-checked-in'
+        lastLocationUpdate: loc ? loc.timestamp : null,
+        latestLocationData: loc,
+        isLocationActive: loc ? loc.isActive : false,
+        attendanceStatus: session ? 'checked-in' : 'not-checked-in',
+        checkInTime: session?.checkInTime || null,
+        onBreak: !!(session && breakBy[uid]),
       };
-      
-      console.log(`📊 User ${user.name}:`, {
-        hasCurrentLocation: !!user.currentLocation,
-        hasLocationData: !!locationData,
-        attendanceStatus: result.attendanceStatus,
-        currentLocation: user.currentLocation
-      });
-      
-      return result;
     });
-
-    console.log('📋 Final employee locations:', employeeLocations.length);
 
     res.status(200).json({
       success: true,

@@ -452,6 +452,8 @@ import {
 import { protect, hrOrAdmin } from '../middleware/authMiddleware.js';
 import Location from '../model/Location.js';
 import User from '../model/User.js';
+import Attendance from '../model/Attendance.js';
+import { OPEN_SESSION_MAX_HOURS } from '../utils/istDate.js';
 
 const router = express.Router();
 
@@ -835,40 +837,30 @@ router.post('/clear-test-data', protect, async (req, res) => {
   }
 });
 
-// Clear all inactive employee location data
+// Clear the location data of employees who aren't working right now (no open check-in session).
+// Anyone checked in keeps their history — however long ago their last location update was
+// (the tracker only saves every 30 min when someone isn't moving).
 router.delete('/clear-inactive', protect, hrOrAdmin, async (req, res) => {
   try {
-    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
-    
-    // Find all users with inactive locations (older than 30 minutes) or no location at all
-    const usersWithInactiveLocations = await User.find({
-      $or: [
-        { 'currentLocation.lastUpdated': { $lt: thirtyMinutesAgo } },
-        { currentLocation: { $exists: false } },
-        { currentLocation: null }
-      ]
-    });
-    
-    let deletedLocationCount = 0;
-    let clearedUserCount = 0;
-    
-    // For inactive users, delete their location history AND clear their currentLocation
-    for (const user of usersWithInactiveLocations) {
-      // Delete all location history for this inactive user
-      const deleteResult = await Location.deleteMany({ userId: user._id });
-      deletedLocationCount += deleteResult.deletedCount;
-      
-      // Clear current location from user profile
-      await User.findByIdAndUpdate(user._id, {
-        $unset: { currentLocation: 1 }
-      });
-      clearedUserCount++;
-    }
-    
+    const openSince = new Date(Date.now() - OPEN_SESSION_MAX_HOURS * 3600 * 1000);
+    const working = await Attendance.distinct('userId', { status: 'checked-in', checkInTime: { $gte: openSince } });
+
+    const inactiveIds = (await User.find({ _id: { $nin: working } }).select('_id').lean()).map((u) => u._id);
+
+    // Count who actually has something to clear before deleting
+    const [withHistory, withCurrent] = await Promise.all([
+      Location.distinct('userId', { userId: { $in: inactiveIds } }),
+      User.distinct('_id', { _id: { $in: inactiveIds }, currentLocation: { $exists: true, $ne: null } }),
+    ]);
+    const clearedUserCount = new Set([...withHistory, ...withCurrent].map(String)).size;
+
+    const deleteResult = await Location.deleteMany({ userId: { $in: inactiveIds } });
+    await User.updateMany({ _id: { $in: inactiveIds } }, { $unset: { currentLocation: 1 } });
+
     res.json({
       success: true,
-      message: `Cleared ${deletedLocationCount} location records for ${clearedUserCount} inactive employees`,
-      deletedCount: deletedLocationCount,
+      message: `Cleared ${deleteResult.deletedCount} location records for ${clearedUserCount} employees who aren't checked in`,
+      deletedCount: deleteResult.deletedCount,
       clearedUsers: clearedUserCount
     });
     

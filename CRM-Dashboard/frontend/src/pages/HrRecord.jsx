@@ -57,14 +57,15 @@ const HrRecord = () => {
         </div>
       </div>
 
-      {/* Tab content — Attendance brings its own cards; the other tabs sit in a white card */}
+      {/* Tab content — redesigned tabs bring their own cards; the others sit in a white card */}
       {activeTab === "attendance" ? (
         <AttendanceTab />
+      ) : activeTab === "locations" ? (
+        <LocationTab />
       ) : (
         <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
           {activeTab === "tasks" && <TasksTab />}
           {activeTab === "leaves" && <LeaveTab />}
-          {activeTab === "locations" && <LocationTab />}
           {activeTab === "employees" && <EmployeeSearchTab />}
           {activeTab === "register" && <RegisterEmployee setActiveTab={setActiveTab} />}
         </div>
