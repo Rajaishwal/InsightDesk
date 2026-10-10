@@ -20,13 +20,20 @@ import PaySlips from './pages/PaySlips';
 import EmployeeReport from './pages/EmployeeReport';
 import MobileBlock from './components/MobileBlock';
 import ChatNotificationPopup from './components/ChatNotificationPopup';
+import SplashScreen from './components/SplashScreen';
+import { useAuth } from './context/AuthContext';
+import { useState } from 'react';
 
 
 function App() {
   const location = useLocation();
+  const { bootLoading } = useAuth();
+  // Brand splash on every full page load — except /login, whose page already plays the same animation
+  const [showSplash] = useState(() => location.pathname !== '/login');
 
   return (
     <>
+      {showSplash && <SplashScreen ready={!bootLoading} />}
       <ChatNotificationPopup />
       <div id="mobile-block" className="block md:hidden">
         <MobileBlock />

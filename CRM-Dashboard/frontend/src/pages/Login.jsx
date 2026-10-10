@@ -4,83 +4,10 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
-import {
-  Eye, EyeOff, X, Mail, Lock, KeyRound, Loader2, ArrowRight, AlertCircle,
-  Clock, Timer, CalendarDays, MessagesSquare,
-} from "lucide-react";
+import { Eye, EyeOff, X, Mail, Lock, KeyRound, Loader2, ArrowRight, AlertCircle } from "lucide-react";
 import axios from "../services/axios";
 import { useToast } from "../context/ToastContext";
-
-// Feature icons riding the two orbits around the logo (angle in degrees, 0 = right, clockwise)
-const OUTER_ICONS = [
-  { Icon: Clock,          angle: -50, delay: "1.4s", tone: "text-amber-300" },
-  { Icon: CalendarDays,   angle: 130, delay: "1.6s", tone: "text-sky-300" },
-];
-const INNER_ICONS = [
-  { Icon: Timer,          angle: 205, delay: "1.5s", tone: "text-sky-300" },
-  { Icon: MessagesSquare, angle: 25,  delay: "1.7s", tone: "text-amber-300" },
-];
-const OUTER_DOTS = [{ angle: 200, cls: "h-2.5 w-2.5 bg-amber-400" }, { angle: 45, cls: "h-2 w-2 bg-blue-400" }];
-const INNER_DOTS = [{ angle: 115, cls: "h-1.5 w-1.5 bg-white/70" }, { angle: -60, cls: "h-2 w-2 bg-blue-400" }];
-
-// Places a child on an orbit of radius r at the given angle
-const orbitPos = (angle, r) => ({ transform: `rotate(${angle}deg) translateX(${r}px) rotate(${-angle}deg)` });
-
-function OrbitIcon({ Icon, angle, delay, tone, r }) {
-  return (
-    <div className="absolute left-1/2 top-1/2 -ml-5 -mt-5 h-10 w-10" style={orbitPos(angle, r)}>
-      <div className="login-upright h-full w-full">
-        <div className="login-pop flex h-full w-full items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/15 backdrop-blur-sm"
-          style={{ animationDelay: delay }}>
-          {Icon && <Icon className={`h-[18px] w-[18px] ${tone}`} />}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function OrbitDot({ angle, cls, r }) {
-  return (
-    <div className="absolute left-1/2 top-1/2 h-0 w-0" style={orbitPos(angle, r)}>
-      <span className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full ${cls}`} />
-    </div>
-  );
-}
-
-// The InsightDesk mark drawn in SVG: the blue "I" rises in, then the amber "D" arc draws itself
-function BrandOrbit() {
-  return (
-    <div aria-hidden className="relative h-[340px] w-[340px] flex-shrink-0 scale-[0.82] lg:scale-100">
-      {/* Outer orbit (r = 160) */}
-      <div className="login-orbit absolute inset-[10px] rounded-full border border-dashed border-white/15" style={{ "--dur": "60s" }}>
-        {OUTER_DOTS.map((d) => <OrbitDot key={d.angle} {...d} r={160} />)}
-        {OUTER_ICONS.map((c) => <OrbitIcon key={c.angle} {...c} r={160} />)}
-      </div>
-      {/* Inner orbit (r = 108) */}
-      <div className="login-orbit-rev absolute inset-[62px] rounded-full border border-white/10" style={{ "--dur": "45s" }}>
-        {INNER_DOTS.map((d) => <OrbitDot key={d.angle} {...d} r={108} />)}
-        {INNER_ICONS.map((c) => <OrbitIcon key={c.angle} {...c} r={108} />)}
-      </div>
-
-      {/* Centre: glowing app-icon tile with the animated mark */}
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="login-glow absolute h-44 w-44 rounded-full bg-gradient-to-br from-blue-500/50 to-amber-400/40 blur-3xl" />
-        <div className="login-float relative">
-          <div className="login-pop flex h-28 w-28 items-center justify-center rounded-[28px] bg-white shadow-2xl shadow-black/40">
-            <svg viewBox="0 0 512 512" className="h-[88px] w-[88px] overflow-visible">
-              <g className="login-mark-i" fill="#1d4ed8">
-                <rect x="96" y="80" width="132" height="58" rx="12" />
-                <rect x="168" y="80" width="60" height="352" rx="10" />
-                <rect x="96" y="374" width="132" height="58" rx="12" />
-              </g>
-              <path className="login-mark-d" d="M240 112 A144 144 0 0 1 240 400" fill="none" stroke="#fbbf24" strokeWidth="64" />
-            </svg>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+import BrandOrbit from "../components/BrandOrbit";
 
 // Live India-time clock (own component so the ticking doesn't re-render the form)
 function LiveClock() {
@@ -294,7 +221,7 @@ export default function Login() {
           </div>
 
           <div className="flex flex-1 flex-col items-center justify-center gap-2 py-4">
-            <BrandOrbit />
+            <BrandOrbit className="scale-[0.82] lg:scale-100" />
             <LiveClock />
           </div>
 
