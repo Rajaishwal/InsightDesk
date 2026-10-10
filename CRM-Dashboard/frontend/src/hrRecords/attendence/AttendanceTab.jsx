@@ -1,82 +1,118 @@
-// AttendanceTab.jsx — HR attendance records tab: fetches logs, task time map, passes to AttendanceTable
-import { useState, useEffect } from "react";
+// AttendanceTab.jsx — HR attendance: summary tiles, filter toolbar and the records table.
+// Task time and breaks come per record from /attendance/logs (each counted inside that day's session).
+import { useState, useEffect, useRef } from "react";
+import { Activity, CalendarDays, Clock, AlertTriangle, RefreshCw } from "lucide-react";
 import api from "../../services/axios";
 import AttendanceFilters from "./AttendanceFilters";
 import AttendanceTable from "./AttendanceTable";
+import StatTile from "../../components/StatTile";
 import { useAutoRefresh } from "../../hooks/useAutoRefresh";
 
-const AttendanceTab = () => {
-  const [attendanceData, setAttendanceData] = useState([]);
-  const [taskTimeMap, setTaskTimeMap] = useState({});   // { userId: seconds }
-  const [filters, setFilters] = useState({
-    page: 1,
-    limit: 20,
-    startDate: "",
-    endDate: "",
-    userId: ""
-  });
-  const [loading, setLoading] = useState(true);
-  const [pagination, setPagination] = useState({
-    totalPages: 1,
-    currentPage: 1,
-    totalRecords: 0
-  });
+const EMPTY_FILTERS = { page: 1, limit: 20, startDate: "", endDate: "", userId: "" };
 
-  const fetchAttendanceData = async () => {
+const fmtHours = (h) => {
+  const mins = Math.round((h || 0) * 60);
+  return `${Math.floor(mins / 60)}h ${String(mins % 60).padStart(2, "0")}m`;
+};
+const fmtKey = (k) => new Date(`${k}T00:00:00+05:30`).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+
+const AttendanceTab = () => {
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [records, setRecords] = useState([]);
+  const [pagination, setPagination] = useState({ currentPage: 1, totalPages: 1, totalRecords: 0 });
+  const [summary, setSummary] = useState(null);
+  const [people, setPeople] = useState([]);
+  const [loading, setLoading] = useState(true);       // first load / filter change → skeleton
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
+  const filtersRef = useRef(filters); // latest filters for the quiet refreshes below
+
+  const fetchAttendance = async ({ silent = false } = {}) => {
+    const f = filtersRef.current;
+    silent ? setRefreshing(true) : setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-      const params = new URLSearchParams(filters).toString();
-      const res = await api.get(`http://localhost:5000/api/attendance/logs?${params}`);
-      setAttendanceData(res.data.attendance);
-      setPagination(res.data);
+      const params = Object.fromEntries(Object.entries(f).filter(([, v]) => v !== ""));
+      const { data } = await api.get("/attendance/logs", { params });
+      setRecords(data.attendance || []);
+      setPagination({ currentPage: Number(data.currentPage) || 1, totalPages: data.totalPages || 1, totalRecords: data.totalRecords || 0, limit: Number(f.limit) });
+      setSummary(data.summary || null);
     } catch (err) {
-      console.error("Error fetching attendance:", err);
+      setError(!err?.response ? "Can't reach the server — make sure the backend is running." : "Couldn't load attendance records.");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
   useEffect(() => {
-    fetchAttendanceData();
+    filtersRef.current = filters;
+    fetchAttendance();
   }, [filters]);
 
-  // Silent background refresh when any attendance event fires
-  useAutoRefresh(fetchAttendanceData, ["crm:attendance:updated"]);
-
-  // Refresh task time every 30s so live timers stay current
+  // Employees for the picker
   useEffect(() => {
-    const fetchTaskTime = () =>
-      api.get("/project-tasks/all-users-today-time")
-        .then((r) => setTaskTimeMap(r.data.totals || {}))
-        .catch(() => {});
-    fetchTaskTime();
-    const id = setInterval(fetchTaskTime, 30000);
-    return () => clearInterval(id);
+    api.get("/users")
+      .then((r) => setPeople((Array.isArray(r.data) ? r.data : []).sort((a, b) => (a.name || "").localeCompare(b.name || ""))))
+      .catch(() => setPeople([]));
   }, []);
 
+  // Check-ins / check-outs / breaks anywhere → refresh quietly
+  useAutoRefresh(() => fetchAttendance({ silent: true }), ["crm:attendance:updated"]);
+
+  // While someone on this page is working, refresh every minute so task time & breaks stay current
+  const anyLive = records.some((r) => r.state === "working" || r.state === "on-break");
+  useEffect(() => {
+    if (!anyLive) return;
+    const id = setInterval(() => fetchAttendance({ silent: true }), 60000);
+    return () => clearInterval(id);
+  }, [anyLive]);
+
+  const filtersActive = !!(filters.userId || filters.startDate || filters.endDate);
+  const clearFilters = () => setFilters((f) => ({ ...EMPTY_FILTERS, limit: f.limit }));
+  const rangeLabel =
+    filters.startDate && filters.endDate ? (filters.startDate === filters.endDate ? fmtKey(filters.startDate) : `${fmtKey(filters.startDate)} – ${fmtKey(filters.endDate)}`)
+    : filters.startDate ? `since ${fmtKey(filters.startDate)}`
+    : filters.endDate ? `until ${fmtKey(filters.endDate)}`
+    : "all time";
+  const s = summary;
+
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
-      {/* Page Heading */}
-      <h2 className="text-2xl font-bold text-gray-800 mb-6">
-        Attendance Records
-      </h2>
-
-      {/* Filters */}
-      <div className="mb-6">
-        <AttendanceFilters filters={filters} setFilters={setFilters} />
+    <div className="space-y-5">
+      {/* Section header */}
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">Attendance</h2>
+          <p className="mt-0.5 text-sm text-gray-500">Check-ins, working hours, task time and breaks for every employee.</p>
+        </div>
+        <button type="button" onClick={() => fetchAttendance({ silent: true })} disabled={refreshing}
+          className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 shadow-sm transition hover:bg-gray-50 disabled:opacity-60">
+          <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} /> Refresh
+        </button>
       </div>
 
-      {/* Table Section */}
-      <div className="bg-white shadow-lg rounded-xl p-6 border border-gray-200">
-        <AttendanceTable
-          data={attendanceData}
-          loading={loading}
-          pagination={pagination}
-          setFilters={setFilters}
-          filters={filters}
-          taskTimeMap={taskTimeMap}
-        />
+      {/* Summary — for the current filters */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatTile tone="emerald" Icon={Activity} label="Working now" value={s ? s.workingNow : "—"} sub="checked in right now" />
+        <StatTile tone="violet" Icon={CalendarDays} label="Records" value={s ? s.records : "—"} sub={rangeLabel} />
+        <StatTile tone="blue" Icon={Clock} label="Avg working day" value={s ? fmtHours(s.avgHours) : "—"}
+          sub={s ? `over ${s.closedDays} completed ${s.closedDays === 1 ? "day" : "days"}` : " "} />
+        <StatTile tone={s?.missedCheckouts ? "rose" : "amber"} Icon={AlertTriangle} label="Missed check-outs" value={s ? s.missedCheckouts : "—"}
+          sub={s?.missedCheckouts ? "sessions never checked out" : "every session was closed"} />
       </div>
+
+      <AttendanceFilters filters={filters} setFilters={setFilters} people={people} />
+
+      <AttendanceTable
+        data={records}
+        loading={loading}
+        error={error}
+        onRetry={() => fetchAttendance()}
+        pagination={pagination}
+        onPage={(page) => setFilters((f) => ({ ...f, page }))}
+        filtersActive={filtersActive}
+        onClearFilters={clearFilters}
+      />
     </div>
   );
 };

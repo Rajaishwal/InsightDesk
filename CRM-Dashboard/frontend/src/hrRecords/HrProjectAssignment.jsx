@@ -7,6 +7,8 @@ import {
   ClipboardCheck, CheckCircle2, RefreshCw, SearchX, AlertCircle,
 } from "lucide-react";
 import { useAutoRefresh } from "../hooks/useAutoRefresh";
+import Avatar from "../components/PersonAvatar";
+import StatTile from "../components/StatTile";
 import ProjectModal from "../components/ProjectModal";
 import ProjectTaskDrawer from "../components/ProjectTaskDrawer";
 import ProjectActivityFeed from "../components/ProjectActivityFeed";
@@ -14,26 +16,6 @@ import AddProject from "./AddProject";
 import axios from "../services/axios";
 import { useToast } from "../context/ToastContext";
 import { useConfirm } from "../context/ConfirmContext";
-
-const initials = (name = "") =>
-  name.trim().split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase() || "?";
-
-// Photo if the person has one, otherwise initials on the brand gradient
-function Avatar({ person, name, size = 28 }) {
-  const label = person?.name || name || "";
-  const box = { width: size, height: size };
-  return person?.photo ? (
-    <img src={person.photo} alt="" title={label} style={box} className="flex-shrink-0 rounded-full object-cover ring-2 ring-white" />
-  ) : (
-    <span
-      title={label}
-      style={{ ...box, fontSize: Math.round(size * 0.36) }}
-      className="inline-flex flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-400 to-violet-500 font-bold text-white ring-2 ring-white"
-    >
-      {initials(label)}
-    </span>
-  );
-}
 
 // Overlapping avatars of the team (first 3, then +n)
 function TeamStack({ members }) {
@@ -78,38 +60,6 @@ function TaskProgress({ stats }) {
         </div>
       )}
     </div>
-  );
-}
-
-const TILE_TONES = {
-  violet:  { bar: "border-l-violet-400",  iconBg: "bg-violet-50",  icon: "text-violet-600",  on: "ring-1 ring-violet-300 bg-violet-50/50" },
-  blue:    { bar: "border-l-blue-400",    iconBg: "bg-blue-50",    icon: "text-blue-600",    on: "ring-1 ring-blue-300 bg-blue-50/50" },
-  amber:   { bar: "border-l-amber-400",   iconBg: "bg-amber-50",   icon: "text-amber-600",   on: "ring-1 ring-amber-300 bg-amber-50/50" },
-  emerald: { bar: "border-l-emerald-400", iconBg: "bg-emerald-50", icon: "text-emerald-600", on: "ring-1 ring-emerald-300 bg-emerald-50/50" },
-};
-
-// Summary tile (same style as the dashboard stat cards) that doubles as a filter
-function StatTile({ label, value, sub, Icon, tone, active, onClick }) {
-  const t = TILE_TONES[tone];
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={`cursor-pointer rounded-xl border border-l-4 border-gray-100 ${t.bar} bg-white p-4 text-left shadow-sm transition hover:shadow-md
-        focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 ${active ? t.on : ""}`}
-    >
-      <div className="flex items-start justify-between">
-        <div className="min-w-0">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{label}</p>
-          <p className="mt-1 text-2xl font-black leading-none text-gray-800">{value}</p>
-          <p className="mt-1.5 truncate text-[11px] text-gray-400" title={sub}>{sub}</p>
-        </div>
-        <div className={`ml-2 flex-shrink-0 rounded-xl p-2.5 ${t.iconBg}`}>
-          {Icon && <Icon className={`h-5 w-5 ${t.icon}`} />}
-        </div>
-      </div>
-    </button>
   );
 }
 

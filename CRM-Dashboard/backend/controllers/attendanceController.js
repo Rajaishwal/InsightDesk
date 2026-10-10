@@ -5,7 +5,7 @@ import Break from "../models/Break.js";
 import ProjectTask from "../model/ProjectTask.js";
 import HRTask from "../model/hrTaskModel.js";
 import { getIo } from "../socket.js";
-import { istDateKey, findOpenAttendance } from "../utils/istDate.js";
+import { istDateKey, istDayEnd, findOpenAttendance, OPEN_SESSION_MAX_HOURS } from "../utils/istDate.js";
 
 // Check In - Create new attendance record for the day
 export const checkIn = async (req, res) => {
@@ -232,50 +232,130 @@ export const checkOut = async (req, res) => {
 };
 
 // Get all attendance records (for HR)
+// GET /api/attendance/logs?page&limit&userId&startDate&endDate (dates are IST "YYYY-MM-DD"; either one alone works)
+// Each record gets its own break and task time — counted inside that record's check-in → check-out window —
+// plus a state: working | on-break | checked-out | missed-checkout. `summary` covers the whole filter, not just the page.
+const MAX_TASK_SESSION_SECS = 12 * 3600; // longer = a timer left running by mistake; not counted (same rule as the employee report)
+
 export const getAllAttendance = async (req, res) => {
   try {
-    const { page = 1, limit = 50, userId, startDate, endDate } = req.query;
-    
-    // Build filter object
+    const page  = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const { userId, startDate, endDate } = req.query;
+
     const filter = {};
     if (userId) filter.userId = userId;
-    if (startDate && endDate) {
-      filter.date = {
-        $gte: startDate,
-        $lte: endDate
-      };
+    if (startDate || endDate) {
+      filter.date = {};
+      if (startDate) filter.date.$gte = startDate;
+      if (endDate) filter.date.$lte = endDate;
     }
 
-    const attendance = await Attendance.find(filter)
-      .populate('userId', 'name email role')
-      .sort({ date: -1, checkInTime: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
+    const now = Date.now();
+    const staleBefore = new Date(now - OPEN_SESSION_MAX_HOURS * 3600 * 1000);
 
-    const total = await Attendance.countDocuments(filter);
+    const [attendance, total, summaryRows] = await Promise.all([
+      Attendance.find(filter)
+        .populate('userId', 'name email role employeeId photo designation')
+        .sort({ date: -1, checkInTime: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      Attendance.countDocuments(filter),
+      Attendance.find(filter).select('status checkInTime workingHours').lean(),
+    ]);
 
-    const attendanceWithBreaks = await Promise.all(
-      attendance.map(async (record) => {
-        const dayStart = new Date(record.date + 'T00:00:00.000Z');
-        const dayEnd = new Date(record.date + 'T23:59:59.999Z');
-        const breaks = await Break.find({
-          userId: record.userId,
-          startTime: { $gte: dayStart, $lte: dayEnd },
-          endTime: { $exists: true, $ne: null }
-        });
-        const totalBreakSeconds = breaks.reduce((sum, b) => sum + (b.durationInSeconds || 0), 0);
-        return {
-          ...record.toObject(),
-          breakDurationMinutes: totalBreakSeconds > 0 ? Math.round(totalBreakSeconds / 60) : 0
-        };
-      })
-    );
+    // Summary over the whole filter
+    let workingNow = 0, missedCheckouts = 0, closedDays = 0, closedHours = 0;
+    for (const r of summaryRows) {
+      if (r.status === 'checked-in') {
+        if (new Date(r.checkInTime) >= staleBefore) workingNow++;
+        else missedCheckouts++;
+      } else if (r.workingHours > 0) {
+        closedDays++;
+        closedHours += r.workingHours;
+      }
+    }
+
+    // Each record's window: check-in → check-out, or → now while still working,
+    // or → end of that day when the check-out was missed (the session was left open)
+    const windows = attendance.map((r) => {
+      const start = new Date(r.checkInTime).getTime();
+      const open  = r.status === 'checked-in';
+      const stale = open && new Date(r.checkInTime) < staleBefore;
+      const end   = r.checkOutTime ? new Date(r.checkOutTime).getTime()
+                  : stale ? istDayEnd(r.date).getTime()
+                  : now;
+      return { start, end, open: open && !stale, stale };
+    });
+
+    const userIds = [...new Set(attendance.map((r) => String(r.userId?._id || r.userId)))];
+    let breaks = [], projTasks = [], hrTasks = [];
+    if (attendance.length) {
+      const from = new Date(Math.min(...windows.map((w) => w.start)));
+      const to   = new Date(Math.max(...windows.map((w) => w.end)));
+      [breaks, projTasks, hrTasks] = await Promise.all([
+        Break.find({ userId: { $in: userIds }, startTime: { $gte: from, $lte: to } })
+          .select('userId startTime endTime durationInSeconds').lean(),
+        ProjectTask.find({ 'timers.userId': { $in: userIds } }).select('timers').lean(),
+        HRTask.find({ 'timers.userId': { $in: userIds } }).select('timers').lean(),
+      ]);
+    }
+
+    // Task-timer intervals per user: logged sessions + any timer running now
+    const intervalsByUser = {};
+    for (const task of [...projTasks, ...hrTasks]) {
+      for (const entry of task.timers || []) {
+        const uid = String(entry.userId);
+        if (!userIds.includes(uid)) continue;
+        const list = (intervalsByUser[uid] ||= []);
+        for (const s of entry.sessions || []) {
+          if ((s.duration || 0) <= MAX_TASK_SESSION_SECS) list.push([new Date(s.startTime).getTime(), new Date(s.endTime).getTime()]);
+        }
+        if (entry.timerStartedAt) {
+          const started = new Date(entry.timerStartedAt).getTime();
+          if (now - started <= MAX_TASK_SESSION_SECS * 1000) list.push([started, now]);
+        }
+      }
+    }
+    const overlap = (a0, a1, b0, b1) => Math.max(0, Math.min(a1, b1) - Math.max(a0, b0));
+
+    const enriched = attendance.map((r, i) => {
+      const w = windows[i];
+      const uid = String(r.userId?._id || r.userId);
+
+      const taskMs = (intervalsByUser[uid] || []).reduce((n, [s, e]) => n + overlap(s, e, w.start, w.end), 0);
+
+      let breakSecs = 0, onBreak = false;
+      for (const b of breaks) {
+        if (String(b.userId) !== uid) continue;
+        const t = new Date(b.startTime).getTime();
+        if (t < w.start || t > w.end) continue;
+        if (b.endTime) breakSecs += b.durationInSeconds || 0;
+        else if (w.open) { onBreak = true; breakSecs += Math.floor((now - t) / 1000); }
+      }
+
+      return {
+        ...r,
+        taskSeconds: Math.floor(taskMs / 1000),
+        breakSeconds: breakSecs,
+        breakDurationMinutes: Math.round(breakSecs / 60),
+        state: w.stale ? 'missed-checkout' : w.open ? (onBreak ? 'on-break' : 'working') : 'checked-out',
+      };
+    });
 
     res.status(200).json({
-      attendance: attendanceWithBreaks,
-      totalPages: Math.ceil(total / limit),
+      attendance: enriched,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
       currentPage: page,
-      totalRecords: total
+      totalRecords: total,
+      summary: {
+        records: total,
+        workingNow,
+        missedCheckouts,
+        closedDays,
+        avgHours: closedDays ? Math.round((closedHours / closedDays) * 100) / 100 : 0,
+      },
     });
 
   } catch (error) {
