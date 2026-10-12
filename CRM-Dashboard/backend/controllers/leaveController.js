@@ -432,6 +432,88 @@ export const updateLeaveStatus = async (req, res) => {
 };
 
 // Get leave statistics for HR dashboard
+// GET /api/leaves/hr/employees — one entry per employee for the HR leave view: who they are, how many requests
+// per status, approved days this year (IST), their latest request and their latest decided (approved / rejected) one.
+// Everyone with the employee role is listed, plus anyone else who has applied for leave.
+export const getLeaveEmployees = async (req, res) => {
+  try {
+    const yearStart = new Date(`${istDateKey().slice(0, 4)}-01-01T00:00:00.000Z`); // leave dates = UTC-midnight days
+
+    const [users, perUser] = await Promise.all([
+      User.find({}).select('name email employeeId photo designation role').lean(),
+      Leave.aggregate([
+        { $sort: { startDate: -1, appliedAt: -1 } },
+        {
+          $group: {
+            _id: '$userId',
+            userName: { $first: '$userName' },
+            userEmployeeId: { $first: '$userEmployeeId' },
+            total:    { $sum: 1 },
+            pending:  { $sum: { $cond: [{ $eq: ['$status', 'Pending'] }, 1, 0] } },
+            approved: { $sum: { $cond: [{ $eq: ['$status', 'Approved'] }, 1, 0] } },
+            rejected: { $sum: { $cond: [{ $eq: ['$status', 'Rejected'] }, 1, 0] } },
+            // when their oldest still-pending request was applied (first come, first served); $min skips the nulls
+            pendingSince: { $min: { $cond: [{ $eq: ['$status', 'Pending'] }, '$appliedAt', null] } },
+            approvedDaysThisYear: {
+              $sum: { $cond: [{ $and: [{ $eq: ['$status', 'Approved'] }, { $gte: ['$startDate', yearStart] }] }, '$totalDays', 0] },
+            },
+            all: { $push: { _id: '$_id', leaveType: '$leaveType', startDate: '$startDate', endDate: '$endDate', totalDays: '$totalDays', status: '$status', appliedAt: '$appliedAt' } },
+          },
+        },
+        {
+          $project: {
+            userName: 1, userEmployeeId: 1,
+            total: 1, pending: 1, approved: 1, rejected: 1, approvedDaysThisYear: 1, pendingSince: 1,
+            latest: { $arrayElemAt: ['$all', 0] },
+            latestDecided: { $arrayElemAt: [{ $filter: { input: '$all', cond: { $ne: ['$$this.status', 'Pending'] } } }, 0] },
+          },
+        },
+      ]),
+    ]);
+
+    const statsBy = Object.fromEntries(perUser.map((s) => [String(s._id), s]));
+    const userIds = new Set(users.map((u) => String(u._id)));
+    const entry = (u, s, former = false) => ({
+      _id: u._id,
+      name: u.name,
+      email: u.email || '',
+      employeeId: u.employeeId || '',
+      designation: u.designation || '',
+      photo: u.photo || null,
+      former, // has leave on record but is no longer in the user list
+      counts: { total: s?.total || 0, pending: s?.pending || 0, approved: s?.approved || 0, rejected: s?.rejected || 0 },
+      pendingSince: s?.pendingSince || null,
+      approvedDaysThisYear: s?.approvedDaysThisYear || 0,
+      latest: s?.latest || null,
+      latestDecided: s?.latestDecided || null,
+    });
+
+    const employees = [
+      ...users
+        .filter((u) => u.role === 'employee' || statsBy[String(u._id)])
+        .map((u) => entry(u, statsBy[String(u._id)])),
+      // leave requests whose person was removed — still listed so totals add up
+      ...perUser
+        .filter((s) => !userIds.has(String(s._id)))
+        .map((s) => entry({ _id: s._id, name: s.userName, employeeId: s.userEmployeeId }, s, true)),
+    ]
+      // Waiting for a decision always on top, first come first served (earliest applied first);
+      // then everyone else by most recent leave, then by name
+      .sort((a, b) => {
+        const ap = a.counts.pending > 0, bp = b.counts.pending > 0;
+        if (ap !== bp) return ap ? -1 : 1;
+        if (ap) return new Date(a.pendingSince) - new Date(b.pendingSince);
+        return new Date(b.latest?.startDate || 0) - new Date(a.latest?.startDate || 0) ||
+          (a.name || '').localeCompare(b.name || '');
+      });
+
+    res.json({ employees });
+  } catch (error) {
+    console.error('Get leave employees error:', error);
+    res.status(500).json({ message: 'Server error while fetching employees\' leave' });
+  }
+};
+
 // GET /api/leaves/hr/stats — all-time counts per status, who is on approved leave today,
 // and approved leave starting this month. "Today" / "this month" are India time; leave dates are
 // stored as UTC-midnight calendar days, so compare against the same.

@@ -7,6 +7,7 @@ import {
   getLeaveStats,
   getAllLeaveRequests,
   getHRLeaveStats,
+  getLeaveEmployees,
   processMonthlyCarryForward,
   getMonthlyAllocation,
   cancelLeave
@@ -32,7 +33,8 @@ router.get('/all', protect, getAllLeaves);
 
 // HR-specific routes
 router.get('/hr/all-requests', protect, getAllLeaveRequests);
-router.get('/hr/stats', protect, getHRLeaveStats); 
+router.get('/hr/stats', protect, getHRLeaveStats);
+router.get('/hr/employees', protect, getLeaveEmployees); // one entry per employee (HR leave view)
 router.put('/hr/status/:leaveId', protect, updateLeaveStatus);
 
 // Admin routes for monthly processing
