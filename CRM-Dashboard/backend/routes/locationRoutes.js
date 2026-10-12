@@ -453,7 +453,7 @@ import { protect, hrOrAdmin } from '../middleware/authMiddleware.js';
 import Location from '../model/Location.js';
 import User from '../model/User.js';
 import Attendance from '../model/Attendance.js';
-import { OPEN_SESSION_MAX_HOURS } from '../utils/istDate.js';
+import { openSessionFilter } from '../utils/istDate.js';
 
 const router = express.Router();
 
@@ -842,8 +842,7 @@ router.post('/clear-test-data', protect, async (req, res) => {
 // (the tracker only saves every 30 min when someone isn't moving).
 router.delete('/clear-inactive', protect, hrOrAdmin, async (req, res) => {
   try {
-    const openSince = new Date(Date.now() - OPEN_SESSION_MAX_HOURS * 3600 * 1000);
-    const working = await Attendance.distinct('userId', { status: 'checked-in', checkInTime: { $gte: openSince } });
+    const working = await Attendance.distinct('userId', openSessionFilter());
 
     const inactiveIds = (await User.find({ _id: { $nin: working } }).select('_id').lean()).map((u) => u._id);
 

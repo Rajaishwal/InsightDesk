@@ -3,6 +3,7 @@ import Leave from '../model/Leave.js';
 import User from '../model/User.js';
 import MonthlyLeaveAllocation from '../model/MonthlyLeaveAllocation.js';
 import { getIo } from '../socket.js';
+import { istDateKey } from '../utils/istDate.js';
 
 // Utility function to calculate working days (excluding weekends)
 const calculateWorkingDays = (startDate, endDate) => {
@@ -275,46 +276,55 @@ export const getLeaveStats = async (req, res) => {
 
 // HR-specific endpoints
 // Get all leave requests for HR management
+// GET /api/leaves/hr/all-requests?status&userId&startDate&endDate&page&limit
+// Dates filter on the leave's start day ("YYYY-MM-DD"). `counts` = requests per status for the same
+// employee/date filters (ignoring status) — for the status switch in the HR toolbar.
 export const getAllLeaveRequests = async (req, res) => {
   try {
-    const { status, page = 1, limit = 20, startDate, endDate } = req.query;
-    
-    // Build filter object
-    const filter = {};
-    if (status && status !== 'all') {
-      filter.status = status;
-    }
-    
+    const { status, userId, startDate, endDate } = req.query;
+    const page  = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+
+    const base = {};
+    if (userId && mongoose.isValidObjectId(userId)) base.userId = new mongoose.Types.ObjectId(userId);
     if (startDate || endDate) {
-      filter.startDate = {};
-      if (startDate) filter.startDate.$gte = new Date(startDate);
-      if (endDate) filter.startDate.$lte = new Date(endDate);
+      base.startDate = {};
+      if (startDate) base.startDate.$gte = new Date(`${startDate}T00:00:00.000Z`);
+      if (endDate) base.startDate.$lte = new Date(`${endDate}T00:00:00.000Z`);
     }
+    const filter = status && status !== 'all' ? { ...base, status } : base;
 
-    const skip = (page - 1) * limit;
-    
-    const rawLeaves = await Leave.find(filter)
-      .sort({ appliedAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit))
-      .populate('userId', 'name email employeeId');
+    const [rawLeaves, totalRecords, byStatus] = await Promise.all([
+      Leave.find(filter)
+        .sort({ appliedAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .populate('userId', 'name email employeeId photo designation'),
+      Leave.countDocuments(filter),
+      Leave.aggregate([{ $match: base }, { $group: { _id: '$status', n: { $sum: 1 } } }]),
+    ]);
 
-    // Merge populated employeeId into each leave object
+    // Merge the employee's ID / photo / designation into each leave
     const leaves = rawLeaves.map(l => {
       const obj = l.toObject();
       obj.userEmployeeId = obj.userEmployeeId || l.userId?.employeeId || '';
+      obj.userPhoto = l.userId?.photo || null;
+      obj.userDesignation = l.userId?.designation || '';
       return obj;
     });
 
-    const totalRecords = await Leave.countDocuments(filter);
-    const totalPages = Math.ceil(totalRecords / limit);
+    const counts = { Pending: 0, Approved: 0, Rejected: 0 };
+    byStatus.forEach((s) => { counts[s._id] = s.n; });
+    const totalPages = Math.max(1, Math.ceil(totalRecords / limit));
 
     res.json({
       leaves,
+      counts: { ...counts, all: counts.Pending + counts.Approved + counts.Rejected },
       pagination: {
-        currentPage: parseInt(page),
+        currentPage: page,
         totalPages,
         totalRecords,
+        limit,
         hasNext: page < totalPages,
         hasPrev: page > 1
       }
@@ -422,41 +432,47 @@ export const updateLeaveStatus = async (req, res) => {
 };
 
 // Get leave statistics for HR dashboard
+// GET /api/leaves/hr/stats — all-time counts per status, who is on approved leave today,
+// and approved leave starting this month. "Today" / "this month" are India time; leave dates are
+// stored as UTC-midnight calendar days, so compare against the same.
 export const getHRLeaveStats = async (req, res) => {
   try {
-    const today = new Date();
-    const currentMonth = today.getMonth();
-    const currentYear = today.getFullYear();
-    
-    // Get all leave requests
-    const totalRequests = await Leave.countDocuments();
-    
-    // Get pending requests
-    const pendingRequests = await Leave.countDocuments({ status: 'Pending' });
-    
-    // Get approved requests this month
-    const approvedThisMonth = await Leave.countDocuments({
-      status: 'Approved',
-      appliedAt: {
-        $gte: new Date(currentYear, currentMonth, 1),
-        $lt: new Date(currentYear, currentMonth + 1, 1)
-      }
-    });
-    
-    // Get rejected requests this month
-    const rejectedThisMonth = await Leave.countDocuments({
-      status: 'Rejected',
-      appliedAt: {
-        $gte: new Date(currentYear, currentMonth, 1),
-        $lt: new Date(currentYear, currentMonth + 1, 1)
-      }
-    });
+    const todayKey   = istDateKey();
+    const today      = new Date(`${todayKey}T00:00:00.000Z`);
+    const monthStart = new Date(`${todayKey.slice(0, 8)}01T00:00:00.000Z`);
+    const nextMonth  = new Date(monthStart);
+    nextMonth.setUTCMonth(nextMonth.getUTCMonth() + 1);
+
+    const [byStatus, onLeave, approvedMonth] = await Promise.all([
+      Leave.aggregate([{ $group: { _id: '$status', n: { $sum: 1 } } }]),
+      Leave.find({ status: 'Approved', startDate: { $lte: today }, endDate: { $gte: today } })
+        .populate('userId', 'name photo employeeId')
+        .select('userId userName leaveType halfDay')
+        .lean(),
+      Leave.aggregate([
+        { $match: { status: 'Approved', startDate: { $gte: monthStart, $lt: nextMonth } } },
+        { $group: { _id: null, n: { $sum: 1 }, days: { $sum: '$totalDays' } } },
+      ]),
+    ]);
+
+    const count = { Pending: 0, Approved: 0, Rejected: 0 };
+    byStatus.forEach((s) => { count[s._id] = s.n; });
 
     res.json({
-      totalRequests,
-      pendingRequests,
-      approvedThisMonth,
-      rejectedThisMonth
+      totalRequests: count.Pending + count.Approved + count.Rejected,
+      pendingRequests: count.Pending,
+      approvedRequests: count.Approved,
+      rejectedRequests: count.Rejected,
+      approvedThisMonth: approvedMonth[0]?.n || 0,
+      approvedDaysThisMonth: approvedMonth[0]?.days || 0,
+      onLeaveToday: onLeave.map((l) => ({
+        _id: l.userId?._id || l._id,
+        name: l.userId?.name || l.userName,
+        photo: l.userId?.photo || null,
+        employeeId: l.userId?.employeeId || '',
+        leaveType: l.leaveType,
+        halfDay: !!l.halfDay,
+      })),
     });
   } catch (error) {
     console.error('Get HR leave stats error:', error);

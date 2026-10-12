@@ -1,8 +1,9 @@
 // AttendanceTable.jsx — HR attendance table: employee, day, check-in/out, working hours (live while working),
 // task time and breaks for that session, and a status chip. Task & break figures come from the server per record.
 import { useState, useEffect } from "react";
-import { AlertCircle, CalendarX2, ChevronLeft, ChevronRight, Moon } from "lucide-react";
+import { AlertCircle, CalendarX2, Moon } from "lucide-react";
 import PersonAvatar from "../../components/PersonAvatar";
+import Pagination from "../../components/Pagination";
 
 const TZ = "Asia/Kolkata";
 const FULL_DAY_SECS = 8 * 3600; // the working-hours bar fills at 8h; longer days are flagged as overtime
@@ -46,14 +47,6 @@ function SkeletonRows({ n = 6 }) {
   ));
 }
 
-// Page numbers with gaps: 1 … 4 5 6 … 14
-const pageList = (cur, last) => {
-  const set = new Set([1, last, cur - 1, cur, cur + 1].filter((p) => p >= 1 && p <= last));
-  const out = [];
-  [...set].sort((a, b) => a - b).forEach((p, i, arr) => { if (i && p - arr[i - 1] > 1) out.push("…"); out.push(p); });
-  return out;
-};
-
 const AttendanceTable = ({ data, loading, error, onRetry, pagination, onPage, filtersActive, onClearFilters }) => {
   const [now, setNow] = useState(Date.now());
 
@@ -65,8 +58,6 @@ const AttendanceTable = ({ data, loading, error, onRetry, pagination, onPage, fi
   }, [data]);
 
   const { currentPage = 1, totalPages = 1, totalRecords = 0, limit = data.length } = pagination;
-  const from = totalRecords ? (currentPage - 1) * limit + 1 : 0;
-  const to = Math.min(totalRecords, from + data.length - 1);
 
   return (
     <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
@@ -218,35 +209,9 @@ const AttendanceTable = ({ data, loading, error, onRetry, pagination, onPage, fi
       </div>
 
       {/* Pagination */}
-      {!loading && !error && totalRecords > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 px-5 py-3">
-          <p className="text-xs text-gray-500">
-            Showing <span className="font-semibold text-gray-700">{from}–{to}</span> of <span className="font-semibold text-gray-700">{totalRecords}</span>
-          </p>
-          {totalPages > 1 && (
-            <div className="flex items-center gap-1">
-              <button type="button" onClick={() => onPage(currentPage - 1)} disabled={currentPage <= 1} aria-label="Previous page"
-                className="cursor-pointer rounded-full p-1.5 text-gray-500 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-30">
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              {pageList(currentPage, totalPages).map((p, i) =>
-                p === "…" ? (
-                  <span key={`gap${i}`} className="px-1 text-xs text-gray-400">…</span>
-                ) : (
-                  <button key={p} type="button" onClick={() => onPage(p)} aria-current={p === currentPage ? "page" : undefined}
-                    className={`h-7 min-w-7 cursor-pointer rounded-full px-2 text-xs font-semibold tabular-nums transition
-                      ${p === currentPage ? "bg-gray-800 text-white" : "text-gray-600 hover:bg-gray-100"}`}>
-                    {p}
-                  </button>
-                )
-              )}
-              <button type="button" onClick={() => onPage(currentPage + 1)} disabled={currentPage >= totalPages} aria-label="Next page"
-                className="cursor-pointer rounded-full p-1.5 text-gray-500 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-30">
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-          )}
-        </div>
+      {!loading && !error && (
+        <Pagination currentPage={currentPage} totalPages={totalPages} totalRecords={totalRecords}
+          pageSize={limit} shown={data.length} onPage={onPage} />
       )}
     </div>
   );

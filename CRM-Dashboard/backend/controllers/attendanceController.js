@@ -5,7 +5,7 @@ import Break from "../models/Break.js";
 import ProjectTask from "../model/ProjectTask.js";
 import HRTask from "../model/hrTaskModel.js";
 import { getIo } from "../socket.js";
-import { istDateKey, istDayEnd, findOpenAttendance, OPEN_SESSION_MAX_HOURS } from "../utils/istDate.js";
+import { istDateKey, istDayEnd, findOpenAttendance, isOpenSession } from "../utils/istDate.js";
 
 // Check In - Create new attendance record for the day
 export const checkIn = async (req, res) => {
@@ -251,8 +251,8 @@ export const getAllAttendance = async (req, res) => {
       if (endDate) filter.date.$lte = endDate;
     }
 
-    const now = Date.now();
-    const staleBefore = new Date(now - OPEN_SESSION_MAX_HOURS * 3600 * 1000);
+    const nowDate = new Date();
+    const now = nowDate.getTime();
 
     const [attendance, total, summaryRows] = await Promise.all([
       Attendance.find(filter)
@@ -262,14 +262,14 @@ export const getAllAttendance = async (req, res) => {
         .limit(limit)
         .lean(),
       Attendance.countDocuments(filter),
-      Attendance.find(filter).select('status checkInTime workingHours').lean(),
+      Attendance.find(filter).select('status checkInTime workingHours date').lean(),
     ]);
 
     // Summary over the whole filter
     let workingNow = 0, missedCheckouts = 0, closedDays = 0, closedHours = 0;
     for (const r of summaryRows) {
       if (r.status === 'checked-in') {
-        if (new Date(r.checkInTime) >= staleBefore) workingNow++;
+        if (isOpenSession(r, nowDate)) workingNow++;
         else missedCheckouts++;
       } else if (r.workingHours > 0) {
         closedDays++;
@@ -282,7 +282,7 @@ export const getAllAttendance = async (req, res) => {
     const windows = attendance.map((r) => {
       const start = new Date(r.checkInTime).getTime();
       const open  = r.status === 'checked-in';
-      const stale = open && new Date(r.checkInTime) < staleBefore;
+      const stale = open && !isOpenSession(r, nowDate);
       const end   = r.checkOutTime ? new Date(r.checkOutTime).getTime()
                   : stale ? istDayEnd(r.date).getTime()
                   : now;

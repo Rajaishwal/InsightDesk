@@ -62,10 +62,11 @@ const HrRecord = () => {
         <AttendanceTab />
       ) : activeTab === "locations" ? (
         <LocationTab />
+      ) : activeTab === "leaves" ? (
+        <LeaveTab />
       ) : (
         <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
           {activeTab === "tasks" && <TasksTab />}
-          {activeTab === "leaves" && <LeaveTab />}
           {activeTab === "employees" && <EmployeeSearchTab />}
           {activeTab === "register" && <RegisterEmployee setActiveTab={setActiveTab} />}
         </div>

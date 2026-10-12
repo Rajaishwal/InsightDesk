@@ -2,7 +2,7 @@ import Location from '../model/Location.js';
 import User from '../model/User.js';
 import Attendance from '../model/Attendance.js';
 import Break from '../models/Break.js';
-import { findOpenAttendance, OPEN_SESSION_MAX_HOURS } from '../utils/istDate.js';
+import { findOpenAttendance, openSessionFilter } from '../utils/istDate.js';
 
 // Calculate distance between two points using Haversine formula
 const calculateDistance = (lat1, lon1, lat2, lon2) => {
@@ -258,10 +258,6 @@ export const getLocationHistory = async (req, res) => {
 // HR/Admin: Get all employees' current locations
 export const getAllEmployeeLocations = async (req, res) => {
   try {
-    // "Currently checked in" = an open session from the last OPEN_SESSION_MAX_HOURS — not just today's date,
-    // so someone who checked in before midnight and is still working stays Active
-    const openSince = new Date(Date.now() - OPEN_SESSION_MAX_HOURS * 3600 * 1000);
-
     // Employees whose location is being tracked
     const employees = await User.find(
       { currentLocation: { $exists: true, $ne: null } },
@@ -276,8 +272,9 @@ export const getAllEmployeeLocations = async (req, res) => {
         { $sort: { userId: 1, timestamp: -1 } },
         { $group: { _id: '$userId', loc: { $first: '$$ROOT' } } },
       ]),
-      // Check-in status comes from attendance itself (not from location history, which may have been cleared)
-      Attendance.find({ userId: { $in: ids }, status: 'checked-in', checkInTime: { $gte: openSince } })
+      // Check-in status comes from attendance itself (not from location history, which may have been cleared),
+      // using the shared open-session rule (checked in within 16h, or today)
+      Attendance.find({ userId: { $in: ids }, ...openSessionFilter() })
         .select('userId checkInTime').lean(),
       Break.find({ userId: { $in: ids }, endTime: null }).select('userId startTime').lean(),
     ]);

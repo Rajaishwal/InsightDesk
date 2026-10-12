@@ -33,13 +33,25 @@ export const istParts = (d = new Date()) => {
   return { year, month: month - 1, day };
 };
 
-// A work session can run past midnight (check in 11 PM, out 1 AM), so "currently checked in" is the latest
-// open record from the last 16h — not just today's date. Older open records are forgotten check-outs, not live sessions.
+// A work session can run past midnight (check in 11 PM, out 1 AM), so "currently checked in" is an open record
+// from the last 16h — or any open record dated today (India time), however long it has run, so today's session can
+// always be checked out today. Open records older than that are forgotten check-outs from earlier days, not live sessions.
+// Every place that asks "is this person checked in?" uses this one rule.
 export const OPEN_SESSION_MAX_HOURS = 16;
 
+/** Mongo filter for a live (open) attendance session. */
+export const openSessionFilter = (now = new Date()) => ({
+  status: 'checked-in',
+  $or: [
+    { checkInTime: { $gte: new Date(now.getTime() - OPEN_SESSION_MAX_HOURS * 3600 * 1000) } },
+    { date: istDateKey(now) },
+  ],
+});
+
+/** Same rule for a record already loaded (needs status, checkInTime, date). */
+export const isOpenSession = (r, now = new Date()) =>
+  r.status === 'checked-in' &&
+  (new Date(r.checkInTime).getTime() >= now.getTime() - OPEN_SESSION_MAX_HOURS * 3600 * 1000 || r.date === istDateKey(now));
+
 export const findOpenAttendance = (Attendance, userId) =>
-  Attendance.findOne({
-    userId,
-    status: 'checked-in',
-    checkInTime: { $gte: new Date(Date.now() - OPEN_SESSION_MAX_HOURS * 3600 * 1000) },
-  }).sort({ checkInTime: -1 });
+  Attendance.findOne({ userId, ...openSessionFilter() }).sort({ checkInTime: -1 });
