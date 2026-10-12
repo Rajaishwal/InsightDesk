@@ -7,6 +7,7 @@ import {
   Calendar, Droplet, ChevronRight, Users,
 } from "lucide-react";
 import axios from "../services/axios";
+import { useListNav } from "../hooks/useListNav";
 
 const initials = (name = "") =>
   name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
@@ -29,7 +30,7 @@ const Badge = ({ label, color = "indigo" }) => {
 const InfoRow = ({ icon: Icon, label, value }) => (
   <div className="flex items-start gap-3">
     <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center flex-shrink-0 mt-0.5">
-      <Icon size={14} className="text-indigo-500" />
+      {Icon && <Icon size={14} className="text-indigo-500" />}
     </div>
     <div>
       <p className="text-[11px] text-gray-400 uppercase tracking-wide font-semibold">{label}</p>
@@ -41,7 +42,7 @@ const InfoRow = ({ icon: Icon, label, value }) => (
 const Section = ({ icon: Icon, title, color = "text-indigo-600", children }) => (
   <div className="bg-gray-50 rounded-xl p-5">
     <h5 className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-4 pb-2 border-b border-gray-100">
-      <Icon size={15} className={color} />
+      {Icon && <Icon size={15} className={color} />}
       {title}
     </h5>
     {children}
@@ -134,6 +135,16 @@ export default function EmployeeSearch() {
     selectEmployee(emp);
   };
 
+  // ↓ / ↑ / Enter / Esc on the suggestion list
+  const shownSuggestions = suggestions.slice(0, 6);
+  const nav = useListNav({
+    count: shownSuggestions.length,
+    open: showDrop,
+    onSelect: (i) => pickSuggestion(shownSuggestions[i]),
+    onClose: () => setShowDrop(false),
+    onOpen: () => setShowDrop(true),
+  });
+
   const clearSearch = () => {
     setQuery("");
     setSuggestions([]);
@@ -189,6 +200,7 @@ export default function EmployeeSearch() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onFocus={() => suggestions.length > 0 && setShowDrop(true)}
+                onKeyDown={nav.onKeyDown}
                 placeholder="Search employees…"
                 className="flex-1 py-3 text-sm text-gray-700 outline-none bg-transparent"
               />
@@ -211,12 +223,13 @@ export default function EmployeeSearch() {
 
             {/* Dropdown suggestions */}
             {showDrop && suggestions.length > 0 && (
-              <div className="absolute z-50 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
-                {suggestions.slice(0, 6).map((s) => (
+              <div ref={nav.listRef} className="absolute z-50 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
+                {shownSuggestions.map((s, i) => (
                   <div
                     key={s._id}
+                    {...nav.itemProps(i)}
                     onMouseDown={() => pickSuggestion(s)}
-                    className="flex items-center gap-3 px-4 py-3 hover:bg-indigo-50 cursor-pointer border-b border-gray-50 last:border-0"
+                    className={`flex items-center gap-3 px-4 py-3 cursor-pointer border-b border-gray-50 last:border-0 transition-colors ${nav.active === i ? "bg-indigo-50" : ""}`}
                   >
                     <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center text-sm font-bold flex-shrink-0 overflow-hidden">
                       {s.photo

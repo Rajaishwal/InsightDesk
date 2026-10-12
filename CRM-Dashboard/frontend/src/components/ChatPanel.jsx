@@ -4,6 +4,7 @@ import { X, Search, Send, MessageSquare, Circle, Paperclip, FileText, Download, 
 import { useAuth } from "../context/AuthContext";
 import { useSocket } from "../context/SocketContext";
 import api from "../services/axios";
+import { useListNav } from "../hooks/useListNav";
 
 // Avatar initials helper
 const Avatar = ({ name, photo, size = "w-9 h-9" }) => {
@@ -165,6 +166,14 @@ const ChatPanel = ({ onClose }) => {
     setReplyTo(null);
   };
 
+  // ↓ / ↑ / Enter on the search results (Enter opens that chat), Esc clears the search
+  const searchNav = useListNav({
+    count: searchResults.length,
+    open: !!searchTerm && searchResults.length > 0,
+    onSelect: (i) => openChat(searchResults[i]),
+    onClose: () => setSearchTerm(""),
+  });
+
 
   const activeMessages = messages[activeChat?._id] || [];
 
@@ -231,6 +240,7 @@ const ChatPanel = ({ onClose }) => {
                 placeholder="Search or start new chat"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={searchNav.onKeyDown}
                 className="bg-transparent text-sm outline-none w-full text-gray-700 placeholder-gray-400"
               />
               {searchTerm && (
@@ -251,14 +261,15 @@ const ChatPanel = ({ onClose }) => {
                   <p className="text-sm text-gray-400">No employees found</p>
                 </div>
               ) : (
-                <>
+                <div ref={searchNav.listRef}>
                   <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-4 py-2">Results</p>
-                  {searchResults.map((emp) => (
+                  {searchResults.map((emp, i) => (
                     <button
                       key={emp._id}
                       onClick={() => openChat(emp)}
-                      className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-[#f0f2f5] transition text-left ${
-                        activeChat?._id === emp._id ? "bg-[#f0f2f5]" : ""
+                      {...searchNav.itemProps(i)}
+                      className={`w-full flex items-center gap-3 px-4 py-3 transition text-left ${
+                        searchNav.active === i || activeChat?._id === emp._id ? "bg-[#f0f2f5]" : ""
                       }`}
                     >
                       <div className="relative flex-shrink-0">
@@ -271,7 +282,7 @@ const ChatPanel = ({ onClose }) => {
                       </div>
                     </button>
                   ))}
-                </>
+                </div>
               )
             ) : (
               /* Recent conversations */

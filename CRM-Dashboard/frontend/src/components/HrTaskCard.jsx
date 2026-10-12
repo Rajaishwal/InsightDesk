@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { X } from "lucide-react";
 import axios from "../services/axios";
+import { useListNav } from "../hooks/useListNav";
 
 const highlightMatch = (text, query) => {
   if (!text || !query) return text;
@@ -73,6 +74,15 @@ export const HrTaskForm = ({ onClose }) => {
     setSuggestions([]);
   };
 
+  // ↓ / ↑ / Enter / Esc on the employee suggestions
+  const suggestNav = useListNav({
+    count: suggestions.length,
+    open: showSuggestions,
+    onSelect: (i) => selectEmployee(suggestions[i]),
+    onClose: () => setShowSuggestions(false),
+    onOpen: () => setShowSuggestions(true),
+  });
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -132,6 +142,7 @@ export const HrTaskForm = ({ onClose }) => {
                   setAssignedTo(""); // clear selection if user edits
                 }}
                 onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+                onKeyDown={suggestNav.onKeyDown}
                 required
                 disabled={loading}
                 className="flex-1 text-base outline-none placeholder-gray-400 bg-transparent disabled:cursor-not-allowed"
@@ -152,13 +163,14 @@ export const HrTaskForm = ({ onClose }) => {
 
             {/* Dropdown */}
             {showSuggestions && suggestions.length > 0 && (
-              <ul className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-52 overflow-y-auto">
-                {suggestions.map((emp) => (
+              <ul ref={suggestNav.listRef} className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-52 overflow-y-auto">
+                {suggestions.map((emp, i) => (
                   <li key={emp._id}>
                     <button
                       type="button"
+                      {...suggestNav.itemProps(i)}
                       onMouseDown={() => selectEmployee(emp)}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-indigo-50 transition text-left"
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 transition text-left ${suggestNav.active === i ? "bg-indigo-50" : ""}`}
                     >
                       {/* Avatar */}
                       <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold flex-shrink-0">

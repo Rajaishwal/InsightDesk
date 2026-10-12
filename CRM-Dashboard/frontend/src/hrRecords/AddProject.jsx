@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import api from "../services/axios";
+import { useListNav } from "../hooks/useListNav";
 import {
   Plus, Trash2, X, Loader2, User, Mail,
   FolderPlus, FileText, Briefcase, Wrench, ClipboardList
@@ -32,6 +33,15 @@ const SuggestInput = ({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  // ↓ / ↑ / Enter / Esc on the suggestions
+  const nav = useListNav({
+    count: filtered.length,
+    open: open && filtered.length > 0,
+    onSelect: (i) => { onSelect(filtered[i]); setOpen(false); },
+    onClose: () => setOpen(false),
+    onOpen: () => setOpen(true),
+  });
+
   return (
     <div className="relative" ref={containerRef}>
       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none z-10">
@@ -44,6 +54,7 @@ const SuggestInput = ({
         disabled={disabled}
         onChange={(e) => { onChange(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)}
+        onKeyDown={nav.onKeyDown}
         className="w-full pl-10 pr-8 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-gray-50 hover:bg-white text-sm"
       />
       {value && !disabled && (
@@ -57,12 +68,13 @@ const SuggestInput = ({
       )}
 
       {open && filtered.length > 0 && (
-        <ul className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-xl max-h-52 overflow-y-auto">
+        <ul ref={nav.listRef} className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-xl max-h-52 overflow-y-auto">
           {filtered.map((item, i) => (
             <li
               key={item._id || i}
+              {...nav.itemProps(i)}
               onMouseDown={(e) => { e.preventDefault(); onSelect(item); setOpen(false); }}
-              className="px-4 py-2.5 cursor-pointer hover:bg-blue-50 transition text-sm border-b border-gray-50 last:border-0"
+              className={`px-4 py-2.5 cursor-pointer transition text-sm border-b border-gray-50 last:border-0 ${nav.active === i ? "bg-blue-50" : ""}`}
             >
               {renderRow(item)}
             </li>

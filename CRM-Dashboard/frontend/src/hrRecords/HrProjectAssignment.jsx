@@ -7,6 +7,7 @@ import {
   ClipboardCheck, CheckCircle2, RefreshCw, SearchX, AlertCircle,
 } from "lucide-react";
 import { useAutoRefresh } from "../hooks/useAutoRefresh";
+import { useListNav } from "../hooks/useListNav";
 import Avatar from "../components/PersonAvatar";
 import StatTile from "../components/StatTile";
 import ProjectModal from "../components/ProjectModal";
@@ -86,7 +87,7 @@ const MENU_W = 216;
 const MENU_H = 200; // approx — used to open upward near the bottom of the screen
 
 // One row in the status menu
-function StatusOption({ status, selected, disabled, note, onPick, children }) {
+function StatusOption({ status, selected, disabled, note, onPick, children, navProps = {}, active = false }) {
   const m = STATUS_META[status];
   return (
     <button
@@ -96,9 +97,10 @@ function StatusOption({ status, selected, disabled, note, onPick, children }) {
       aria-disabled={disabled}
       disabled={disabled}
       onClick={() => onPick(status)}
+      {...navProps}
       className={`flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition focus:outline-none
-        ${disabled ? "cursor-not-allowed" : "cursor-pointer hover:bg-gray-50 focus-visible:bg-gray-50"}
-        ${selected ? "bg-gray-50" : ""}`}
+        ${disabled ? "cursor-not-allowed" : "cursor-pointer"}
+        ${active ? "bg-indigo-50" : selected ? "bg-gray-50" : ""}`}
     >
       <span className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${disabled ? "bg-gray-300" : m.dot}`} />
       <span className="min-w-0 flex-1">
@@ -120,10 +122,33 @@ function ProjectStatusCell({ project, stats, onChange }) {
   const btnRef  = useRef(null);
   const menuRef = useRef(null);
 
-  // Close on outside click, Esc, scroll or resize; focus the current option when it opens
+  const total   = stats?.total || 0;
+  const done    = stats?.completed || 0;
+  const allDone = total > 0 && done === total;
+
+  const pick = (status) => {
+    setOpen(false);
+    if (status !== project.status) onChange(project, status);
+  };
+
+  // ↓ / ↑ move between the options you can pick (Completed only once every task is done), Enter picks.
+  // Opens on the current status.
+  const choices = ["Pending", "Ongoing", ...(allDone ? ["Completed"] : [])];
+  const nav = useListNav({
+    count: choices.length,
+    open,
+    onSelect: (i) => pick(choices[i]),
+    initial: Math.max(0, choices.indexOf(project.status)),
+    focusItems: true,
+  });
+  const optionNav = (status) => {
+    const i = choices.indexOf(status);
+    return i < 0 ? {} : { navProps: nav.itemProps(i), active: nav.active === i };
+  };
+
+  // Close on outside click, Esc, scroll or resize
   useEffect(() => {
     if (!open) return;
-    menuRef.current?.querySelector('[aria-selected="true"]')?.focus();
     const close = () => setOpen(false);
     const onDown = (e) => {
       if (!menuRef.current?.contains(e.target) && !btnRef.current?.contains(e.target)) close();
@@ -153,9 +178,6 @@ function ProjectStatusCell({ project, stats, onChange }) {
   }
 
   const meta    = STATUS_META[project.status] || STATUS_META.Pending;
-  const total   = stats?.total || 0;
-  const done    = stats?.completed || 0;
-  const allDone = total > 0 && done === total;
 
   const toggle = () => {
     if (open) return setOpen(false);
@@ -168,11 +190,6 @@ function ProjectStatusCell({ project, stats, onChange }) {
       bottom: up ? window.innerHeight - r.top + 6 : undefined,
     });
     setOpen(true);
-  };
-
-  const pick = (status) => {
-    setOpen(false);
-    if (status !== project.status) onChange(project, status);
   };
 
   return (
@@ -195,21 +212,23 @@ function ProjectStatusCell({ project, stats, onChange }) {
 
       {open && pos && createPortal(
         <div
-          ref={menuRef}
+          ref={(el) => { menuRef.current = el; nav.listRef.current = el; }}
           role="listbox"
           aria-label={`Status of ${project.title}`}
+          onKeyDown={nav.onKeyDown}
           className="animate-dialog-in fixed z-[60] rounded-xl border border-gray-100 bg-white p-1 shadow-lg shadow-gray-900/10"
           style={{ width: MENU_W, left: pos.left, top: pos.top, bottom: pos.bottom }}
         >
           <p className="px-2 pb-0.5 pt-1 text-[9px] font-bold uppercase tracking-widest text-gray-400">Set status</p>
-          <StatusOption status="Pending" selected={project.status === "Pending"} onPick={pick} />
-          <StatusOption status="Ongoing" selected={project.status === "Ongoing"} onPick={pick} />
+          <StatusOption status="Pending" selected={project.status === "Pending"} onPick={pick} {...optionNav("Pending")} />
+          <StatusOption status="Ongoing" selected={project.status === "Ongoing"} onPick={pick} {...optionNav("Ongoing")} />
           <div className="mx-2 my-0.5 h-px bg-gray-100" />
           <StatusOption
             status="Completed"
             selected={false}
             disabled={!allDone}
             onPick={pick}
+            {...optionNav("Completed")}
             note={allDone ? undefined : total === 0 ? "No tasks yet — nothing to complete" : `${total - done} of ${total} tasks still open`}
           >
             {!allDone && total > 0 && (
@@ -366,6 +385,15 @@ const HrProjectAssignment = () => {
 
   const pickPerson = (u) => { setPerson(u); setSearchTerm(""); setShowSuggestions(false); };
 
+  // ↓ / ↑ / Enter / Esc on the people suggestions
+  const peopleNav = useListNav({
+    count: suggestions.length,
+    open: showSuggestions && suggestions.length > 0,
+    onSelect: (i) => pickPerson(suggestions[i].u),
+    onClose: () => setShowSuggestions(false),
+    onOpen: () => setShowSuggestions(true),
+  });
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       {/* ── Header: title, search, new project ── */}
@@ -394,6 +422,7 @@ const HrProjectAssignment = () => {
                 value={searchTerm}
                 onChange={(e) => { setSearchTerm(e.target.value); setShowSuggestions(true); }}
                 onFocus={() => setShowSuggestions(true)}
+                onKeyDown={peopleNav.onKeyDown}
                 className="w-full min-w-0 bg-transparent text-sm text-gray-700 outline-none placeholder:text-gray-400"
               />
               {searchTerm && (
@@ -405,14 +434,15 @@ const HrProjectAssignment = () => {
 
             {/* People suggestions — pick one to see only their projects */}
             {showSuggestions && suggestions.length > 0 && (
-              <div className="animate-dialog-in absolute right-0 z-50 mt-2 w-full overflow-hidden rounded-xl border border-gray-100 bg-white p-1 shadow-lg shadow-gray-900/10">
+              <div ref={peopleNav.listRef} className="animate-dialog-in absolute right-0 z-50 mt-2 w-full overflow-hidden rounded-xl border border-gray-100 bg-white p-1 shadow-lg shadow-gray-900/10">
                 <p className="px-2.5 pb-1 pt-1.5 text-[9px] font-bold uppercase tracking-widest text-gray-400">People</p>
-                {suggestions.map(({ u, count }) => (
+                {suggestions.map(({ u, count }, i) => (
                   <button
                     key={u._id}
+                    {...peopleNav.itemProps(i)}
                     type="button"
                     onMouseDown={(e) => { e.preventDefault(); pickPerson(u); }}
-                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition hover:bg-gray-50"
+                    className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition ${peopleNav.active === i ? "bg-indigo-50" : ""}`}
                   >
                     <Avatar person={u} size={28} />
                     <span className="min-w-0 flex-1">

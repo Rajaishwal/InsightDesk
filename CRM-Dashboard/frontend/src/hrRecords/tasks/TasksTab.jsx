@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import api from "../../services/axios";
 import { HrTaskForm } from "../../components/HrTaskCard";
 import TasksTable from "./TasksTable";
+import { useListNav } from "../../hooks/useListNav";
 import {
   CheckCircle2, Search, Clock, RotateCcw, Plus,
   X, ClipboardList, Loader2, Users, Radio,
@@ -176,6 +177,15 @@ export default function TasksTab() {
     finally { setTaskLoading(false); }
   };
 
+  // ↓ / ↑ / Enter / Esc on the employee suggestions
+  const suggestNav = useListNav({
+    count: suggestions.length,
+    open: dropOpen,
+    onSelect: (i) => selectEmployee(suggestions[i]),
+    onClose: () => setDropOpen(false),
+    onOpen: () => setDropOpen(true),
+  });
+
   const clearEmployee = () => {
     setEmployee(null);
     setQuery("");
@@ -246,6 +256,7 @@ export default function TasksTab() {
               value={query}
               onChange={e => { setQuery(e.target.value); }}
               onFocus={() => suggestions.length > 0 && setDropOpen(true)}
+              onKeyDown={suggestNav.onKeyDown}
               className="flex-1 text-sm outline-none placeholder:text-gray-400 bg-transparent"
             />
           )}
@@ -264,12 +275,12 @@ export default function TasksTab() {
             <p className="px-4 pt-3 pb-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
               <Users className="w-3 h-3" /> {suggestions.length} employee{suggestions.length !== 1 ? "s" : ""} found
             </p>
-            <div className="max-h-60 overflow-y-auto divide-y divide-gray-50">
-              {suggestions.map(emp => {
+            <div ref={suggestNav.listRef} className="max-h-60 overflow-y-auto divide-y divide-gray-50">
+              {suggestions.map((emp, i) => {
                 const id = typeof emp._id === "object" ? String(emp._id) : emp._id;
                 return (
-                  <button key={id} type="button" onMouseDown={() => selectEmployee(emp)}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-indigo-50 transition text-left">
+                  <button key={id} type="button" onMouseDown={() => selectEmployee(emp)} {...suggestNav.itemProps(i)}
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 transition text-left ${suggestNav.active === i ? "bg-indigo-50" : ""}`}>
                     {emp.photo
                       ? <img src={emp.photo} className="w-9 h-9 rounded-xl object-cover flex-shrink-0" alt="" />
                       : <div className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center text-sm font-bold flex-shrink-0">

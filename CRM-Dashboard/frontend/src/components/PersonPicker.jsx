@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Search, Check, Users } from "lucide-react";
 import PersonAvatar from "./PersonAvatar";
+import { useListNav } from "../hooks/useListNav";
 
 export default function PersonPicker({ people, value, onChange }) {
   const [open, setOpen] = useState(false);
@@ -21,6 +22,16 @@ export default function PersonPicker({ people, value, onChange }) {
 
   const pick = (id) => { onChange(id); setOpen(false); setQ(""); };
   const shown = people.filter((p) => p.name?.toLowerCase().includes(q.trim().toLowerCase()));
+
+  // ↓ / ↑ / Enter / Esc from the search box. Rows: "All employees" (when not searching), then the people.
+  const ids = [...(!q ? [""] : []), ...shown.map((p) => p._id)];
+  const nav = useListNav({
+    count: ids.length,
+    open,
+    onSelect: (i) => pick(ids[i]),
+    onClose: () => setOpen(false),
+  });
+  const offset = !q ? 1 : 0;
 
   return (
     <div className="relative" ref={ref}>
@@ -50,22 +61,23 @@ export default function PersonPicker({ people, value, onChange }) {
               autoFocus
               value={q}
               onChange={(e) => setQ(e.target.value)}
+              onKeyDown={nav.onKeyDown}
               placeholder="Find an employee…"
               className="w-full bg-transparent text-sm text-gray-700 outline-none placeholder:text-gray-400"
             />
           </div>
-          <div role="listbox" className="max-h-64 overflow-y-auto py-1 [scrollbar-width:thin]">
+          <div role="listbox" ref={nav.listRef} className="max-h-64 overflow-y-auto py-1 [scrollbar-width:thin]">
             {!q && (
-              <button type="button" role="option" aria-selected={!value} onClick={() => pick("")}
-                className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm transition hover:bg-gray-50 ${!value ? "bg-gray-50" : ""}`}>
+              <button type="button" role="option" aria-selected={!value} onClick={() => pick("")} {...nav.itemProps(0)}
+                className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm transition ${nav.active === 0 ? "bg-indigo-50" : !value ? "bg-gray-50" : ""}`}>
                 <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-gray-100"><Users className="h-3.5 w-3.5 text-gray-500" /></span>
                 <span className="flex-1 font-medium text-gray-800">All employees</span>
                 {!value && <Check className="h-3.5 w-3.5 text-indigo-600" />}
               </button>
             )}
-            {shown.map((p) => (
-              <button key={p._id} type="button" role="option" aria-selected={p._id === value} onClick={() => pick(p._id)}
-                className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left transition hover:bg-gray-50 ${p._id === value ? "bg-gray-50" : ""}`}>
+            {shown.map((p, i) => (
+              <button key={p._id} type="button" role="option" aria-selected={p._id === value} onClick={() => pick(p._id)} {...nav.itemProps(i + offset)}
+                className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left transition ${nav.active === i + offset ? "bg-indigo-50" : p._id === value ? "bg-gray-50" : ""}`}>
                 <PersonAvatar person={p} size={28} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium text-gray-800">{p.name}</span>

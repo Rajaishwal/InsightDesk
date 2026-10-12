@@ -5,6 +5,7 @@ import { useConfirm } from "../context/ConfirmContext";
 import { useAuth } from "../context/AuthContext";
 import axios from "../services/axios";
 import { getCache, setCache } from "../utils/pageCache";
+import { useListNav } from "../hooks/useListNav";
 import { PlusCircle, Trash2, CheckCircle, X, Search, FileEdit, IndianRupee } from "lucide-react";
 
 const Salary = () => {
@@ -61,6 +62,17 @@ const Salary = () => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  const pickSuggestion = (emp) => { setSearchTerm(emp.name); setShowSuggestions(false); };
+
+  // ↓ / ↑ / Enter / Esc on the suggestion list
+  const suggestNav = useListNav({
+    count: suggestions.length,
+    open: showSuggestions,
+    onSelect: (i) => pickSuggestion(suggestions[i]),
+    onClose: () => setShowSuggestions(false),
+    onOpen: () => setShowSuggestions(true),
+  });
 
   const highlightMatch = (text, query) => {
     if (!text || !query) return text;
@@ -263,6 +275,7 @@ const Salary = () => {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+                  onKeyDown={suggestNav.onKeyDown}
                   className="w-full outline-none text-sm text-gray-700 bg-transparent"
                 />
                 {searchTerm && (
@@ -272,12 +285,13 @@ const Salary = () => {
                 )}
               </div>
               {showSuggestions && suggestions.length > 0 && (
-                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
-                  {suggestions.map((emp) => (
+                <div ref={suggestNav.listRef} className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                  {suggestions.map((emp, i) => (
                     <div
                       key={emp._id}
-                      onMouseDown={() => { setSearchTerm(emp.name); setShowSuggestions(false); }}
-                      className="flex items-center gap-3 px-4 py-2.5 hover:bg-indigo-50 cursor-pointer border-b border-gray-100 last:border-0"
+                      {...suggestNav.itemProps(i)}
+                      onMouseDown={() => pickSuggestion(emp)}
+                      className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer border-b border-gray-100 last:border-0 transition-colors ${suggestNav.active === i ? "bg-indigo-50" : ""}`}
                     >
                       <div className="w-7 h-7 rounded-full bg-indigo-500 text-white flex items-center justify-center text-xs font-semibold shrink-0">
                         {emp.photo
