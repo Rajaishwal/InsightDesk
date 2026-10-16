@@ -338,7 +338,7 @@ router.get('/employee-dashboard', protect, async (req, res) => {
 
     // Build calendar + aggregate stats
     const calendarDays = [];
-    let workingDays = 0, presentDays = 0, leaveDayCount = 0, totalWorkHours = 0;
+    let workingDays = 0, presentDays = 0, leaveDayCount = 0, totalWorkHours = 0, weekendDaysWorked = 0;
 
     for (let d = 1; d <= daysInMonth; d++) {
       const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
@@ -346,10 +346,18 @@ router.get('/employee-dashboard', protect, async (req, res) => {
       const isWeekend = dow === 0 || dow === 6;
       const isFuture = ds > todayStr;
       const isToday = ds === todayStr;
-      let status = 'future', checkIn = null, checkOut = null, workingHours = 0;
+      let status = 'future', checkIn = null, checkOut = null, workingHours = 0, weekendWork = false;
 
       if (isWeekend) {
-        status = 'weekend';
+        // Weekends are off — but a weekend day the employee actually worked shows as present
+        const att = !isFuture && attMap[ds];
+        if (att) {
+          status = 'present'; weekendWork = true; weekendDaysWorked++;
+          checkIn = att.checkInTime; checkOut = att.checkOutTime; workingHours = att.workingHours || 0;
+          totalWorkHours += workingHours;
+        } else {
+          status = 'weekend';
+        }
       } else if (isFuture) {
         status = 'future';
       } else {
@@ -380,7 +388,7 @@ router.get('/employee-dashboard', protect, async (req, res) => {
           status = 'absent';
         }
       }
-      calendarDays.push({ date: ds, day: d, dow, status, checkIn, checkOut, workingHours, isToday, halfDay: halfDayDates.has(ds), leaveType: leaveDateTypes[ds] || null });
+      calendarDays.push({ date: ds, day: d, dow, status, checkIn, checkOut, workingHours, isToday, weekendWork, halfDay: halfDayDates.has(ds), leaveType: leaveDateTypes[ds] || null });
     }
 
     // Find which project has the user's currently running task timer
@@ -417,6 +425,7 @@ router.get('/employee-dashboard', protect, async (req, res) => {
       presentDaysThisMonth: presentDays,              // total present days in the current month
       workingDaysThisMonth: workingDays - leaveDayCount, // Mon–Fri elapsed this month minus approved leave (same rule as the weekly card)
       leaveDaysThisMonth: leaveDayCount,
+      weekendDaysWorked,                              // Sat/Sun days worked this month (not part of the working-day ratio)
       activeProjects, completedProjects, totalProjects: projects.length,
       activeTimerProjectId,
       completedTasks, totalTasks,
@@ -516,7 +525,7 @@ router.get('/attendance-calendar', protect, async (req, res) => {
     for (const a of attendance) attMap[a.date] = a;
 
     const calendarDays = [];
-    let workingDays = 0, presentDays = 0, leaveDayCount = 0;
+    let workingDays = 0, presentDays = 0, leaveDayCount = 0, weekendDaysWorked = 0;
 
     for (let d = 1; d <= daysInMonth; d++) {
       const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
@@ -524,10 +533,17 @@ router.get('/attendance-calendar', protect, async (req, res) => {
       const isWeekend = dow === 0 || dow === 6;
       const isFuture  = ds > todayStr;
       const isToday   = ds === todayStr;
-      let status = 'future', checkIn = null, checkOut = null, workingHours = 0;
+      let status = 'future', checkIn = null, checkOut = null, workingHours = 0, weekendWork = false;
 
       if (isWeekend) {
-        status = 'weekend';
+        // Weekends are off — but a weekend day the employee actually worked shows as present
+        const att = !isFuture && attMap[ds];
+        if (att) {
+          status = 'present'; weekendWork = true; weekendDaysWorked++;
+          checkIn = att.checkInTime; checkOut = att.checkOutTime; workingHours = att.workingHours || 0;
+        } else {
+          status = 'weekend';
+        }
       } else if (isFuture) {
         status = 'future';
       } else {
@@ -553,11 +569,12 @@ router.get('/attendance-calendar', protect, async (req, res) => {
           status = 'absent';
         }
       }
-      calendarDays.push({ date: ds, day: d, dow, status, checkIn, checkOut, workingHours, isToday, halfDay: halfDayDates.has(ds), leaveType: leaveDateTypes[ds] || null });
+      calendarDays.push({ date: ds, day: d, dow, status, checkIn, checkOut, workingHours, isToday, weekendWork, halfDay: halfDayDates.has(ds), leaveType: leaveDateTypes[ds] || null });
     }
 
     res.json({
       calendarDays,
+      weekendDaysWorked,
       presentDaysThisMonth: presentDays,
       workingDaysThisMonth: workingDays - leaveDayCount, // minus approved leave
       leaveDaysThisMonth: leaveDayCount,

@@ -13,16 +13,17 @@ import HrTaskBoard from "../components/HrTaskBoard";
 import ProjectTaskDrawer from "../components/ProjectTaskDrawer";
 import LiveTaskTimer from "../components/LiveTaskTimer";
 
-/* ── Calendar day status styles ── */
+/* ── Calendar day status styles — soft solid fills, white text; Sat & Sun grey ── */
 const DAY_STYLE = {
-  present: ["bg-emerald-100 hover:bg-emerald-200", "text-emerald-700"],
-  late: ["bg-amber-100   hover:bg-amber-200", "text-amber-700"],
-  leave: ["bg-blue-100    hover:bg-blue-200", "text-blue-700"],
-  "half-leave": [null, "text-blue-700"],   // background handled via inline gradient
-  absent: ["bg-red-100     hover:bg-red-200", "text-red-600"],
-  weekend: ["bg-gray-50", "text-gray-300 cursor-default"],
-  future: ["bg-white", "text-gray-200 cursor-default"],
+  present: ["bg-emerald-400 hover:bg-emerald-500", "text-white"],
+  late: ["bg-amber-400   hover:bg-amber-500", "text-white"],
+  leave: ["bg-blue-400    hover:bg-blue-500", "text-white"],
+  "half-leave": [null, "text-white"],   // background handled via inline gradient
+  absent: ["bg-red-400     hover:bg-red-500", "text-white"],
+  weekend: ["bg-gray-100", "text-gray-400 cursor-default"],
+  future: ["bg-gray-50", "text-gray-300 cursor-default"],
 };
+const WEEK_OFF = ["bg-gray-100", "text-gray-400 cursor-default"]; // Sat / Sun not worked (past or upcoming)
 const STATUS_LABEL = { present: "Present", late: "Late (after 9:30)", leave: "On Leave", "half-leave": "Half Day Leave", absent: "Absent", weekend: "Weekend", future: "—" };
 
 const LEAVE_ABBR = {
@@ -140,6 +141,7 @@ export default function EmployeeDashboard() {
   /* ── Calendar grid ── */
   const firstDow = effCalendarDays.length > 0 ? (new Date(effCalendarDays[0].date).getDay() + 6) % 7 : 0;
   const cells = [...Array(firstDow).fill(null), ...effCalendarDays];
+  while (cells.length % 7) cells.push(null); // fill the last week so no grey gap shows after the month ends
   const calRows = [];
   for (let i = 0; i < cells.length; i += 7) calRows.push(cells.slice(i, i + 7));
 
@@ -315,6 +317,7 @@ export default function EmployeeDashboard() {
                   ["bg-amber-400", null, "Late"],
                   ["bg-blue-400", null, "On Leave"],
                   ["bg-red-400", null, "Absent"],
+                  ["bg-gray-300", null, "Week off"],
                 ].map(([cls, , lbl]) => (
                   <div key={lbl} className="flex items-center gap-1">
                     <div className={`w-2 h-2 rounded-full ${cls}`} />
@@ -325,58 +328,56 @@ export default function EmployeeDashboard() {
             </div>
 
             {/* Day header row */}
-            <div className="grid grid-cols-7 gap-px bg-gray-200 rounded-t-lg overflow-hidden">
+            <div className="grid grid-cols-7 gap-1 mb-1">
               {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d, i) => (
-                <div key={i} className={`text-center text-[10px] font-bold py-1.5 tracking-wide
-                  ${i === 6 ? "text-rose-500 bg-rose-50" : "text-gray-500 bg-gray-50"}`}>
+                <div key={i} className={`rounded-[2px] text-center text-[10px] font-bold py-1.5 tracking-wide
+                  ${i >= 5 ? "text-gray-400 bg-gray-100" : "text-gray-500 bg-gray-50"}`}>
                   {d}
                 </div>
               ))}
             </div>
 
             {/* Calendar flat grid */}
-            <div className="grid grid-cols-7 gap-px bg-gray-200 rounded-b-lg overflow-hidden">
+            <div className="grid grid-cols-7 gap-1">
               {calRows.flat().map((cell, idx) => {
                 const ci = idx % 7;
-                const isSunday = ci === 6;
+                const isWeekOff = ci >= 5; // Sat / Sun
 
                 if (!cell) {
                   return (
-                    <div key={idx} className={`h-9 ${isSunday ? "bg-rose-50" : "bg-white"}`} />
+                    <div key={idx} className="h-9" />
                   );
                 }
 
                 const isInactive = cell.status === "weekend" || cell.status === "future";
                 const isHalfLeave = cell.status === "half-leave";
-                const [bg, text] = isSunday && isInactive
-                  ? ["bg-rose-50", "text-rose-200 cursor-default"]
-                  : (DAY_STYLE[cell.status] || ["bg-white", "text-gray-200 cursor-default"]);
+                // A Sat / Sun the employee worked comes back from the server as present (green) — otherwise grey
+                const [bg, text] = isWeekOff && isInactive
+                  ? WEEK_OFF
+                  : (DAY_STYLE[cell.status] || ["bg-white", "text-gray-300 cursor-default"]);
 
                 return (
                   <button
                     key={idx}
                     onMouseEnter={() => setHoveredDay(cell)}
                     onMouseLeave={() => setHoveredDay(null)}
-                    style={isHalfLeave ? { background: "linear-gradient(to right, #d1fae5 50%, #dbeafe 50%)" } : undefined}
+                    style={isHalfLeave ? { background: "linear-gradient(to right, #34d399 50%, #60a5fa 50%)" } : undefined}
                     className={`
-                      relative h-9 flex items-center justify-center
+                      relative h-9 flex items-center justify-center rounded-[2px]
                       text-[11px] font-bold select-none transition-colors duration-150
                       ${isHalfLeave ? "" : `${bg} ${text}`}
-                      ${cell.isToday ? "ring-2 ring-inset ring-indigo-400" : ""}
+                      ${cell.isToday ? "ring-2 ring-indigo-500 ring-offset-1" : ""}
                     `}
                   >
                     {isHalfLeave ? (
                       // Half-day leave: just "HD" over the half-present / half-leave background — the date shows on hover
-                      <span className="text-[11px] font-black tracking-wide text-blue-700">HD</span>
+                      <span className="text-[11px] font-black tracking-wide text-white">HD</span>
                     ) : cell.status === "leave" && cell.leaveType ? (
                       // Leave day: just the leave type (PL / SL / LOP …) — the date shows in the hover strip
-                      <span className="text-[11px] font-black tracking-wide text-blue-700">
+                      <span className="text-[11px] font-black tracking-wide text-white">
                         {LEAVE_ABBR[cell.leaveType] ?? cell.leaveType}
                       </span>
                     ) : cell.day}
-                    {isSunday && (
-                      <span className="absolute top-0.5 right-0.5 text-[6px] text-rose-300 leading-none">☀</span>
-                    )}
                   </button>
                 );
               })}
@@ -390,7 +391,7 @@ export default function EmployeeDashboard() {
                     <p className="text-xs font-bold text-gray-700">
                       {new Date(hoveredDay.date).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
                     </p>
-                    <p className="text-[11px] text-gray-400 mt-0.5">{STATUS_LABEL[hoveredDay.status]}</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">{STATUS_LABEL[hoveredDay.status]}{hoveredDay.weekendWork ? " · worked on a week off" : ""}</p>
                   </div>
                   {hoveredDay.checkIn && (
                     <div className="text-right">
