@@ -14,7 +14,6 @@ const router = express.Router();
 router.post("/checkin", protect, checkIn);
 router.post("/checkout", protect, checkOut);
 
-// Get attendance records
 router.get("/logs", protect, getAllAttendance);
 router.get("/status/:userId", protect, getTodayStatus);
 

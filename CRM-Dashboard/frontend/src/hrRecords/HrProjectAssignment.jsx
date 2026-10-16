@@ -480,7 +480,6 @@ const HrProjectAssignment = () => {
           sub="closed and locked" active={filter === "completed"} onClick={() => setFilter(filter === "completed" ? "all" : "completed")} />
       </div>
 
-      {/* ── Projects table ── */}
       <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3.5">
           <div className="flex min-w-0 items-center gap-2">
@@ -592,7 +591,6 @@ const HrProjectAssignment = () => {
         </div>
       </div>
 
-      {/* Activity Feed */}
       <ProjectActivityFeed />
 
       {showProjectAdd && (
@@ -602,7 +600,6 @@ const HrProjectAssignment = () => {
         />
       )}
 
-      {/* Tracklist drawer */}
       {tracklistProject && (
         <ProjectTaskDrawer
           project={tracklistProject}
@@ -611,7 +608,6 @@ const HrProjectAssignment = () => {
         />
       )}
 
-      {/* Project details */}
       {viewProject && (
         <ProjectModal
           project={viewProject}

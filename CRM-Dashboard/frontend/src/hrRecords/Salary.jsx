@@ -165,7 +165,6 @@ function SalaryForm({ people, peopleState, onRetryPeople, salaries, selfId, onCl
           </div>
           {clash && <p className="-mt-3 text-xs text-amber-600">{person.name} already has a salary for {form.month} {form.year}.</p>}
 
-          {/* Basic pay */}
           <div>
             <p className="mb-1.5 text-[11px] font-bold uppercase tracking-widest text-gray-400">Basic pay (monthly)</p>
             <div className="relative">
@@ -175,7 +174,6 @@ function SalaryForm({ people, peopleState, onRetryPeople, salaries, selfId, onCl
             </div>
           </div>
 
-          {/* Breakdown */}
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-3.5">
               <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-700">Allowances · + {inr(calc.totalAllow)}</p>
@@ -344,7 +342,6 @@ const Salary = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      {/* Header */}
       <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Employee Salary</h1>
@@ -364,7 +361,6 @@ const Salary = () => {
         </div>
       </div>
 
-      {/* Tiles */}
       <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatTile tone="violet" Icon={Wallet} label="Net payroll" value={loading ? "—" : inr(totalNet)}
           sub={`${inPeriod.length} ${inPeriod.length === 1 ? "salary" : "salaries"} · ${periodLabel}`}
@@ -378,7 +374,6 @@ const Salary = () => {
           active={status === "attention"} onClick={() => toggleStatus("attention")} />
       </div>
 
-      {/* Month chips */}
       {periods.length > 0 && (
         <div className="mb-4 flex flex-wrap items-center gap-1.5">
           <span className="mr-1 text-[10px] font-bold uppercase tracking-widest text-gray-400">Month</span>
@@ -391,7 +386,6 @@ const Salary = () => {
         </div>
       )}
 
-      {/* Table */}
       <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[980px]">

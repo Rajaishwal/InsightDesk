@@ -21,7 +21,6 @@ const fmtDur = (sec) => {
   return `${s}s`;
 };
 
-
 const fmtShort = (ts) => {
   if (!ts) return "—";
   const d = new Date(ts);
@@ -52,7 +51,6 @@ const PERIODS = [
   { id: "all",   label: "All"    },
 ];
 
-
 /* ─────────────────────────────────────────────────────────
    Main TasksTab
 ───────────────────────────────────────────────────────── */
@@ -76,7 +74,6 @@ export default function TasksTab() {
   const [empTasks,    setEmpTasks]    = useState([]);
   const [taskLoading, setTaskLoading] = useState(false);
 
-  /* ── Active timers ── */
   const [activeTimers,      setActiveTimers]      = useState([]);
   const [activeLoading,     setActiveLoading]     = useState(true);
   const [activeNow,         setActiveNow]         = useState(new Date());
@@ -109,7 +106,6 @@ export default function TasksTab() {
     return () => clearInterval(id);
   }, []);
 
-  /* ── Load work log ── */
   const loadWorkLog = (p = workLogPeriod) => {
     setWorkLogLoading(true);
     api.get(`/project-tasks/work-log?period=${p}`)
@@ -120,7 +116,6 @@ export default function TasksTab() {
 
   useEffect(() => { loadWorkLog(workLogPeriod); }, [workLogPeriod]);
 
-  /* ── Load all completed tasks ── */
   const loadCompleted = () => {
     setRecentLoading(true);
     api.get("http://localhost:5000/api/hr-tasks/")
@@ -262,7 +257,6 @@ export default function TasksTab() {
             />
           )}
 
-          {/* Clear */}
           {(query || employee) && (
             <button onClick={clearEmployee} className="p-1 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition flex-shrink-0">
               <X className="w-4 h-4" />
@@ -270,7 +264,6 @@ export default function TasksTab() {
           )}
         </div>
 
-        {/* Suggestions dropdown */}
         {dropOpen && suggestions.length > 0 && (
           <div className="absolute z-50 left-0 right-0 top-full mt-1.5 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
             <p className="px-4 pt-3 pb-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
@@ -310,11 +303,9 @@ export default function TasksTab() {
         )}
       </div>
 
-
       {/* ── Active Now + Work Sessions side by side ── */}
       <div className="grid grid-cols-1 xl:grid-cols-[320px_1fr] gap-5 items-start">
 
-        {/* Active Now */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/60">
             <div className="flex items-center gap-2">
@@ -374,7 +365,6 @@ export default function TasksTab() {
           )}
         </div>
 
-        {/* Work Sessions */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-100 bg-gray-50/60 flex-wrap gap-y-2">
             <div className="flex items-center gap-2">
@@ -461,11 +451,10 @@ export default function TasksTab() {
         }
 
         </div>{/* end Work Log card */}
-      </div>{/* end grid */}
+      </div>
 
       {/* ── Recent Completed Tasks panel ── */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        {/* Header */}
         <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-b border-gray-100 bg-gray-50/60 flex-wrap gap-y-2">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
@@ -479,7 +468,6 @@ export default function TasksTab() {
             </span>
           </div>
           <div className="flex items-center gap-2">
-            {/* Period tabs */}
             <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
               {PERIODS.map(p => (
                 <button key={p.id} onClick={() => setPeriod(p.id)}
@@ -488,12 +476,10 @@ export default function TasksTab() {
                   }`}>{p.label}</button>
               ))}
             </div>
-            {/* Assign */}
             <button onClick={() => setShowForm(true)}
               className="flex items-center gap-1.5 text-xs font-bold bg-gray-800 text-white px-3.5 py-2 rounded-lg hover:bg-indigo-700 transition whitespace-nowrap">
               <Plus className="w-3.5 h-3.5" /> Assign New Task
             </button>
-            {/* Refresh */}
             <Tooltip text="Refresh"><button onClick={loadCompleted}
               className="p-2 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition">
               <RotateCcw className="w-3.5 h-3.5" />
@@ -501,7 +487,6 @@ export default function TasksTab() {
           </div>
         </div>
 
-        {/* Body */}
         {recentLoading ? (
           <div className="flex items-center justify-center gap-2 py-10 text-sm text-gray-400">
             <div className="w-4 h-4 border-2 border-indigo-200 border-t-indigo-500 rounded-full animate-spin" />Loading…
@@ -560,7 +545,6 @@ export default function TasksTab() {
           </div>
         )}
 
-        {/* Footer */}
         {!recentLoading && completedFiltered.length > 0 && (
           <div className="px-5 py-2 border-t border-gray-100 bg-gray-50/60 text-[11px] text-gray-400 flex items-center justify-between">
             <span>Showing {completedFiltered.length} completed task{completedFiltered.length !== 1 ? "s" : ""}</span>

@@ -3,7 +3,6 @@ import Project from "../model/Project.js";
 import ProjectTask from "../model/ProjectTask.js";
 import User from "../model/User.js";
 
-// Utility: Generate Project ID
 const generateProjectId = async () => {
   const lastProject = await Project.findOne().sort({ createdAt: -1 });
   const lastId = lastProject ? lastProject.projectId : "PRJ-000";
@@ -11,7 +10,6 @@ const generateProjectId = async () => {
   return `PRJ-${num.toString().padStart(3, "0")}`;
 };
 
-// Create a new project
 export const createProject = async (req, res) => {
   try {
 
@@ -33,7 +31,6 @@ export const createProject = async (req, res) => {
       });
     }
 
-    // ✅ Generate new projectId here
     const projectId = await generateProjectId();
 
     if (teamMembers && teamMembers.length > 4) {
@@ -120,7 +117,6 @@ export const createProject = async (req, res) => {
   }
 };
 
-// Get all projects
 export const getAllProjects = async (req, res) => {
   try {
     const { status, manager, page = 1, limit = 10 } = req.query;
@@ -162,7 +158,6 @@ export const getAllProjects = async (req, res) => {
   }
 };
 
-// Update project
 // Status rules: only HR/admin change it; "Completed" is allowed only once every task in the project's
 // tracklist is done (the team has finished), and a Completed project is locked for good.
 export const updateProject = async (req, res) => {

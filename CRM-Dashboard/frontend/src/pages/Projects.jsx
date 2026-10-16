@@ -101,7 +101,6 @@ const Projects = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      {/* Header + Search */}
       <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Projects</h1>
@@ -126,7 +125,6 @@ const Projects = () => {
         </div>
       </div>
 
-      {/* Table */}
       <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
         <div ref={tableRef} className={`overflow-x-auto ${capClass(tableMaxH)}`} style={capStyle(tableMaxH)}>
           <table className="min-w-full">

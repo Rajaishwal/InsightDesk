@@ -194,7 +194,6 @@ export default function EmployeeDashboard() {
         />
       )}
 
-      {/* ── Profile header ── */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="h-0.5 bg-gradient-to-r from-indigo-500 via-violet-500 to-blue-500" />
         <div className="px-6 py-4 flex items-center gap-5">
@@ -218,7 +217,6 @@ export default function EmployeeDashboard() {
             </button>
           </div>
 
-          {/* Info */}
           <div className="flex-1 min-w-0">
             <h1 className="text-lg font-bold text-gray-900 truncate">{user?.name}</h1>
             <p className="text-sm text-indigo-600 font-medium">{user?.designation || user?.role}</p>
@@ -260,7 +258,6 @@ export default function EmployeeDashboard() {
         </div>
       </div>
 
-      {/* ── Stat Cards ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {statCards.map(({ label, value, sub, Icon, iconBg, iconColor, accent }) => (
           <div key={label} className={`bg-white rounded-xl shadow-sm border border-gray-100 p-4 ${accent}`}>
@@ -281,16 +278,13 @@ export default function EmployeeDashboard() {
       {/* ── Main 2-col ── */}
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_310px] gap-5">
 
-        {/* LEFT */}
         <div className="space-y-5">
 
           {/* Monthly Attendance Calendar */}
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
 
-            {/* Header */}
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                {/* Month navigation */}
                 <Tooltip text="Previous month"><button
                   onClick={() => handleMonthNav(-1)}
                   disabled={viewMonthOffset <= -2 || monthLoading}
@@ -412,13 +406,11 @@ export default function EmployeeDashboard() {
           <HrTaskBoard />
         </div>
 
-        {/* RIGHT */}
         <div className="space-y-5">
 
           {/* Today's Focus — isolated component, only it ticks every second */}
           <LiveTaskTimer checkedOut={locationStatus === "checked-out"} />
 
-          {/* Projects */}
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">

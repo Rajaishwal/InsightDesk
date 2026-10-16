@@ -89,7 +89,6 @@ export default function Login() {
     }
   }, [user, navigate]);
 
-  // password change states
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [pwErr, setPwErr] = useState("");
@@ -209,7 +208,6 @@ export default function Login() {
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-violet-50 px-6 py-10">
       <div className="grid w-full max-w-[60rem] overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-xl md:grid-cols-[1.05fr_1fr]">
 
-        {/* ── Brand panel ── */}
         <aside className="relative flex flex-col overflow-hidden bg-[#0f1b3d] p-9 text-white lg:p-10">
           {/* Wordmark only — the animated mark below carries the logo */}
           <div className="relative z-10">
@@ -229,7 +227,6 @@ export default function Login() {
           <p className="relative text-center text-[11px] text-blue-200/50">© {new Date().getFullYear()} InsightDesk</p>
         </aside>
 
-        {/* ── Sign-in form ── */}
         <section className="flex flex-col justify-center px-8 py-10 sm:px-12">
           <p className="text-[11px] font-bold uppercase tracking-widest text-blue-600">Sign in</p>
           <h1 className="mt-1.5 text-[1.75rem] font-bold leading-tight text-gray-900">Welcome back</h1>
@@ -301,7 +298,6 @@ export default function Login() {
         </section>
       </div>
 
-      {/* ── Change password dialog ── */}
       {showChangePassword && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4 backdrop-blur-sm"

@@ -136,7 +136,6 @@ export default function Profile() {
   };
   const removeSkill = (s) => setForm(p => ({ ...p, skills: p.skills.filter(x => x !== s) }));
 
-  // ── Submit ────────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -169,13 +168,11 @@ export default function Profile() {
     <div className="min-h-screen bg-gray-50 p-8">
       <form onSubmit={handleSubmit} className="space-y-6">
 
-        {/* ── BANNER ───────────────────────────────────────────── */}
         <div className="relative bg-gradient-to-br from-indigo-50 via-violet-50 to-blue-50 overflow-hidden border border-indigo-100 rounded-2xl shadow-sm">
           {/* Subtle dot pattern */}
           <div className="absolute inset-0 opacity-[0.4]"
             style={{ backgroundImage: "radial-gradient(circle, #c7d2fe 1px, transparent 1px)", backgroundSize: "28px 28px" }} />
 
-          {/* Top row */}
           <div className="relative flex items-start justify-between px-8 pt-6 pb-0">
             <div className="flex items-center gap-5">
               {/* Profile photo inside banner */}
@@ -206,7 +203,6 @@ export default function Profile() {
               </div>
             </div>
 
-            {/* Edit button */}
             <button type="button" onClick={() => setEditing(v => !v)}
               className={`mt-1 px-4 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 border transition ${editing
                 ? "bg-red-500 border-red-500 text-white hover:bg-red-600"
@@ -219,7 +215,6 @@ export default function Profile() {
 
           {/* Bottom stats bar */}
           <div className="relative mt-5 border-t border-indigo-100 flex divide-x divide-indigo-100">
-            {/* Profile completion */}
             <div className="flex-1 px-6 py-3">
               <p className="text-gray-400 text-[10px] uppercase tracking-wider mb-1.5">Profile Completion</p>
               <div className="flex items-center gap-3">
@@ -229,12 +224,10 @@ export default function Profile() {
                 <span className="text-indigo-700 font-bold text-sm">{completionPct}%</span>
               </div>
             </div>
-            {/* Employee ID */}
             <div className="px-6 py-3 text-center">
               <p className="text-gray-400 text-[10px] uppercase tracking-wider mb-1">Employee ID</p>
               <p className="text-gray-800 font-mono font-semibold text-sm">{form.employeeId || "—"}</p>
             </div>
-            {/* Shift */}
             <div className="px-6 py-3 text-center">
               <p className="text-gray-400 text-[10px] uppercase tracking-wider mb-1">Shift</p>
               <p className="text-gray-800 font-semibold text-sm">{form.shiftTiming || "—"}</p>
@@ -263,7 +256,6 @@ export default function Profile() {
             {/* LEFT — 2 columns wide */}
             <div className="lg:col-span-2 space-y-6">
 
-              {/* Bio */}
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                 <SectionHeader icon={faFileAlt} label="Bio / About Me" color="text-indigo-500" />
                 <Field label="" icon={null}>
@@ -273,7 +265,6 @@ export default function Profile() {
                 </Field>
               </div>
 
-              {/* Basic Information */}
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                 <SectionHeader icon={faIdBadge} label="Basic Information" color="text-blue-500" />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -322,7 +313,6 @@ export default function Profile() {
                 </div>
               </div>
 
-              {/* Professional Information */}
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                 <SectionHeader icon={faCode} label="Professional Information" color="text-indigo-500" />
                 <div className="space-y-5">
@@ -361,7 +351,6 @@ export default function Profile() {
                 </div>
               </div>
 
-              {/* Address */}
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                 <div className="flex items-center justify-between mb-4">
                   <SectionHeader icon={faHome} label="Address Information" color="text-green-500" />
@@ -394,7 +383,6 @@ export default function Profile() {
             {/* RIGHT — 1 column wide */}
             <div className="space-y-6">
 
-              {/* Contact Information */}
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                 <SectionHeader icon={faPhone} label="Contact Information" color="text-green-500" />
                 <div className="space-y-4">
@@ -418,7 +406,6 @@ export default function Profile() {
                 </div>
               </div>
 
-              {/* Emergency Contact */}
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                 <SectionHeader icon={faHeartbeat} label="Emergency Contact" color="text-red-500" />
                 <div className="space-y-4">

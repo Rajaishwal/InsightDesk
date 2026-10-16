@@ -122,7 +122,6 @@ const ScrollHint = ({ total, shown = 3 }) => total > shown
   ? <p className="mt-2 text-center text-[10px] font-semibold text-gray-400">Scroll for {total - shown} more</p>
   : null;
 
-/* ── Live status chip ───────────────────────────────────────────────────── */
 function LiveStatus({ live }) {
   const map = {
     working: { cls: "border-indigo-300 text-indigo-600", dot: "bg-indigo-500 animate-pulse", text: `Working on "${live.taskTitle}" since ${fmtTime(live.since)}` },
@@ -471,7 +470,6 @@ export default function EmployeeReport() {
       {/* Holds the previous render dimmed while a new period loads — no layout jump */}
       <div className={`space-y-5 transition-opacity ${loading ? "pointer-events-none opacity-60" : ""}`}>
 
-        {/* ── Header ── */}
         <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
           <div className="h-0.5 bg-gradient-to-r from-indigo-500 via-violet-500 to-blue-500" />
           <div className="flex flex-wrap items-center gap-5 px-6 py-5">
@@ -518,7 +516,6 @@ export default function EmployeeReport() {
           <p className="rounded-lg border border-red-100 bg-red-50 px-4 py-2 text-sm text-red-600">{error} Showing the previous period.</p>
         )}
 
-        {/* ── Key numbers ── */}
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
           <Stat label="Attendance" Icon={CalendarDays} accent="border-l-emerald-400"
             value={k.attendanceRate == null ? "—" : `${k.attendanceRate}%`}
@@ -544,7 +541,6 @@ export default function EmployeeReport() {
             sub="approved leave in period" />
         </div>
 
-        {/* ── Attendance + Focus ── */}
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
           <Card title="Attendance" Icon={CalendarDays}
             right={<span className="text-[11px] text-gray-400">{k.breakCount} breaks · avg {fmtHM(k.avgBreakSec)}{k.daysOverBreakLimit ? ` · ${k.daysOverBreakLimit} day(s) over 60m` : ""}</span>}>
@@ -608,7 +604,6 @@ export default function EmployeeReport() {
           )}
         </section>
 
-        {/* ── Projects + Tasks ── */}
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
           <Card title="Projects" Icon={Layers}
             right={projects.length > 0 && (

@@ -154,14 +154,12 @@ export const HrTaskForm = ({ onClose }) => {
               )}
             </div>
 
-            {/* Selected pill */}
             {assignedTo && (
               <p className="mt-1 ml-1 text-xs text-green-600 font-medium">
                 ✓ Employee ID: <span className="font-bold">{assignedTo}</span>
               </p>
             )}
 
-            {/* Dropdown */}
             {showSuggestions && suggestions.length > 0 && (
               <ul ref={suggestNav.listRef} className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-52 overflow-y-auto">
                 {suggestions.map((emp, i) => (
@@ -172,7 +170,6 @@ export const HrTaskForm = ({ onClose }) => {
                       onMouseDown={() => selectEmployee(emp)}
                       className={`w-full flex items-center gap-3 px-4 py-2.5 transition text-left ${suggestNav.active === i ? "bg-indigo-50" : ""}`}
                     >
-                      {/* Avatar */}
                       <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
                         {emp.name?.[0]?.toUpperCase() || "?"}
                       </div>

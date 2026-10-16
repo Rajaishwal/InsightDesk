@@ -36,7 +36,6 @@ const AttendanceFilters = ({ filters, setFilters, people }) => {
 
       <span className="hidden h-6 w-px bg-gray-100 sm:block" />
 
-      {/* Quick ranges */}
       <div className="flex flex-wrap gap-1">
         {PRESETS.map((p) => (
           <button
@@ -52,7 +51,6 @@ const AttendanceFilters = ({ filters, setFilters, people }) => {
         ))}
       </div>
 
-      {/* Custom range */}
       <div className="flex items-center gap-1.5">
         <Tooltip text={badRange ? "The From date can't be after the To date" : "Show attendance from this day"}>
           <input type="date" aria-label="From date" value={filters.startDate} max={filters.endDate || undefined}

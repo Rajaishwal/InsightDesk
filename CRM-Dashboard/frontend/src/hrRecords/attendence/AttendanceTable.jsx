@@ -115,7 +115,6 @@ const AttendanceTable = ({ data, loading, error, onRetry, pagination, onPage, fi
 
                 return (
                   <tr key={r._id} className="transition hover:bg-gray-50/70">
-                    {/* Employee */}
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-2.5">
                         <PersonAvatar person={person} name={r.userName} size={32} />
@@ -126,13 +125,11 @@ const AttendanceTable = ({ data, loading, error, onRetry, pagination, onPage, fi
                       </div>
                     </td>
 
-                    {/* Day */}
                     <td className="whitespace-nowrap px-4 py-3.5">
                       <p className="text-sm text-gray-700">{day.main}</p>
                       {day.tag && <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-500">{day.tag}</p>}
                     </td>
 
-                    {/* Check in / out */}
                     <td className="whitespace-nowrap px-4 py-3.5 text-sm tabular-nums text-gray-700">{fmtTime(r.checkInTime)}</td>
                     <td className="whitespace-nowrap px-4 py-3.5 text-sm tabular-nums">
                       {r.checkOutTime ? (
@@ -151,7 +148,6 @@ const AttendanceTable = ({ data, loading, error, onRetry, pagination, onPage, fi
                       )}
                     </td>
 
-                    {/* Working hours */}
                     <td className="px-4 py-3.5">
                       {missed ? (
                         <span className="text-gray-300">—</span>
@@ -168,7 +164,6 @@ const AttendanceTable = ({ data, loading, error, onRetry, pagination, onPage, fi
                       )}
                     </td>
 
-                    {/* Task time */}
                     <td className="whitespace-nowrap px-4 py-3.5">
                       {r.taskSeconds > 0 ? (
                         <>
@@ -180,7 +175,6 @@ const AttendanceTable = ({ data, loading, error, onRetry, pagination, onPage, fi
                       )}
                     </td>
 
-                    {/* Break */}
                     <td className="whitespace-nowrap px-4 py-3.5">
                       {r.breakSeconds > 0 ? (
                         <Tooltip text={r.breakSeconds > 3600 ? "Longer than an hour" : undefined}><span className={`text-sm font-semibold tabular-nums ${r.breakSeconds > 3600 ? "text-rose-600" : "text-gray-700"}`}>
@@ -191,7 +185,6 @@ const AttendanceTable = ({ data, loading, error, onRetry, pagination, onPage, fi
                       )}
                     </td>
 
-                    {/* Status */}
                     <td className="px-5 py-3.5">
                       <Tooltip text={missed ? "This session was never checked out" : undefined}><span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${st.chip}`}>
                         <span className={`h-1.5 w-1.5 rounded-full ${st.dot}`} />
@@ -206,7 +199,6 @@ const AttendanceTable = ({ data, loading, error, onRetry, pagination, onPage, fi
         </table>
       </div>
 
-      {/* Pagination */}
       {!loading && !error && (
         <Pagination currentPage={currentPage} totalPages={totalPages} totalRecords={totalRecords}
           pageSize={limit} shown={data.length} onPage={onPage} />

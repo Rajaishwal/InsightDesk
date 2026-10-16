@@ -138,13 +138,10 @@ export default function ProjectTaskDrawer({ project, onClose, isManager }) {
 
   return (
     <div className="fixed inset-0 z-50 flex">
-      {/* Backdrop */}
       <div className="flex-1 bg-black/40 backdrop-blur-sm" onClick={onClose} />
 
-      {/* Drawer */}
       <div className="relative w-full max-w-lg bg-white shadow-2xl flex flex-col h-full overflow-hidden">
 
-        {/* Header */}
         <div className="px-6 py-5 bg-gradient-to-r from-indigo-600 to-indigo-800 text-white flex-shrink-0">
           <div className="flex items-start justify-between">
             <div>
@@ -167,7 +164,6 @@ export default function ProjectTaskDrawer({ project, onClose, isManager }) {
           </div>
         </div>
 
-        {/* Timeline */}
         <div className="flex-1 overflow-y-auto px-5 py-5">
           {loading ? (
             <div className="py-20 text-center text-gray-400 text-sm">Loading tasks...</div>
@@ -206,19 +202,16 @@ export default function ProjectTaskDrawer({ project, onClose, isManager }) {
 
                 return (
                   <div key={task._id} className="flex gap-4 relative">
-                    {/* Spine */}
                     <div className="flex flex-col items-center flex-shrink-0 pt-1">
                       <div className={`w-3 h-3 rounded-full ${dotCls} ring-2 ring-white shadow z-10 flex-shrink-0
                         ${running ? "animate-pulse" : ""}`} />
                       {!isLast && <div className="w-px flex-1 bg-gray-200 mt-1 min-h-[24px]" />}
                     </div>
 
-                    {/* Card */}
                     <div className={`flex-1 mb-5 bg-gray-50 rounded-xl border p-4 min-w-0 transition
                       ${running ? "border-indigo-300 bg-indigo-50/40" : "border-gray-100"}
                       ${busy ? "opacity-70" : ""}`}>
 
-                      {/* Title + Status */}
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
                           <span className="text-sm font-semibold text-gray-800">{task.title}</span>
@@ -248,12 +241,10 @@ export default function ProjectTaskDrawer({ project, onClose, isManager }) {
                         )}
                       </div>
 
-                      {/* Description */}
                       {task.description && (
                         <p className="text-xs text-gray-500 mt-2 leading-relaxed">{task.description}</p>
                       )}
 
-                      {/* Timer row */}
                       <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-gray-100 gap-2">
                         {/* Left: timer display */}
                         <div className="flex items-center gap-1.5 min-w-0">
@@ -269,7 +260,6 @@ export default function ProjectTaskDrawer({ project, onClose, isManager }) {
 
                         {/* Right: play/stop + creator */}
                         <div className="flex items-center gap-2 flex-shrink-0">
-                          {/* Creator avatar */}
                           <div className="flex items-center gap-1.5">
                             <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0
                               ${task.createdByRole === "employee" ? "bg-indigo-400" : "bg-slate-600"}`}>

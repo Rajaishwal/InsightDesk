@@ -70,7 +70,6 @@ const ProjectModal = ({ project, onClose, isHrView = false }) => {
         className="animate-dialog-in flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
         <div className="h-1 flex-shrink-0 bg-gradient-to-r from-indigo-500 via-violet-500 to-blue-500" />
 
-        {/* Header */}
         <div className="flex items-start gap-3 px-6 pt-5">
           <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-indigo-50">
             <FolderKanban className="h-5 w-5 text-indigo-600" />
@@ -94,7 +93,6 @@ const ProjectModal = ({ project, onClose, isHrView = false }) => {
           </button></HoverTip>
         </div>
 
-        {/* Body */}
         <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5 [scrollbar-width:thin]">
           <Section label="Description">
             <p className="text-sm leading-relaxed text-gray-700">{project.description || <span className="text-gray-400">No description.</span>}</p>
@@ -129,7 +127,6 @@ const ProjectModal = ({ project, onClose, isHrView = false }) => {
           </Section>
         </div>
 
-        {/* Footer */}
         <div className="flex flex-shrink-0 justify-end gap-2 border-t border-gray-100 px-6 py-4">
           <button type="button" onClick={onClose}
             className="rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">

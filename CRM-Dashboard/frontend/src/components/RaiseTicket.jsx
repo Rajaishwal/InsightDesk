@@ -86,7 +86,6 @@ export default function RaiseTicket({ isOpen, onClose, onSubmit }) {
         </div>
 
         <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
-          {/* Category */}
           <div>
             <Label>What's it about?</Label>
             <div role="radiogroup" aria-label="Category" onKeyDown={radioKeys(CATEGORIES, form.category, pickCategory)} className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -108,7 +107,6 @@ export default function RaiseTicket({ isOpen, onClose, onSubmit }) {
             </div>
           </div>
 
-          {/* Problem */}
           {form.category && (
             <div>
               <Label hint="optional">Problem</Label>
@@ -128,7 +126,6 @@ export default function RaiseTicket({ isOpen, onClose, onSubmit }) {
             </div>
           )}
 
-          {/* Priority */}
           <div>
             <Label>How urgent?</Label>
             <div role="radiogroup" aria-label="Priority" onKeyDown={radioKeys(PRIORITIES, form.priority, (p) => set({ priority: p }))} className="grid grid-cols-3 gap-2">
@@ -146,7 +143,6 @@ export default function RaiseTicket({ isOpen, onClose, onSubmit }) {
             </div>
           </div>
 
-          {/* Description */}
           <div>
             <Label hint={`${form.description.length}/${MAX}`}>Describe it</Label>
             <textarea rows={4} maxLength={MAX} value={form.description} onChange={(e) => set({ description: e.target.value })}
@@ -154,7 +150,6 @@ export default function RaiseTicket({ isOpen, onClose, onSubmit }) {
               className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50/70 px-3 py-2.5 text-sm text-gray-800 outline-none transition placeholder:text-gray-300 focus:border-indigo-300 focus:bg-white focus:ring-4 focus:ring-indigo-50" />
           </div>
 
-          {/* Attachments */}
           <div>
             <Label hint="screenshots or documents">Attachments</Label>
             <FileUploader attachments={attachments} onChange={setAttachments} disabled={submitting} />

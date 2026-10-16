@@ -85,7 +85,6 @@ const SuggestInput = ({
   );
 };
 
-// ── Role badge ──────────────────────────────────────────────────────────────────
 const RoleBadge = ({ role }) => {
   const colors = {
     admin:   "bg-purple-100 text-purple-700",
@@ -177,7 +176,6 @@ const AddProject = ({ onClose, onSave }) => {
     });
   };
 
-  // ── Save ──────────────────────────────────────────────────────────────────────
   const handleSaveClick = async () => {
     if (!formData.title || !formData.manager || !formData.email) {
       setError("Title, Manager name, and Manager email are required.");
@@ -235,12 +233,10 @@ const AddProject = ({ onClose, onSave }) => {
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-start justify-center z-[1000] p-4 overflow-y-auto">
       <div className="bg-white/95 rounded-2xl shadow-2xl w-full max-w-2xl p-8 relative border border-gray-200 my-10">
 
-        {/* Close */}
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 transition">
           <X size={22} />
         </button>
 
-        {/* Title */}
         <h2 className="text-2xl font-bold text-gray-900 mb-8 flex items-center gap-3 border-b pb-3">
           <FolderPlus size={28} className="text-blue-600" />
           Add New Project
@@ -267,14 +263,12 @@ const AddProject = ({ onClose, onSave }) => {
           </div>
         </div>
 
-        {/* ── Manager section ── */}
         <div className="mb-2">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1">
             <User size={13} /> Project Manager
             <span className="ml-1 text-[10px] normal-case font-normal text-gray-400">(admin / hr / manager roles only)</span>
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            {/* Manager Name */}
             <SuggestInput
               value={formData.manager}
               onChange={(v) => setFormData((p) => ({ ...p, manager: v }))}
@@ -295,7 +289,6 @@ const AddProject = ({ onClose, onSave }) => {
               )}
             />
 
-            {/* Manager Email */}
             <SuggestInput
               value={formData.email}
               onChange={(v) => setFormData((p) => ({ ...p, email: v }))}
@@ -318,7 +311,6 @@ const AddProject = ({ onClose, onSave }) => {
           </div>
         </div>
 
-        {/* ── Skills & Tools ── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mt-5">
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><Briefcase size={18} /></span>
@@ -338,7 +330,6 @@ const AddProject = ({ onClose, onSave }) => {
           </div>
         </div>
 
-        {/* ── Description ── */}
         <textarea
           name="description" placeholder="Project Description"
           value={formData.description} onChange={handleChange}
@@ -346,14 +337,12 @@ const AddProject = ({ onClose, onSave }) => {
           className="border border-gray-300 rounded-lg w-full p-3 shadow-sm focus:ring-2 focus:ring-blue-500 outline-none transition resize-none bg-gray-50 hover:bg-white text-sm mt-5"
         />
 
-        {/* ── Error ── */}
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm mt-3">
             {error}
           </div>
         )}
 
-        {/* ── Team Members ── */}
         <div className="mt-6">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
@@ -367,7 +356,6 @@ const AddProject = ({ onClose, onSave }) => {
           <div className="flex flex-col gap-3">
             {formData.teamMembers.map((member, index) => (
               <div key={index} className="flex items-start gap-2">
-                {/* Emp ID */}
                 <div className="flex-1">
                   <SuggestInput
                     value={member.empId}
@@ -387,7 +375,6 @@ const AddProject = ({ onClose, onSave }) => {
                   />
                 </div>
 
-                {/* Emp Email */}
                 <div className="flex-1">
                   <SuggestInput
                     value={member.empEmail}
@@ -426,7 +413,6 @@ const AddProject = ({ onClose, onSave }) => {
           </button>
         </div>
 
-        {/* ── Actions ── */}
         <div className="flex justify-end gap-3 mt-8">
           <button
             onClick={onClose} disabled={isLoading}

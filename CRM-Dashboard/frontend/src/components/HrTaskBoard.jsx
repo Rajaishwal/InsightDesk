@@ -25,7 +25,6 @@ const CHIP = {
 const STATUS_OPTIONS = ["In Progress", "Completed"];
 const FINAL_STATUSES = ["Completed", "Failed"];
 
-/* ── Status dropdown badge ── */
 function StatusBadge({ status, taskId, onStatusChange }) {
   const toast = useToast();
   const confirm = useConfirm();
@@ -99,7 +98,6 @@ function StatusBadge({ status, taskId, onStatusChange }) {
   );
 }
 
-/* ── HR Task Row ── */
 function HrTaskRow({ task, userId, onTaskUpdate }) {
   const toast = useToast();
   const myTimer = task.timers?.find(t => t.userId?.toString() === userId?.toString());
@@ -154,12 +152,10 @@ function HrTaskRow({ task, userId, onTaskUpdate }) {
         : "bg-white border-gray-100 hover:border-gray-200 hover:shadow-sm"
       }`}>
 
-      {/* Left bar */}
       <div className={`w-1 h-10 rounded-full flex-shrink-0 transition-all ${
         done ? "bg-emerald-400" : isRunning ? "bg-indigo-500" : "bg-gray-200"
       }`} />
 
-      {/* Info */}
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold truncate text-gray-800">
           {task.title}
@@ -175,7 +171,6 @@ function HrTaskRow({ task, userId, onTaskUpdate }) {
       {/* Status badge — left of timer */}
       <StatusBadge status={localStatus} taskId={task._id} onStatusChange={handleStatusChange} />
 
-      {/* Timer controls */}
       <div className="flex items-center gap-2 flex-shrink-0">
         {done ? (
           <div className="flex items-center gap-1.5">
@@ -254,7 +249,6 @@ export default function HrTaskBoard() {
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 space-y-4">
 
-      {/* Header */}
       <div className="flex items-center gap-2">
         <Timer className="w-4 h-4 text-indigo-500" />
         <h2 className="text-sm font-bold text-gray-800">Task Board</h2>

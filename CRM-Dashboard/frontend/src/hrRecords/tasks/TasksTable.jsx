@@ -70,22 +70,18 @@ const TasksTable = ({ tasks, loading, setTasks }) => {
             const done = task.status === "Completed";
             return (
               <tr key={task._id} className={`transition ${done ? "bg-emerald-50/40 hover:bg-emerald-50" : "hover:bg-gray-50"}`}>
-                {/* Title */}
                 <td className="px-5 py-4 text-sm font-medium text-gray-900 max-w-[180px]">
                   <span className={done ? "line-through text-gray-400" : ""}>{task.title}</span>
                 </td>
 
-                {/* Description */}
                 <td className="px-5 py-4 text-sm text-gray-500 max-w-[200px] truncate">
                   {task.description || <span className="text-gray-300">—</span>}
                 </td>
 
-                {/* Assigned by */}
                 <td className="px-5 py-4 text-sm text-gray-700 whitespace-nowrap">
                   {task.assignedBy ? (task.assignedByName || "HR") : (task.createdByName || "Self")}
                 </td>
 
-                {/* Status */}
                 <td className="px-5 py-4 whitespace-nowrap">
                   <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${STATUS_CHIP[task.status] || "bg-gray-100 text-gray-500"}`}>
                     {task.status || "—"}
@@ -100,12 +96,10 @@ const TasksTable = ({ tasks, loading, setTasks }) => {
                   }
                 </td>
 
-                {/* Completed at */}
                 <td className="px-5 py-4 text-xs text-gray-500 whitespace-nowrap">
                   {done ? fmt(task.completedAt || task.updatedAt) : <span className="text-gray-300">—</span>}
                 </td>
 
-                {/* Created */}
                 <td className="px-5 py-4 text-xs text-gray-400 whitespace-nowrap">
                   {fmt(task.createdAt)}
                 </td>

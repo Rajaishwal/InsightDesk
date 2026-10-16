@@ -69,7 +69,6 @@ function LocationRow({ emp }) {
   return (
     <div className={`overflow-hidden rounded-2xl border border-l-4 border-gray-100 ${EDGE[s]} bg-white shadow-sm transition hover:shadow-md`}>
       <div className="flex flex-col gap-4 px-5 py-4 lg:grid lg:grid-cols-[minmax(200px,1fr)_minmax(260px,1.5fr)_minmax(180px,0.9fr)_auto] lg:items-center lg:gap-6">
-        {/* Who */}
         <div className="flex min-w-0 items-center gap-3">
           <div className="relative flex-shrink-0">
             <PersonAvatar person={emp} size={42} />
@@ -87,7 +86,6 @@ function LocationRow({ emp }) {
           </div>
         </div>
 
-        {/* Where */}
         <div className="flex min-w-0 items-start gap-2.5">
           <span className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-indigo-50">
             <MapPin className="h-3.5 w-3.5 text-indigo-500" />
@@ -121,7 +119,6 @@ function LocationRow({ emp }) {
           </div>
         </div>
 
-        {/* Action */}
         <div className="flex items-center lg:justify-end">
           {lat != null && (
             <a href={mapsLink(lat, lng)} target="_blank" rel="noopener noreferrer"
@@ -215,7 +212,6 @@ const LocationTab = () => {
 
   return (
     <div className="space-y-5">
-      {/* Section header */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h2 className="text-lg font-bold text-gray-900">Employee locations</h2>
@@ -247,7 +243,6 @@ const LocationTab = () => {
 
       <LocationFilters filters={filters} setFilters={setFilters} />
 
-      {/* Cards */}
       {error && !employees.length ? (
         <div className="rounded-2xl border border-gray-100 bg-white px-5 py-12 text-center shadow-sm">
           <MapPinOff className="mx-auto h-8 w-8 text-red-300" />

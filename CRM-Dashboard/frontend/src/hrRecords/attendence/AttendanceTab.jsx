@@ -79,7 +79,6 @@ const AttendanceTab = () => {
 
   return (
     <div className="space-y-5">
-      {/* Section header */}
       <div className="flex items-end justify-between gap-4">
         <div>
           <h2 className="text-lg font-bold text-gray-900">Attendance</h2>

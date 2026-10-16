@@ -128,7 +128,6 @@ export const checkOut = async (req, res) => {
       });
     }
 
-    // Update check-out time and status
     attendance.checkOutTime = new Date();
     attendance.status = "checked-out";
     attendance.calculateWorkingHours();

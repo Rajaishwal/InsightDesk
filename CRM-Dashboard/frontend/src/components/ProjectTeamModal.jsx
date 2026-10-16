@@ -3,7 +3,6 @@ const ProjectTeamModal = ({ teamMembers = [], projectTitle = "", onClose }) => {
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/50 backdrop-blur-sm">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-md relative">
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div>
             <h2 className="text-lg font-bold text-gray-800">Team Members</h2>

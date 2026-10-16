@@ -10,7 +10,6 @@ import { protect, hrOrAdmin } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// Get team members for a project by projectId
 router.get('/:projectId/team', protect, async (req, res) => {
   try {
     const project = await Project.findOne({ projectId: req.params.projectId });
@@ -40,11 +39,11 @@ router.get("/next-id", protect, async (req, res) => {
 });
 
 // Public routes (require authentication)
-router.post("/", protect, createProject);                    // Create project
-router.get("/my-projects", protect, getMyProjects);          // Get user's projects
+router.post("/", protect, createProject);
+router.get("/my-projects", protect, getMyProjects);
 
 // HR/Admin routes
-router.get("/", protect, hrOrAdmin, getAllProjects);         // Get all projects (HR/Admin only)
-router.put("/:id", protect, updateProject);                  // Update project
+router.get("/", protect, hrOrAdmin, getAllProjects);
+router.put("/:id", protect, updateProject);
 
 export default router;

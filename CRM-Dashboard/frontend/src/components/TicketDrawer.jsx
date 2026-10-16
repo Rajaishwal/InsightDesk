@@ -131,7 +131,6 @@ export default function TicketDrawer({ ticket: initialTicket, onClose, onUpdate,
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-gray-900/40 backdrop-blur-sm" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <aside className="animate-slideInRight flex h-full w-full max-w-lg flex-col bg-white shadow-2xl" aria-label={`Ticket ${ticket.ticketId}`}>
-        {/* Header */}
         <div className="border-b border-gray-100 px-6 pb-4 pt-5">
           <div className="flex items-start justify-between gap-3">
             <div className="flex flex-wrap items-center gap-1.5">
@@ -148,7 +147,6 @@ export default function TicketDrawer({ ticket: initialTicket, onClose, onUpdate,
             {isAdmin && <><span className="text-gray-300">·</span> by <span className="font-semibold text-gray-700">{ticket.userName}</span> <span className="font-mono text-gray-400">{ticket.userEmployeeId}</span></>}
           </p>
 
-          {/* Status track */}
           <div className="mt-4">
             <div className="grid grid-cols-4 gap-1.5">
               {STATUSES.map((s, i) => {
@@ -171,7 +169,6 @@ export default function TicketDrawer({ ticket: initialTicket, onClose, onUpdate,
           </div>
         </div>
 
-        {/* Conversation */}
         <div className="flex-1 space-y-4 overflow-y-auto bg-gray-50/40 px-6 py-5">
           <Message who={ticket.userName} photo={photos[String(ticket.userId)] || (ownerMine ? user?.photo : undefined)} role="employee"
             time={ticket.createdAt} text={ticket.description} files={ticket.attachments} mine={ownerMine} />
@@ -188,7 +185,6 @@ export default function TicketDrawer({ ticket: initialTicket, onClose, onUpdate,
           <div ref={bottomRef} />
         </div>
 
-        {/* Reply */}
         {closed ? (
           <div className="flex items-center gap-2 border-t border-gray-100 px-6 py-4 text-sm text-gray-500">
             <Lock className="h-4 w-4 text-gray-400" />

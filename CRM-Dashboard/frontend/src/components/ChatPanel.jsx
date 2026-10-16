@@ -33,7 +33,6 @@ const Avatar = ({ name, photo, size = "w-9 h-9" }) => {
   );
 };
 
-
 const ChatPanel = ({ onClose }) => {
   const { user } = useAuth();
   const { messages, sendMessage, editMessage, deleteMessage, markRead, loadHistory, isOnline, unreadFrom, setOpenChat } =
@@ -175,7 +174,6 @@ const ChatPanel = ({ onClose }) => {
     onClose: () => setSearchTerm(""),
   });
 
-
   const activeMessages = messages[activeChat?._id] || [];
 
   const formatTime = (ts) => {
@@ -214,18 +212,15 @@ const ChatPanel = ({ onClose }) => {
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-stretch justify-end pointer-events-none">
-      {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/20 pointer-events-auto"
         onClick={onClose}
       />
 
-      {/* Panel */}
       <div className="relative flex w-[820px] max-w-full h-full bg-white shadow-2xl pointer-events-auto animate-slideInRight">
 
         {/* ── LEFT: Conversation list ── */}
         <div className="w-80 flex-shrink-0 border-r border-gray-100 flex flex-col bg-white">
-          {/* Header */}
           <div className="px-4 pt-5 pb-3 bg-white">
             <div className="flex items-center justify-between mb-4">
               <span className="text-xl font-bold text-gray-900">Chats</span>
@@ -233,7 +228,6 @@ const ChatPanel = ({ onClose }) => {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            {/* Search */}
             <div className="flex items-center gap-2 bg-[#f0f2f5] rounded-full px-4 py-2">
               <Search className="w-4 h-4 text-gray-400 flex-shrink-0" />
               <input
@@ -252,10 +246,8 @@ const ChatPanel = ({ onClose }) => {
             </div>
           </div>
 
-          {/* List body */}
           <div className="flex-1 overflow-y-auto">
             {searchTerm ? (
-              /* Search results */
               searchResults.length === 0 ? (
                 <div className="text-center mt-10 px-4">
                   <Search className="w-8 h-8 text-gray-200 mx-auto mb-2" />
@@ -308,13 +300,11 @@ const ChatPanel = ({ onClose }) => {
                         isActive ? "bg-[#f0f2f5]" : "hover:bg-[#f9f9f9]"
                       }`}
                     >
-                      {/* Avatar */}
                       <div className="relative flex-shrink-0">
                         <Avatar name={conv.name} photo={conv.photo} size="w-12 h-12" />
                         <span className={`absolute bottom-[calc(14.645%_-_4px)] right-[calc(14.645%_-_4px)] w-2 h-2 rounded-full ${isOnline(conv.userId) ? "online-glow-dot" : "offline-glass-dot"}`} />
                       </div>
 
-                      {/* Content */}
                       <div className="flex-1 min-w-0">
                         {/* Row 1: name + time */}
                         <div className="flex items-baseline justify-between gap-1">
@@ -363,7 +353,6 @@ const ChatPanel = ({ onClose }) => {
         <div className="flex-1 flex flex-col min-w-0">
           {activeChat ? (
             <>
-              {/* Chat header */}
               <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100 bg-white shadow-sm flex-shrink-0">
                 <div className="relative">
                   <Avatar name={activeChat.name} photo={activeChat.photo} size="w-10 h-10" />
@@ -379,11 +368,9 @@ const ChatPanel = ({ onClose }) => {
                 </div>
               </div>
 
-              {/* Messages */}
               <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 bg-gray-50">
                 {Object.entries(groupedMessages).map(([dateLabel, msgs]) => (
                   <div key={dateLabel}>
-                    {/* Date separator */}
                     <div className="flex items-center gap-3 my-3">
                       <div className="flex-1 h-px bg-gray-200" />
                       <span className="text-xs text-gray-400 bg-gray-50 px-2">{dateLabel}</span>
@@ -444,14 +431,12 @@ const ChatPanel = ({ onClose }) => {
                               ) : (
                                 <>
 
-                                  {/* ── Message bubble ── */}
                                   <div className={`rounded-2xl overflow-hidden ${isMe ? "rounded-br-sm" : "rounded-bl-sm"} ${
                                     msg.fileType === "image" ? "shadow-sm" :
                                     msg.fileType ? (isMe ? "bg-indigo-600 text-white" : "bg-white text-gray-800 shadow-sm border border-gray-100") :
                                     (isMe ? "bg-indigo-600 text-white" : "bg-white text-gray-800 shadow-sm border border-gray-100")
                                   }`}>
 
-                                    {/* Reply quote */}
                                     {msg.replyTo?.senderName && (
                                       <div className={`mx-2 mt-2 px-3 py-2 rounded-lg border-l-4 ${isMe ? "bg-indigo-500 border-indigo-300" : "bg-gray-50 border-indigo-400"}`}>
                                         <p className={`text-[11px] font-semibold mb-0.5 ${isMe ? "text-indigo-200" : "text-indigo-600"}`}>
@@ -467,7 +452,6 @@ const ChatPanel = ({ onClose }) => {
                                       </div>
                                     )}
 
-                                    {/* Content */}
                                     {msg.fileType === "image" ? (
                                       <>
                                         <img
@@ -561,7 +545,6 @@ const ChatPanel = ({ onClose }) => {
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* Input */}
               <div className="flex-shrink-0 bg-white border-t border-gray-100">
                 {/* Reply preview bar */}
                 {replyTo && (
@@ -619,7 +602,6 @@ const ChatPanel = ({ onClose }) => {
                   />
 
                   <div className="flex items-end gap-2 bg-gray-50 rounded-2xl border border-gray-200 px-4 py-2 focus-within:border-indigo-400 focus-within:ring-1 focus-within:ring-indigo-200 transition">
-                    {/* Paperclip */}
                     <Tooltip text="Attach file"><button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}

@@ -46,7 +46,6 @@ router.get('/admin-stats', protect, admin, async (_req, res) => {
       monthlyData.push({ month: start.toLocaleDateString('en-US', { month: 'short' }), count });
     }
 
-    // Today's attendance
     const todayAtt = await Attendance.find({ date: today });
     const presentCount = todayAtt.length;
 
@@ -468,7 +467,6 @@ router.get('/attendance-calendar', protect, async (req, res) => {
       }).lean(),
     ]);
 
-    // Build leave sets
     const leaveDates = new Set(); const halfDayDates = new Set(); const leaveDateTypes = {};
     for (const lv of leaves) {
       for (let d = new Date(lv.startDate); d <= new Date(lv.endDate); d.setDate(d.getDate() + 1)) {

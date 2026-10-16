@@ -25,12 +25,10 @@ export const getTasksByUserId = async (req, res) => {
     // Convert to ObjectId for proper comparison
     const objectId = new mongoose.Types.ObjectId(userId);
     
-    // Find tasks created by this user
     const tasks = await Task.find({ createdBy: objectId })
       .populate("createdBy", "name email")
       .sort({ createdAt: -1 });
-    
-    
+
     res.status(200).json({ success: true, tasks });
   } catch (error) {
     console.error("❌ Error in getTasksByUserId:", error);

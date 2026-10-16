@@ -131,11 +131,9 @@ const AdminDashboard = () => {
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
 
-      {/* ── Profile Card ── */}
       <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-slate-100 rounded-2xl shadow-sm border border-indigo-100 overflow-hidden mb-5">
         <div className="flex items-center justify-between px-7 py-5">
 
-          {/* Left: avatar + info */}
           <div className="flex items-center gap-5">
             {/* Square-rounded avatar with straddling edit button */}
             <div className="group relative w-[72px] h-[72px] flex-shrink-0">
@@ -268,7 +266,6 @@ const AdminDashboard = () => {
         })}
       </div>
 
-      {/* ── Main Grid ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
         {/* Left — 2/3 */}
@@ -281,7 +278,6 @@ const AdminDashboard = () => {
               <p className="text-[11px] text-gray-400 mt-0.5">New employees per month · last {joinData.length} months · hover a bar to see who joined</p>
             </div>
 
-            {/* Summary */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
               {[
                 ["Joined", joinTotal, `in ${joinData.length} months`],
@@ -361,7 +357,6 @@ const AdminDashboard = () => {
 
             return (
               <div className="bg-white rounded-2xl shadow-sm p-5">
-                {/* Header */}
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     {cfg && <span className={`w-2.5 h-2.5 rounded-full ${cfg.dot}`} />}
@@ -393,7 +388,6 @@ const AdminDashboard = () => {
                   </div>
                 </div>
 
-                {/* Table */}
                 <div className="overflow-x-auto">
                   <div className="max-h-[360px] overflow-y-auto">
                     <table className="w-full text-sm">
@@ -446,7 +440,6 @@ const AdminDashboard = () => {
                                   onClick={canExpand ? () => toggleBreakExpand(emp._id) : undefined}
                                   className={`transition-colors ${canExpand ? "cursor-pointer" : ""} ${isExpanded ? "bg-amber-50" : "hover:bg-gray-50"}`}
                                 >
-                                  {/* Name */}
                                   <td className="py-3 pr-4">
                                     <div className="flex items-center gap-2.5">
                                       <div className="w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 font-bold text-xs flex-shrink-0 overflow-hidden">
@@ -469,16 +462,13 @@ const AdminDashboard = () => {
                                       )}
                                     </div>
                                   </td>
-                                  {/* Designation */}
                                   <td className="py-3 pr-4 text-gray-500 text-xs">{emp.designation || "—"}</td>
-                                  {/* Domain */}
                                   <td className="py-3 pr-4">
                                     {emp.domain
                                       ? <span className="px-2 py-0.5 bg-violet-50 text-violet-700 rounded-full text-xs font-medium">{emp.domain}</span>
                                       : <span className="text-gray-400">—</span>
                                     }
                                   </td>
-                                  {/* Emp ID */}
                                   <td className="py-3 pr-4 text-gray-400 font-mono text-xs">{emp.employeeId || "—"}</td>
                                   {/* Last col */}
                                   <td className="py-3 pr-4 text-gray-400 text-xs">
@@ -489,7 +479,6 @@ const AdminDashboard = () => {
                                       : <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{fmtTime(emp.checkInTime)}</span>
                                     }
                                   </td>
-                                  {/* Check-Out col */}
                                   {cfg?.showCheckOut && (
                                     <td className="py-3 text-gray-400 text-xs">
                                       {emp.checkOutTime
@@ -693,7 +682,6 @@ const AdminDashboard = () => {
             </div>
           </div>
 
-          {/* Ongoing Projects */}
           <div className="bg-white rounded-2xl shadow-sm p-5">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-gray-700">Ongoing Projects</h3>

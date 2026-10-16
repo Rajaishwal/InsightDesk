@@ -22,7 +22,6 @@ const calculateWorkingDays = (startDate, endDate) => {
   return workingDays;
 };
 
-// Apply for leave
 export const applyLeave = async (req, res) => {
   try {
     const { leaveType, startDate, endDate, reason, halfDay } = req.body;
@@ -114,7 +113,6 @@ export const applyLeave = async (req, res) => {
   }
 };
 
-// Get user's leaves
 export const getUserLeaves = async (req, res) => {
   try {
     const userId = req.user._id || req.user.id;
@@ -144,16 +142,13 @@ export const getUserLeaves = async (req, res) => {
   }
 };
 
-// Get leave statistics
 export const getLeaveStats = async (req, res) => {
   try {
     const userId = req.user._id || req.user.id;
     const currentDate = new Date();
     const currentYear = currentDate.getFullYear();
     const currentMonth = currentDate.getMonth() + 1; // JavaScript months are 0-indexed
-    
-    
-    // Get or create monthly allocation for current month
+
     const allocation = await MonthlyLeaveAllocation.getOrCreateAllocation(userId, currentYear, currentMonth);
 
     // Get detailed leave counts for current month
@@ -231,7 +226,6 @@ export const getLeaveStats = async (req, res) => {
 };
 
 // HR-specific endpoints
-// Get all leave requests for HR management
 // GET /api/leaves/hr/all-requests?status&userId&startDate&endDate&page&limit
 // Dates filter on the leave's start day ("YYYY-MM-DD"). `counts` = requests per status for the same
 // employee/date filters (ignoring status) — for the status switch in the HR toolbar.
@@ -312,7 +306,6 @@ export const updateLeaveStatus = async (req, res) => {
     const leaveMonth = leave.startDate.getMonth() + 1;
     const leaveDays = leave.totalDays;
 
-    // Update leave status
     leave.status = status;
     leave.hrComments = hrComments || '';
     leave.reviewedAt = new Date();

@@ -41,7 +41,6 @@ export const assignTask = async (req, res) => {
   }
 };
 
-// 👉 Get all HR assigned tasks
 export const getAllHRTasks = async (req, res) => {
   try {
     const tasks = await HRTask.find().sort({ createdAt: -1 });
@@ -132,7 +131,6 @@ export const updateHRTask = async (req, res) => {
   }
 };
 
-// 👉 Delete task
 export const deleteHRTask = async (req, res) => {
   try {
     const taskId = req.params.id;

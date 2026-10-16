@@ -58,7 +58,6 @@ function Badge({ label, value, color, visible, delay, placement }) {
           minWidth: 110,
         }}
       >
-        {/* vertical accent */}
         <div style={{ width: 2, height: 16, borderRadius: 4, backgroundColor: color, flexShrink: 0 }} />
         <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: "#9ca3af", flex: 1 }}>
           {label}
@@ -88,7 +87,6 @@ function SingleDonut({ type, used, hovering, onEnter, onLeave }) {
       {/* Container = exactly SVG size; overflow visible lets badges spill out */}
       <div style={{ position: "relative", width: SIZE, height: SIZE, overflow: "visible" }}>
 
-        {/* Donut SVG */}
         <svg
           width={SIZE} height={SIZE}
           style={{ transform: "rotate(-90deg)", transition: "opacity 0.3s", opacity: hovering ? 0.55 : 1 }}
@@ -103,7 +101,6 @@ function SingleDonut({ type, used, hovering, onEnter, onLeave }) {
           />
         </svg>
 
-        {/* Center text */}
         <div style={{
           position: "absolute", inset: 0,
           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
@@ -124,7 +121,6 @@ function SingleDonut({ type, used, hovering, onEnter, onLeave }) {
 
       </div>
 
-      {/* Type label */}
       <div style={{ textAlign: "center" }}>
         <div style={{ fontSize: 12.5, fontWeight: 600, color: "#374151" }}>
           {type.key.replace(" (LOP)", "")}

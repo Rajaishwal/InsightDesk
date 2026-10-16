@@ -26,7 +26,6 @@ export default function MobileBlock() {
             </div>
           </div>
 
-          {/* Hero icon */}
           <div className="relative mx-auto mt-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-indigo-50">
             <Laptop className="h-10 w-10 text-indigo-600" strokeWidth={1.75} />
             <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-indigo-200 bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-indigo-600">

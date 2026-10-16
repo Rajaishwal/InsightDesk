@@ -30,7 +30,6 @@ const Navbar = () => {
 
   const navigate = useNavigate();
 
-  // Fetch today's attendance status
   const fetchAttendanceStatus = async () => {
     if (!user?._id) return;
     try {
@@ -159,7 +158,6 @@ const Navbar = () => {
   return (
     <nav className="w-full p-2">
       <div className="max-w-8xl mx-auto px-6 py-3 flex items-center justify-between">
-        {/* Brand */}
         <div className="flex items-center">
           {/*
             InsightDesk mark — "ID" monogram
@@ -168,7 +166,6 @@ const Navbar = () => {
           */}
           <img src={logo} alt="InsightDesk logo" className="h-12" />
 
-          {/* Wordmark + tagline */}
           <div className="flex flex-col leading-none">
             <div className="text-[1.4rem] font-extrabold tracking-tight">
               <span className="text-blue-600">Insight</span><span className="text-amber-400">Desk</span>
@@ -179,11 +176,9 @@ const Navbar = () => {
           </div>
         </div>
 
-        {/* Right side */}
         {user ? (
           <div className="flex items-center gap-2">
 
-            {/* Attendance */}
             <div className="relative group">
               <button
                 onClick={() => setShowAttendanceModal(true)}
@@ -204,7 +199,6 @@ const Navbar = () => {
               </button>
             </div>
 
-            {/* Messages */}
             <button
               onClick={() => setShowChat(true)}
               className="relative flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border border-purple-200 bg-purple-50 text-purple-500 hover:bg-purple-100 transition-all"
@@ -218,7 +212,6 @@ const Navbar = () => {
               )}
             </button>
 
-            {/* Break */}
             {!isCheckedIn ? (
               <Tooltip text={isCheckedOut ? "Break disabled after check-out" : "Check in first to use Break"}>
                 <button
@@ -254,7 +247,6 @@ const Navbar = () => {
               </Tooltip>
             )}
 
-            {/* Logout */}
             <Tooltip text={isCheckedIn ? "Check out first before logging out" : "Log out"}>
               <button
                 onClick={isCheckedIn ? undefined : logout}
@@ -284,12 +276,10 @@ const Navbar = () => {
         )}
       </div>
 
-      {/* Attendance Modal */}
       {showAttendanceModal && (
         <Attendance onClose={() => setShowAttendanceModal(false)} />
       )}
 
-      {/* Chat Panel */}
       {showChat && <ChatPanel onClose={() => setShowChat(false)} />}
     </nav>
   );

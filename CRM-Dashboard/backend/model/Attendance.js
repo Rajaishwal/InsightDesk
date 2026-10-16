@@ -49,7 +49,6 @@ const attendanceSchema = new mongoose.Schema(
 // Create compound index to ensure one attendance record per user per day
 attendanceSchema.index({ userId: 1, date: 1 }, { unique: true });
 
-// Method to calculate working hours
 attendanceSchema.methods.calculateWorkingHours = function() {
   if (this.checkOutTime && this.checkInTime) {
     const diffInMs = this.checkOutTime - this.checkInTime;

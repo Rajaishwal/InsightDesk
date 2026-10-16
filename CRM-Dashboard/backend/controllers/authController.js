@@ -32,7 +32,6 @@ export const registerUser = async (req, res) => {
     const validRoles = ["admin", "employee"];
     const finalRole = validRoles.includes(role) ? role : "employee";
 
-
     const user = await User.create({ 
       employeeId,
       name, 
@@ -109,7 +108,6 @@ export const logoutUser = (req, res) => {
   res.status(200).json({ message: "Logged out successfully" });
 };
 
-// Change user password
 export const changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
@@ -124,13 +122,11 @@ export const changePassword = async (req, res) => {
       return res.status(400).json({ message: "New password must be at least 6 characters long" });
     }
 
-    // Find user
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Verify current password
     const isCurrentPasswordValid = await user.matchPassword(currentPassword);
     
     if (!isCurrentPasswordValid) {

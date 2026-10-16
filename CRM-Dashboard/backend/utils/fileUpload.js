@@ -9,7 +9,6 @@ const fileUpload = async (localFilePath) => {
       return null;
     }
 
-    // Check if file exists
     if (!fs.existsSync(localFilePath)) {
       return null;
     }

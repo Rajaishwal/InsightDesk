@@ -170,7 +170,6 @@ function Attendance({ onClose }) {
         <div className="h-0.5 bg-gradient-to-r from-indigo-500 via-violet-500 to-blue-500" />
 
         <div className="p-7">
-          {/* Header */}
           <div className="mb-5 flex items-center gap-3">
             {/* Avatar — photo, or initial fallback (same as dashboard profile header) */}
             <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-2xl border-2 border-indigo-100 bg-indigo-100">
@@ -201,7 +200,6 @@ function Attendance({ onClose }) {
               {ringLayers}
             </div>
 
-            {/* Border ring */}
             <div className="relative overflow-hidden rounded-xl bg-gray-100 p-[2px]">
               {ringLayers}
 

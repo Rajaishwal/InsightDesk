@@ -170,7 +170,6 @@ function RequestForm({ balances, monthLeft, onClose, onDone }) {
         </div>
 
         <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
-          {/* Type */}
           <div>
             <Label>Leave type</Label>
             <div role="radiogroup" aria-label="Leave type" onKeyDown={onTypeKey} className="grid grid-cols-2 gap-2">
@@ -192,7 +191,6 @@ function RequestForm({ balances, monthLeft, onClose, onDone }) {
             </div>
           </div>
 
-          {/* Dates */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label icon={CalendarDays}>From</Label>
@@ -209,7 +207,6 @@ function RequestForm({ balances, monthLeft, onClose, onDone }) {
             </div>
           </div>
 
-          {/* Half day */}
           {HALF_DAY_TYPES.includes(form.leaveType) && (
             <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl bg-gray-50 px-4 py-3 ring-1 ring-gray-100">
               <span>
@@ -222,7 +219,6 @@ function RequestForm({ balances, monthLeft, onClose, onDone }) {
             </label>
           )}
 
-          {/* Summary */}
           {form.startDate && (form.halfDay || form.endDate) && (
             <div className={`flex items-center gap-3 rounded-xl px-4 py-3 ring-1 ${overType ? "bg-amber-50 ring-amber-100" : "bg-indigo-50/60 ring-indigo-100"}`}>
               <span className={`text-2xl font-black tabular-nums ${overType ? "text-amber-600" : "text-indigo-600"}`}>{form.halfDay ? "½" : days}</span>
@@ -234,7 +230,6 @@ function RequestForm({ balances, monthLeft, onClose, onDone }) {
             </div>
           )}
 
-          {/* Reason */}
           <div>
             <Label icon={FileText}>Reason <span className="font-medium normal-case tracking-normal text-gray-300">— optional</span></Label>
             <textarea rows={3} maxLength={500} value={form.reason} onChange={(e) => set({ reason: e.target.value })}
@@ -358,7 +353,6 @@ export default function LeaveManagement() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      {/* Header */}
       <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Leave Management</h1>
@@ -381,7 +375,6 @@ export default function LeaveManagement() {
       {/* Yearly leave breakdown — one donut per type (hover for available / remaining / acquired) */}
       <LeaveDonutChart leaves={leaves} className="mb-5" />
 
-      {/* Next leave */}
       {next && (
         <div className="mb-5 flex flex-wrap items-center gap-3 rounded-2xl border border-indigo-100 bg-indigo-50/50 px-4 py-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-indigo-600 shadow-sm"><CalendarClock className="h-4.5 w-4.5" /></div>
@@ -392,7 +385,6 @@ export default function LeaveManagement() {
         </div>
       )}
 
-      {/* Requests */}
       <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
         <div className="flex flex-col gap-3 border-b border-gray-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-sm font-bold text-gray-900">My requests</h2>

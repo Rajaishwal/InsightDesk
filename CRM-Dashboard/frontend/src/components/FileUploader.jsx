@@ -62,7 +62,6 @@ export default function FileUploader({ attachments = [], onChange, maxFiles = 5,
 
   return (
     <div className="space-y-2">
-      {/* Drop zone */}
       {attachments.length < maxFiles && (
         <div
           onDragOver={e => e.preventDefault()}
@@ -91,7 +90,6 @@ export default function FileUploader({ attachments = [], onChange, maxFiles = 5,
 
       {error && <p className="text-xs text-red-500">{error}</p>}
 
-      {/* File list */}
       {attachments.length > 0 && (
         <div className="space-y-1.5">
           {attachments.map((f, i) => (

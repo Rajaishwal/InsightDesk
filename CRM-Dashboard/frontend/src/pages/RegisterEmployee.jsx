@@ -188,11 +188,9 @@ const RegisterEmployee = ({ setActiveTab }) => {
     );
   }
 
-  /* ── The form ── */
   const previewName = form.name.trim() || "New employee";
   return wrap(
     <div className="space-y-5">
-      {/* Section header */}
       <div className="flex items-end justify-between gap-4">
         <div>
           <h2 className="text-lg font-bold text-gray-900">Register an employee</h2>
@@ -207,7 +205,6 @@ const RegisterEmployee = ({ setActiveTab }) => {
       </div>
 
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
-        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-5 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
           {/* Employee ID — auto-generated */}
           <div>
@@ -233,7 +230,6 @@ const RegisterEmployee = ({ setActiveTab }) => {
             {idError && <p className="mt-1.5 text-xs text-red-500">{idError}</p>}
           </div>
 
-          {/* Name */}
           <div>
             <Label htmlFor="reg-name">Full name</Label>
             <div className="relative">
@@ -243,7 +239,6 @@ const RegisterEmployee = ({ setActiveTab }) => {
             </div>
           </div>
 
-          {/* Email */}
           <div>
             <Label htmlFor="reg-email" hint="They'll sign in with this">Work email</Label>
             <div className="relative">

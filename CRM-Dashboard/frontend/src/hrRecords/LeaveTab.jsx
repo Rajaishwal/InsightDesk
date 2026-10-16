@@ -128,7 +128,6 @@ function EmployeeCard({ emp, open, onToggle, history, busyId, onDecide }) {
     <div className={`overflow-hidden rounded-xl border bg-white shadow-sm transition ${open ? "border-indigo-200 shadow-md" : c.pending > 0 ? "border-amber-200 hover:shadow-md" : "border-gray-100 hover:shadow-md"}`}>
       <button type="button" onClick={onToggle} aria-expanded={open}
         className="grid w-full cursor-pointer items-center gap-3 px-4 py-2.5 text-left lg:grid-cols-[minmax(220px,1fr)_minmax(280px,1.4fr)_minmax(150px,0.7fr)_auto]">
-        {/* Who */}
         <span className="flex min-w-0 items-center gap-2.5">
           <PersonAvatar person={emp} size={32} />
           <span className="min-w-0">
@@ -166,7 +165,6 @@ function EmployeeCard({ emp, open, onToggle, history, busyId, onDecide }) {
           )}
         </span>
 
-        {/* Totals */}
         <span className="text-[11px]">
           <span className="block text-[9px] font-bold uppercase tracking-widest text-gray-400">Requests</span>
           <span className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
@@ -176,7 +174,6 @@ function EmployeeCard({ emp, open, onToggle, history, busyId, onDecide }) {
           <span className="text-[10px] text-gray-400">{dayLabel(emp.approvedDaysThisYear)} off this year</span>
         </span>
 
-        {/* Open / close */}
         <span className={`hidden h-7 w-7 items-center justify-center justify-self-end rounded-full transition lg:flex ${open ? "bg-indigo-50 text-indigo-600" : "text-gray-400"}`}>
           <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
         </span>
@@ -297,7 +294,6 @@ export default function LeaveTab() {
 
   return (
     <div className="space-y-5">
-      {/* Section header */}
       <div className="flex items-end justify-between gap-4">
         <div>
           <h2 className="text-lg font-bold text-gray-900">Leave</h2>
@@ -309,7 +305,6 @@ export default function LeaveTab() {
         </button>
       </div>
 
-      {/* Summary tiles */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatTile tone="amber" Icon={Hourglass} label="Pending" value={s ? s.pendingRequests : "—"}
           sub={s?.pendingRequests ? "waiting for your decision" : "nothing waiting"}
@@ -345,7 +340,6 @@ export default function LeaveTab() {
         </div>
       </div>
 
-      {/* Employee cards */}
       {error && !employees.length ? (
         <div className="rounded-2xl border border-gray-100 bg-white px-5 py-12 text-center shadow-sm">
           <AlertCircle className="mx-auto h-8 w-8 text-red-300" />

@@ -178,7 +178,6 @@ export default function EmployeeSearch() {
   return (
     <div className="min-h-screen bg-gray-50 p-6">
 
-      {/* Page header */}
       <div className="mb-7">
         <h2 className="text-xl font-bold text-gray-900">Employee Search</h2>
         <p className="text-sm text-gray-500 mt-0.5">
@@ -192,7 +191,6 @@ export default function EmployeeSearch() {
         {/* ── LEFT: Search panel ─────────────────────────────── */}
         <div className="w-[360px] flex-shrink-0">
 
-          {/* Search bar */}
           <form onSubmit={doSearch} ref={wrapRef} className="relative">
             <div className="flex items-center bg-white border border-gray-200 rounded-xl shadow-sm px-4 gap-3">
               <Search size={18} className="text-gray-400 flex-shrink-0" />
@@ -221,7 +219,6 @@ export default function EmployeeSearch() {
               </button></Tooltip>
             </div>
 
-            {/* Dropdown suggestions */}
             {showDrop && suggestions.length > 0 && (
               <div ref={nav.listRef} className="absolute z-50 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
                 {shownSuggestions.map((s, i) => (
@@ -259,7 +256,6 @@ export default function EmployeeSearch() {
             )}
           </form>
 
-          {/* Results list */}
           {results.length > 0 && (
             <div className="mt-3">
               <p className="text-xs text-gray-400 font-medium uppercase tracking-wider mb-2 px-1">
@@ -316,7 +312,6 @@ export default function EmployeeSearch() {
           {emp ? (
             <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100">
 
-              {/* Banner */}
               <div className="relative bg-gradient-to-br from-indigo-50 via-violet-50 to-blue-50 border-b border-indigo-100 overflow-hidden">
                 <div
                   className="absolute inset-0 opacity-40"
@@ -362,7 +357,6 @@ export default function EmployeeSearch() {
                   </button>
                 </div>
 
-                {/* Stats bar */}
                 <div className="relative mt-4 border-t border-indigo-100 flex divide-x divide-indigo-100">
                   {[
                     { label: "Employee ID",  value: emp.employeeId || "—" },
@@ -378,7 +372,6 @@ export default function EmployeeSearch() {
                 </div>
               </div>
 
-              {/* Scrollable body */}
               <div className="overflow-y-auto p-6 space-y-4 max-h-[calc(100vh-300px)] relative">
                 {detailLoading && (
                   <div className="absolute inset-0 bg-white/80 flex items-center justify-center z-10">
@@ -455,7 +448,6 @@ export default function EmployeeSearch() {
             </div>
 
           ) : (
-            /* Empty state */
             <div className="flex flex-col items-center justify-center text-center bg-white rounded-2xl border border-dashed border-gray-200 h-[500px]">
               <div className="w-16 h-16 rounded-full bg-indigo-50 flex items-center justify-center mb-4">
                 <Users size={28} className="text-indigo-300" />

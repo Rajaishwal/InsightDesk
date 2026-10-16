@@ -244,7 +244,6 @@ function Slip({ p, user, onChanged }) {
 
   return (
     <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-      {/* Top band */}
       <div className="relative overflow-hidden bg-gray-900 px-6 py-5 text-white">
         <div className="pointer-events-none absolute -right-10 -top-16 h-48 w-48 rounded-full bg-indigo-500/20 blur-2xl" />
         <div className="relative flex flex-wrap items-start justify-between gap-4">
@@ -272,7 +271,6 @@ function Slip({ p, user, onChanged }) {
 
       <ReceiptPanel p={p} onChanged={onChanged} />
 
-      {/* Who */}
       <div className="grid grid-cols-2 gap-px border-b border-gray-100 bg-gray-100 sm:grid-cols-3">
         {[["Employee", p.userName], ["Employee ID", p.userId], ["Designation", user?.designation || "—"]].map(([k, v]) => (
           <div key={k} className="bg-white px-6 py-3">
@@ -282,7 +280,6 @@ function Slip({ p, user, onChanged }) {
         ))}
       </div>
 
-      {/* Earnings / deductions */}
       <div className="grid gap-x-8 px-6 py-4 md:grid-cols-2">
         <div>
           <p className="pb-1 text-[10px] font-bold uppercase tracking-widest text-emerald-700">Earnings</p>
@@ -298,7 +295,6 @@ function Slip({ p, user, onChanged }) {
         </div>
       </div>
 
-      {/* Net pay */}
       <div className="mx-6 mb-5 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-indigo-50/60 px-4 py-3 ring-1 ring-indigo-100">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-gray-900">Net pay <span className="font-normal text-gray-500">= earnings − deductions</span></p>
@@ -386,13 +382,11 @@ const PaySlips = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      {/* Header */}
       <div className="mb-5">
         <h1 className="text-2xl font-bold text-gray-900">Payslips & Salary</h1>
         <p className="mt-1 text-sm text-gray-500">Your monthly payslips. Salaries are added by an admin — contact HR if something looks wrong.</p>
       </div>
 
-      {/* Tiles */}
       <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatTile tone="violet" Icon={Wallet} label="Latest net pay" value={loading ? "—" : latest ? inr(latest.netPay) : "₹0"}
           sub={latest ? `${latest.month} ${latest.year}` : "no payslips yet"} />
@@ -425,7 +419,6 @@ const PaySlips = () => {
         <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
           <Slip p={current} user={user} onChanged={onChanged} />
 
-          {/* History */}
           <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3.5">
               <h2 className="text-sm font-bold text-gray-900">All payslips</h2>

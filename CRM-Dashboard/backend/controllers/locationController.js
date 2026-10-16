@@ -4,7 +4,6 @@ import Attendance from '../model/Attendance.js';
 import Break from '../models/Break.js';
 import { findOpenAttendance, openSessionFilter } from '../utils/istDate.js';
 
-// Update employee location
 export const updateLocation = async (req, res) => {
   try {
     const { 
@@ -66,7 +65,6 @@ export const updateLocation = async (req, res) => {
     // 0.0010 degrees ≈ 100 meters precision  
     // 0.0100 degrees ≈ 1 kilometer precision
     const coordinatePrecision = 0.0001; // Currently set to ~10 meters
-    
 
     if (lastLocation) {
       // Check if coordinates are the same (within precision threshold)

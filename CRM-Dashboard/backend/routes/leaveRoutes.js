@@ -13,10 +13,8 @@ import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Apply for leave
 router.post('/apply', protect, applyLeave);
 
-// Get current user's leaves
 router.get('/my-leaves', protect, getUserLeaves);
 
 // Get leave statistics for current user

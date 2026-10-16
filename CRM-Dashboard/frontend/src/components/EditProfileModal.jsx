@@ -152,7 +152,6 @@ export default function EditProfileModal({ onClose }) {
           </button>
 
           <div className="flex items-end gap-4">
-            {/* Avatar */}
             <div className="relative flex-shrink-0">
               <div className="w-16 h-16 rounded-xl overflow-hidden border-2 border-white/20 bg-indigo-600">
                 {user?.photo
@@ -177,7 +176,6 @@ export default function EditProfileModal({ onClose }) {
               <input ref={fileRef} type="file" accept="image/*" onChange={handlePhoto} className="hidden" />
             </div>
 
-            {/* Name + meta */}
             <div className="pb-0.5">
               <h2 className="text-white font-bold text-base leading-tight">{user?.name}</h2>
               <p className="text-indigo-300 text-xs font-medium mt-0.5">{user?.designation || user?.role}</p>
@@ -208,10 +206,8 @@ export default function EditProfileModal({ onClose }) {
           </div>
         </div>
 
-        {/* ── Body ── */}
         <div className="px-6 py-5">
 
-          {/* Lock notice */}
           {locked && (
             <div className="flex items-center gap-2 text-[10px] text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mb-4">
               <Lock className="w-3 h-3 flex-shrink-0" />
@@ -260,7 +256,6 @@ export default function EditProfileModal({ onClose }) {
           )}
         </div>
 
-        {/* ── Footer ── */}
         <div className="px-6 pb-5 flex items-center justify-between gap-3">
           {editing ? (
             <>

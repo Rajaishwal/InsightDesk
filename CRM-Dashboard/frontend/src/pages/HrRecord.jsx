@@ -26,7 +26,6 @@ const HrRecord = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      {/* Header */}
       <div className="mb-5">
         <h1 className="text-2xl font-bold text-gray-900">HR Dashboard</h1>
         <p className="mt-1 text-sm text-gray-500">
@@ -34,7 +33,6 @@ const HrRecord = () => {
         </p>
       </div>
 
-      {/* Tab bar */}
       <div className="mb-5 overflow-x-auto pb-1">
         <div role="tablist" aria-label="HR sections" className="inline-flex gap-1 rounded-full border border-gray-100 bg-white p-1 shadow-sm">
           {TABS.map(({ id, label, Icon }) => {

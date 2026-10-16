@@ -61,7 +61,6 @@ export default function LiveTaskTimer({ checkedOut = false }) {
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
 
-      {/* Header */}
       <div className="flex items-center gap-2 mb-4">
         <TrendingUp className="w-4 h-4 text-indigo-500" />
         <h2 className="text-sm font-bold text-gray-800">Today's Focus</h2>
@@ -76,7 +75,6 @@ export default function LiveTaskTimer({ checkedOut = false }) {
         )}
       </div>
 
-      {/* Arc Ring */}
       <div className="flex flex-col items-center mb-5">
         <div className="relative w-[160px] h-[160px]">
           <svg viewBox="0 0 110 110" className="w-full h-full -rotate-90">
@@ -104,7 +102,6 @@ export default function LiveTaskTimer({ checkedOut = false }) {
         </div>
       </div>
 
-      {/* Remaining time */}
       <div className={`rounded-xl p-3 text-center mb-3 ${checkedOut ? "bg-gray-50" :
         actualTaskSec >= TARGET_SEC ? "bg-emerald-50" :
           actualTaskSec >= 5 * 3600 ? "bg-amber-50" : "bg-indigo-50/60"

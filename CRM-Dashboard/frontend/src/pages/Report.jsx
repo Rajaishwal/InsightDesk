@@ -115,7 +115,6 @@ export default function Report() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      {/* Header */}
       <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Support</h1>
@@ -143,7 +142,6 @@ export default function Report() {
         </div>
       </div>
 
-      {/* Status tiles */}
       <div className="mb-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
         {STATUSES.map((s) => {
           const meta = STATUS[s];
@@ -161,7 +159,6 @@ export default function Report() {
         })}
       </div>
 
-      {/* Waiting banner */}
       {!loading && waitingCount > 0 && status !== "waiting" && (
         <button type="button" onClick={() => setStatus("waiting")}
           className="mb-4 flex w-full items-center gap-3 rounded-2xl border border-indigo-100 bg-indigo-50/60 px-4 py-2.5 text-left text-sm transition hover:bg-indigo-50">
@@ -175,7 +172,6 @@ export default function Report() {
       )}
 
       <div className={`grid items-start gap-5 ${isAdmin && byCategory.length > 0 ? "lg:grid-cols-[minmax(0,1fr)_300px]" : ""}`}>
-        {/* Tickets */}
         <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
           <div className="flex flex-col gap-3 border-b border-gray-100 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-sm font-bold text-gray-900">{listTitle} <span className="font-medium text-gray-400">· {visible.length}</span></h2>

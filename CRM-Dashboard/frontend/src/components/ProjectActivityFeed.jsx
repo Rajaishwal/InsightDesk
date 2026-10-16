@@ -85,7 +85,6 @@ export default function ProjectActivityFeed({ projectId }) {
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 mt-6">
-      {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
         <div className="flex items-center gap-2.5">
           <Activity className="w-5 h-5 text-indigo-500" />
@@ -106,7 +105,6 @@ export default function ProjectActivityFeed({ projectId }) {
         </button>
       </div>
 
-      {/* Feed */}
       <div className="divide-y divide-gray-50 max-h-[420px] overflow-y-auto">
         {loading ? (
           <div className="py-10 text-center text-sm text-gray-400">Loading activity...</div>
@@ -118,12 +116,10 @@ export default function ProjectActivityFeed({ projectId }) {
             const Icon = cfg.icon;
             return (
               <div key={act._id} className="flex items-start gap-3 px-6 py-3.5 hover:bg-gray-50 transition">
-                {/* Avatar */}
                 <div className="w-8 h-8 rounded-full bg-indigo-500 text-white flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
                   {initials(act.userName)}
                 </div>
 
-                {/* Body */}
                 <div className="flex-1 min-w-0">
                   <div className="flex flex-wrap items-baseline gap-1.5 text-sm text-gray-600">
                     <span className="font-semibold text-gray-800">{act.userName}</span>
@@ -131,16 +127,13 @@ export default function ProjectActivityFeed({ projectId }) {
                   </div>
 
                   <div className="flex items-center gap-2 mt-1">
-                    {/* Project badge */}
                     <span className="text-[11px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded font-medium">
                       {act.projectName || act.projectId}
                     </span>
-                    {/* Action icon badge */}
                     <span className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded ${cfg.bg} ${cfg.color}`}>
                       <Icon className="w-3 h-3" />
                       {act.action.replace("_", " ")}
                     </span>
-                    {/* Time */}
                     <span className="text-[11px] text-gray-400 ml-auto">{timeAgo(act.createdAt)}</span>
                   </div>
                 </div>

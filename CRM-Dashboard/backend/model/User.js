@@ -28,7 +28,6 @@ const userSchema = new mongoose.Schema(
     dateOfBirth: { type: Date },
     bloodGroup:  { type: String, enum: ['A+','A-','B+','B-','AB+','AB-','O+','O-'] },
 
-    // Emergency contact
     emergencyContact: {
       name:         { type: String },
       phone:        { type: String },
@@ -60,7 +59,6 @@ userSchema.pre("save", async function (next) {
   next();
 });
 
-// Compare password method
 userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
