@@ -2,15 +2,12 @@ import express from 'express';
 import {
   applyLeave,
   getUserLeaves,
-  getAllLeaves,
   updateLeaveStatus,
   getLeaveStats,
   getAllLeaveRequests,
   getHRLeaveStats,
   getLeaveEmployees,
-  processMonthlyCarryForward,
-  getMonthlyAllocation,
-  cancelLeave
+  cancelLeave,
 } from '../controllers/leaveController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
@@ -25,25 +22,13 @@ router.get('/my-leaves', protect, getUserLeaves);
 // Get leave statistics for current user
 router.get('/stats', protect, getLeaveStats);
 
-// Get monthly allocation details for current user
-router.get('/monthly-allocation', protect, getMonthlyAllocation);
-
-// Get all leaves (HR/Admin only)
-router.get('/all', protect, getAllLeaves);
-
 // HR-specific routes
 router.get('/hr/all-requests', protect, getAllLeaveRequests);
 router.get('/hr/stats', protect, getHRLeaveStats);
 router.get('/hr/employees', protect, getLeaveEmployees); // one entry per employee (HR leave view)
 router.put('/hr/status/:leaveId', protect, updateLeaveStatus);
 
-// Admin routes for monthly processing
-router.post('/admin/process-carry-forward', protect, processMonthlyCarryForward);
-
 // Cancel a pending leave (employee)
 router.delete('/cancel/:leaveId', protect, cancelLeave);
-
-// Update leave status (HR/Admin only)
-router.put('/status/:leaveId', protect, updateLeaveStatus);
 
 export default router;

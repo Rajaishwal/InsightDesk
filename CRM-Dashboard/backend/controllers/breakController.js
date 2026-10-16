@@ -5,9 +5,6 @@ import mongoose from "mongoose";
 import { getIo } from "../socket.js";
 import { istDayStart } from "../utils/istDate.js";
 
-// Use a valid ObjectId string from your User collection or just a random valid ObjectId for testing
-const DUMMY_USER_ID = "64d3e4b7f2a4c2a1b1234567"; // 24 hex chars
-
 // startBreak
 export const startBreak = async (req, res) => {
   try {
@@ -118,7 +115,6 @@ export const getBreakStatus = async (req, res) => {
 export const getBreakLogs = async (req, res) => {
   try {
     const { userId } = req.params;
-    const { date } = req.query;
 
     const startOfDay = istDayStart(); // midnight India time
 

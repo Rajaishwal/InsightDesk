@@ -1,7 +1,7 @@
 // Login.jsx — Employee and admin login page with JWT authentication.
 // Two-panel card: InsightDesk brand panel on the left, sign-in form on the right,
 // plus a "Change password" dialog (confirms the current password first).
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, X, Mail, Lock, KeyRound, Loader2, ArrowRight, AlertCircle } from "lucide-react";

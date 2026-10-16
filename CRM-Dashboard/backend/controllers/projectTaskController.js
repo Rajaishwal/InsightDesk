@@ -375,44 +375,6 @@ export const getMyTodayTime = async (req, res) => {
   }
 };
 
-// GET /api/project-tasks/all-users-today-time  (admin view — all users' task seconds today)
-export const getAllUsersTodayTime = async (req, res) => {
-  try {
-    const startOfDay = istDayStart(); // midnight India time
-
-    const [projTasks, hrTasks] = await Promise.all([
-      ProjectTask.find({ 'timers.0': { $exists: true } }).lean(),
-      HRTask.find({      'timers.0': { $exists: true } }).lean(),
-    ]);
-
-    const totals = {}; // { userId: seconds }
-
-    for (const task of [...projTasks, ...hrTasks]) {
-      for (const entry of (task.timers || [])) {
-        const uid = entry.userId?.toString();
-        if (!uid) continue;
-        if (!totals[uid]) totals[uid] = 0;
-
-        for (const s of (entry.sessions || [])) {
-          if (new Date(s.startTime) >= startOfDay) {
-            totals[uid] += s.duration || 0;
-          }
-        }
-        // Add live running time
-        if (entry.timerStartedAt) {
-          const started = new Date(entry.timerStartedAt);
-          const since = started >= startOfDay ? started : startOfDay;
-          totals[uid] += Math.floor((Date.now() - since) / 1000);
-        }
-      }
-    }
-
-    res.json({ totals });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-
 // GET /api/project-tasks/active-timers
 export const getActiveTimers = async (req, res) => {
   try {
@@ -526,56 +488,3 @@ export const getWorkLog = async (req, res) => {
   }
 };
 
-// GET /api/project-tasks/all-sessions?period=today|week|month|all
-export const getAllSessions = async (req, res) => {
-  try {
-    const { period = 'today' } = req.query;
-    const now = new Date();
-    const cutoff = period === 'today'  ? new Date(now.getFullYear(), now.getMonth(), now.getDate()) :
-                   period === 'week'   ? new Date(now - 7 * 86400000) :
-                   period === 'month'  ? new Date(now.getFullYear(), now.getMonth(), 1) : null;
-
-    const tasks = await ProjectTask.find().lean();
-
-    const userIds    = [...new Set(tasks.flatMap(t => t.timers.map(tm => tm.userId?.toString())))];
-    const projectIds = [...new Set(tasks.map(t => t.projectId))];
-
-    const [users, projects] = await Promise.all([
-      User.find({ _id: { $in: userIds } }).select('name employeeId designation photo').lean(),
-      Project.find({ projectId: { $in: projectIds } }).select('projectId title').lean(),
-    ]);
-
-    const userMap    = Object.fromEntries(users.map(u => [u._id.toString(), u]));
-    const projectMap = Object.fromEntries(projects.map(p => [p.projectId, p]));
-
-    const sessions = [];
-    for (const task of tasks) {
-      const project = projectMap[task.projectId] || {};
-      for (const timer of (task.timers || [])) {
-        const user = userMap[timer.userId?.toString()] || {};
-        for (const s of (timer.sessions || [])) {
-          if (cutoff && new Date(s.startTime) < cutoff) continue;
-          sessions.push({
-            taskId:       task._id,
-            taskTitle:    task.title,
-            projectId:    task.projectId,
-            projectTitle: project.title || task.projectId,
-            userId:       timer.userId,
-            userName:     timer.userName || user.name,
-            employeeId:   user.employeeId,
-            designation:  user.designation,
-            photo:        user.photo,
-            startTime:    s.startTime,
-            endTime:      s.endTime,
-            duration:     s.duration,
-          });
-        }
-      }
-    }
-
-    sessions.sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
-    res.json({ sessions });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};

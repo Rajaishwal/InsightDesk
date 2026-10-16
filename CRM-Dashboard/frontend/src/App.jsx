@@ -1,5 +1,5 @@
 import './App.css';
-import { Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -11,7 +11,6 @@ import Projects from './pages/Projects';
 import Report from './pages/Report';
 import HrRecord from './pages/HrRecord';
 import { useLocation } from 'react-router-dom';
-import Signup from './pages/Signup';
 import Profile from './pages/Profile';
 import LeaveManagement from './pages/LeaveManagement';
 import HrProjectAssignment from './hrRecords/HrProjectAssignment';
@@ -50,9 +49,10 @@ function App() {
 
           <main className="flex-1 bg-gray-50">
             <Routes>
-              <Route path="/register-employee" element={<RegisterEmployee />} />
+              <Route path="/register-employee" element={<ProtectedRoute><RegisterEmployee /></ProtectedRoute>} />
               <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<Signup />} />
+              {/* No public sign-up — accounts are created by an admin (Register Employee) */}
+              <Route path="/signup" element={<Navigate to="/login" replace />} />
               <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
               <Route path="/support" element={<ProtectedRoute><Report /></ProtectedRoute>} />

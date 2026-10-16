@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import api from "../services/axios";
 import { useAuth } from "../context/AuthContext";
-import { LEAVE_TYPES, normalizeType } from "../components/LeaveDonutChart";
+import { LEAVE_TYPES, normalizeType } from "../utils/leaveTypes";
 import MeterRing from "../components/MeterRing";
 import { useCapToFirstN, capClass, capStyle } from "../hooks/useCapToFirstN";
 

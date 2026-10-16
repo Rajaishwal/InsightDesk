@@ -1,5 +1,6 @@
 ﻿import React, { createContext, useContext, useEffect, useState } from "react";
 import api from "../services/axios";
+import { clearCache } from "../utils/pageCache";
 import { useLocationTracker } from "../hooks/useLocationTracker";
 
 const AuthContext = createContext();
@@ -22,7 +23,7 @@ export const AuthProvider = ({ children }) => {
         await checkAttendanceAndStartTracking(res.data._id);
         setBootLoading(false);
         return;
-      } catch (e) {
+      } catch {
         // If cookie auth fails, try localStorage token
         const token = localStorage.getItem("token");
         if (token) {
@@ -30,7 +31,7 @@ export const AuthProvider = ({ children }) => {
             const res = await api.get("http://localhost:5000/api/auth/me");
             setUser(res.data);
             await checkAttendanceAndStartTracking(res.data._id);
-          } catch (e2) {
+          } catch {
             localStorage.removeItem("token");
             setUser(null);
           }
@@ -53,7 +54,7 @@ export const AuthProvider = ({ children }) => {
         // User is currently checked in, start location tracking
         locationTracker.startTracking();
       }
-    } catch (error) {
+    } catch {
       // Don't fail if attendance check fails
     }
   };
@@ -87,10 +88,11 @@ export const AuthProvider = ({ children }) => {
     try {
       // Tell the backend to clear the HTTP-only cookie
       await api.post("http://localhost:5000/api/auth/logout");
-    } catch (_) {
+    } catch {
       // ignore network errors — still clear client state
     }
     localStorage.removeItem("token");
+    clearCache(); // the next person to log in on this tab mustn't see this user's cached pages
     setUser(null);
   };
 

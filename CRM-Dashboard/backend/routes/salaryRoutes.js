@@ -64,19 +64,6 @@ router.get("/me", async (req, res) => {
   }
 });
 
-// GET /api/salary/user/:userId — one person's records (admin, or yourself)
-router.get("/user/:userId", async (req, res) => {
-  try {
-    if (req.user.role !== "admin" && !isSelf(req, req.params.userId)) {
-      return res.status(403).json({ error: "You can only see your own payslips." });
-    }
-    const rows = await Salary.find({ userId: req.params.userId }).sort({ year: -1, createdAt: -1 });
-    res.json(rows);
-  } catch {
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
 // GET /api/salary — all records, optional ?userId= (admin)
 router.get("/", admin, async (req, res) => {
   try {

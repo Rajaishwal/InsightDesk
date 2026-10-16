@@ -1,8 +1,14 @@
 import express from 'express';
 import {
-  getProjectTasks, addProjectTask, updateTaskStatus,
-  startTimer, stopTimer, getProjectStats, getMyTodayTime,
-  getActiveTimers, getAllSessions, getWorkLog, getAllUsersTodayTime,
+  getProjectTasks,
+  addProjectTask,
+  updateTaskStatus,
+  startTimer,
+  stopTimer,
+  getProjectStats,
+  getMyTodayTime,
+  getActiveTimers,
+  getWorkLog,
 } from '../controllers/projectTaskController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
@@ -12,9 +18,7 @@ const router = express.Router();
 router.get('/stats/all',              protect, getProjectStats);
 router.get('/my-time-today',          protect, getMyTodayTime);
 router.get('/active-timers',          protect, getActiveTimers);
-router.get('/all-sessions',           protect, getAllSessions);
 router.get('/work-log',               protect, getWorkLog);
-router.get('/all-users-today-time',   protect, getAllUsersTodayTime);
 
 router.get('/:projectId', protect, getProjectTasks);
 router.post('/:projectId', protect, addProjectTask);

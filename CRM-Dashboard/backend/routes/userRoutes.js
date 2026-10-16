@@ -10,10 +10,8 @@ import {
   updateUserProfile,
   getAllUsers,
   getUserById,
-  updateUser,
-  deleteUser,
 } from '../controllers/userController.js';
-import { protect, admin, hrOrAdmin } from '../middleware/authMiddleware.js';
+import { protect, admin, hrOrAdmin, selfOrAdmin } from '../middleware/authMiddleware.js';
 import { istDateKey, istParts, addDaysKey, dowOfKey, istDayStart } from '../utils/istDate.js';
 
 const router = express.Router();
@@ -24,48 +22,8 @@ const ymd = (y, m0, d) => `${y}-${String(m0 + 1).padStart(2, '0')}-${String(d).p
 // Monday of the IST week containing the date key
 const mondayOf = (ds) => { const dow = dowOfKey(ds); return addDaysKey(ds, -(dow === 0 ? 6 : dow - 1)); };
 
-// PUT /api/users/profile
-router.put('/profile', protect, updateUserProfile);
-
 // GET /api/users — all users (HR/Admin)
 router.get('/', protect, hrOrAdmin, getAllUsers);
-
-// GET /api/users/profile-stats
-router.get('/profile-stats', protect, async (req, res) => {
-  try {
-    const userId = req.user._id;
-    const empId = req.user.employeeId;
-    const now = new Date();
-    const { year: curYear, month: curMonth } = istParts(now);
-    const startOfMonth = new Date(curYear, curMonth, 1);
-    const endOfMonth = new Date(curYear, curMonth + 1, 0, 23, 59, 59, 999);
-
-    const [tasksInProgress, totalTasks, attendanceThisMonth, activeProjects, completedProjects, approvedLeaves] = await Promise.all([
-      HRTask.countDocuments({ assignedTo: empId, status: { $in: ['In Progress', 'Assigned'] } }),
-      HRTask.countDocuments({ assignedTo: empId }),
-      Attendance.find({ userId, date: { $gte: ymd(curYear, curMonth, 1), $lte: ymd(curYear, curMonth, endOfMonth.getDate()) } }),
-      Project.countDocuments({ 'teamMembers.empId': req.user.employeeId, status: 'Ongoing', statusFlag: true }),
-      Project.countDocuments({ 'teamMembers.empId': req.user.employeeId, status: 'Completed', statusFlag: true }),
-      Leave.find({ userId, status: 'Approved', startDate: { $gte: startOfMonth }, endDate: { $lte: endOfMonth } }),
-    ]);
-
-    const attendanceDaysThisMonth = attendanceThisMonth.length;
-    const monthlyWorkingHours = attendanceThisMonth.reduce((sum, a) => sum + (a.workingHours || 0), 0);
-    const totalApprovedLeaveDays = approvedLeaves.reduce((sum, l) => sum + (l.totalDays || 0), 0);
-
-    res.json({
-      tasksInProgress,
-      totalTasks,
-      attendanceDaysThisMonth,
-      monthlyWorkingHours,
-      activeProjects,
-      completedProjects,
-      totalApprovedLeaveDays,
-    });
-  } catch (err) {
-    res.status(500).json({ message: 'Failed to fetch profile stats', error: err.message });
-  }
-});
 
 // GET /api/users/admin-stats — dashboard stats for admin
 router.get('/admin-stats', protect, admin, async (_req, res) => {
@@ -74,10 +32,9 @@ router.get('/admin-stats', protect, admin, async (_req, res) => {
     const today = istDateKey(now);
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    const [totalEmployees, newJoined, onBreakCount] = await Promise.all([
+    const [totalEmployees, newJoined] = await Promise.all([
       User.countDocuments({ role: 'employee' }),
       User.countDocuments({ role: 'employee', createdAt: { $gte: monthStart } }),
-      Break.countDocuments({ endTime: null }),
     ]);
 
     // Monthly joining data for bar chart (last 7 months)
@@ -588,9 +545,7 @@ router.get('/attendance-calendar', protect, async (req, res) => {
   }
 });
 
-router.get('/:id', protect, getUserById);
-router.put('/:id/profile', protect, updateUserProfile);
-router.put('/:id', protect, hrOrAdmin, updateUser);
-router.delete('/:id', protect, hrOrAdmin, deleteUser);
+router.get('/:id', protect, selfOrAdmin('id'), getUserById); // your own details (or any, for an admin)
+router.put('/:id/profile', protect, selfOrAdmin('id'), updateUserProfile); // your own profile (or any, for an admin)
 
 export default router;

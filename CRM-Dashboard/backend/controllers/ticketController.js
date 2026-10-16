@@ -64,23 +64,6 @@ export const getAllTickets = async (req, res) => {
   }
 };
 
-// GET /api/tickets/:ticketId — single ticket with full replies
-export const getTicketById = async (req, res) => {
-  try {
-    const ticket = await Ticket.findById(req.params.ticketId);
-    if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
-
-    // Employees can only view their own
-    if (req.user.role !== 'admin' && ticket.userId.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: 'Access denied' });
-    }
-
-    res.json({ ticket });
-  } catch (err) {
-    res.status(500).json({ message: 'Failed to fetch ticket' });
-  }
-};
-
 // POST /api/tickets/:ticketId/reply — add a reply
 export const addReply = async (req, res) => {
   try {

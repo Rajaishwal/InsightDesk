@@ -73,7 +73,7 @@ const AdminDashboard = () => {
     try {
       const r = await api.get("/users/admin-stats");
       setStats(r.data);
-    } catch {}
+    } catch { /* keep showing the last stats */ }
     finally { setRefreshing(false); }
   };
 

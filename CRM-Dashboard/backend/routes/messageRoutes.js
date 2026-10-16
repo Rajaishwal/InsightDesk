@@ -139,34 +139,4 @@ router.get("/:targetId", protect, async (req, res) => {
   }
 });
 
-// PUT /api/messages/:messageId — edit own message text
-router.put("/:messageId", protect, async (req, res) => {
-  try {
-    const msg = await Message.findById(req.params.messageId);
-    if (!msg) return res.status(404).json({ message: "Message not found" });
-    if (msg.senderId.toString() !== req.user._id.toString())
-      return res.status(403).json({ message: "Forbidden" });
-    msg.text = req.body.text || "";
-    msg.edited = true;
-    await msg.save();
-    res.json(msg);
-  } catch (err) {
-    res.status(500).json({ message: "Edit failed" });
-  }
-});
-
-// DELETE /api/messages/:messageId — delete own message
-router.delete("/:messageId", protect, async (req, res) => {
-  try {
-    const msg = await Message.findById(req.params.messageId);
-    if (!msg) return res.status(404).json({ message: "Message not found" });
-    if (msg.senderId.toString() !== req.user._id.toString())
-      return res.status(403).json({ message: "Forbidden" });
-    await msg.deleteOne();
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ message: "Delete failed" });
-  }
-});
-
 export default router;

@@ -2,16 +2,11 @@ import mongoose from "mongoose";
 
 const salarySchema = new mongoose.Schema(
   {
-    // user: { 
-    //   type: mongoose.Schema.Types.ObjectId, 
-    //   ref: "User", // 🔗 Reference to User collection
-    //   required: true 
-    // },
+    // The employee's Employee ID (e.g. IDE002) — not the Mongo _id
     userId: { 
       type: String, 
       required: true 
     },
-    // userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
 
     userName: {
       type: String,
@@ -39,7 +34,7 @@ const salarySchema = new mongoose.Schema(
     netPay: {
       type: Number,
       min: 0,
-      // ❌ remove required:true → it will be auto-calculated
+      // worked out in the pre-save hook below
     },
     
     month: { 
@@ -74,15 +69,6 @@ const salarySchema = new mongoose.Schema(
     remarks: {
       type: String,
       maxlength: 300,
-    },
-    downloadUrl: { type: String },
-    payslip: {
-      filename: String,
-      path: String,
-      uploadedAt: {
-        type: Date,
-        default: Date.now,
-      },
     },
   },
   { timestamps: true }

@@ -7,7 +7,8 @@ import {
 } from "lucide-react";
 import { useAutoRefresh } from "../hooks/useAutoRefresh";
 import { getCache, setCache } from "../utils/pageCache";
-import LeaveDonutChart, { LEAVE_TYPES, LEAVE_TYPE_KEYS, normalizeType } from "../components/LeaveDonutChart";
+import LeaveDonutChart from "../components/LeaveDonutChart";
+import { LEAVE_TYPES, LEAVE_TYPE_KEYS, normalizeType } from "../utils/leaveTypes";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/axios";
 import { useToast } from "../context/ToastContext";

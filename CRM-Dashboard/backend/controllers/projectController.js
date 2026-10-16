@@ -14,7 +14,6 @@ const generateProjectId = async () => {
 // Create a new project
 export const createProject = async (req, res) => {
   try {
-    console.log("📝 Creating new project:", req.body);
 
     const {
       title,
@@ -80,8 +79,6 @@ export const createProject = async (req, res) => {
     const newProject = new Project(projectData);
     const savedProject = await newProject.save();
 
-    console.log("✅ Project created successfully:", savedProject.projectId);
-
     res.status(201).json({
       success: true,
       message: "Project created successfully!",
@@ -126,7 +123,6 @@ export const createProject = async (req, res) => {
 // Get all projects
 export const getAllProjects = async (req, res) => {
   try {
-    console.log('📋 Fetching all projects');
     const { status, manager, page = 1, limit = 10 } = req.query;
 
     const filter = {};
@@ -143,8 +139,6 @@ export const getAllProjects = async (req, res) => {
 
     const totalProjects = await Project.countDocuments(filter);
     const totalPages = Math.ceil(totalProjects / parseInt(limit));
-
-    console.log(`📊 Found ${projects.length} projects (Page ${page}/${totalPages})`);
 
     res.status(200).json({
       success: true,
@@ -168,46 +162,12 @@ export const getAllProjects = async (req, res) => {
   }
 };
 
-// Get project by ID
-export const getProjectById = async (req, res) => {
-  try {
-    const { id } = req.params;
-    console.log('🔍 Fetching project by ID:', id);
-
-    const project = await Project.findById(id)
-      .populate('createdBy', 'name email employeeId')
-      .populate('lastUpdatedBy', 'name email employeeId')
-      .lean();
-
-    if (!project) {
-      return res.status(404).json({
-        success: false,
-        message: 'Project not found.'
-      });
-    }
-
-    console.log('✅ Project found:', project.projectId);
-
-    res.status(200).json({
-      success: true,
-      project
-    });
-  } catch (error) {
-    console.error('❌ Error fetching project by ID:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error while fetching project.'
-    });
-  }
-};
-
 // Update project
 // Status rules: only HR/admin change it; "Completed" is allowed only once every task in the project's
 // tracklist is done (the team has finished), and a Completed project is locked for good.
 export const updateProject = async (req, res) => {
   try {
     const { id } = req.params;
-    console.log('✏️ Update request received:', { id, body: req.body });
 
     // Find by projectId first, then by _id
     const existing = await Project.findOne({ projectId: id })
@@ -249,8 +209,6 @@ export const updateProject = async (req, res) => {
       { new: true, runValidators: true }
     );
 
-    console.log('✅ Project updated successfully:', project.projectId || project._id);
-
     res.status(200).json({
       success: true,
       message: 'Project updated successfully!',
@@ -266,80 +224,11 @@ export const updateProject = async (req, res) => {
   }
 };
 
-// Delete project (soft delete)
-export const deleteProject = async (req, res) => {
-  try {
-    const { id } = req.params;
-    console.log('🗑️ Deleting project:', id);
-
-    const deletedProject = await Project.findByIdAndUpdate(
-      id,
-      { isActive: false, lastUpdatedBy: req.user._id },
-      { new: true }
-    );
-
-    if (!deletedProject) {
-      return res.status(404).json({
-        success: false,
-        message: 'Project not found.'
-      });
-    }
-
-    console.log('✅ Project deleted successfully:', deletedProject.projectId);
-
-    res.status(200).json({
-      success: true,
-      message: 'Project deleted successfully!'
-    });
-  } catch (error) {
-    console.error('❌ Error deleting project:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error while deleting project.'
-    });
-  }
-};
-
-// Get project statistics
-export const getProjectStats = async (req, res) => {
-  try {
-    console.log('📊 Fetching project statistics');
-
-    const stats = await Project.getProjectStats();
-    const totalProjects = await Project.countDocuments({ isActive: true });
-
-    const priorityStats = await Project.aggregate([
-      { $match: { isActive: true } },
-      { $group: { _id: '$priority', count: { $sum: 1 } } }
-    ]);
-
-    console.log('✅ Project statistics calculated');
-
-    res.status(200).json({
-      success: true,
-      stats: {
-        total: totalProjects,
-        byStatus: stats,
-        byPriority: priorityStats
-      }
-    });
-  } catch (error) {
-    console.error('❌ Error fetching project statistics:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error while fetching project statistics.'
-    });
-  }
-};
-
-
 // Get projects by current user
 export const getMyProjects = async (req, res) => {
   try {
     const userEmail = req.user.email?.toLowerCase();
     const userEmpId = req.user.employeeId;
-
-    console.log('👤 Fetching projects for user:', userEmail, userEmpId);
 
     const projects = await Project.find({
       $and: [
@@ -360,8 +249,6 @@ export const getMyProjects = async (req, res) => {
     })
       .sort({ createdAt: -1 })
       .lean();
-
-    console.log(`✅ Found ${projects.length} projects for user`);
 
     res.status(200).json({
       success: true,

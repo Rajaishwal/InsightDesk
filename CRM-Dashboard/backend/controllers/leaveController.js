@@ -57,14 +57,6 @@ export const applyLeave = async (req, res) => {
       ]
     });
 
-    // const overlappingLeave = await Leave.findOne({
-    //   userId,
-    //   status: { $in: ['Pending', 'Approved'] },
-    //   startDate: { $lte: end },
-    //   endDate: { $gte: start }
-    // });
-
-
     if (overlappingLeave) {
       return res.status(400).json({ message: 'You already have a leave request for overlapping dates' });
     }
@@ -151,42 +143,6 @@ export const getUserLeaves = async (req, res) => {
     res.status(500).json({ message: 'Server error while fetching leaves' });
   }
 };
-
-// Get all leaves (HR/Admin only)
-export const getAllLeaves = async (req, res) => {
-  try {
-    const { page = 1, limit = 20, status, userId, startDate, endDate } = req.query;
-
-    const query = {};
-    if (status) query.status = status;
-    if (userId) query.userId = userId;
-    if (startDate || endDate) {
-      query.startDate = {};
-      if (startDate) query.startDate.$gte = new Date(startDate);
-      if (endDate) query.startDate.$lte = new Date(endDate);
-    }
-
-    const leaves = await Leave.find(query)
-      .populate('userId', 'name email')
-      .populate('approvedBy', 'name')
-      .sort({ appliedAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
-
-    const total = await Leave.countDocuments(query);
-
-    res.json({
-      leaves,
-      totalPages: Math.ceil(total / limit),
-      currentPage: page,
-      totalLeaves: total
-    });
-  } catch (error) {
-    console.error('Get all leaves error:', error);
-    res.status(500).json({ message: 'Server error while fetching all leaves' });
-  }
-};
-
 
 // Get leave statistics
 export const getLeaveStats = async (req, res) => {
@@ -562,54 +518,6 @@ export const getHRLeaveStats = async (req, res) => {
   }
 };
 
-// Process monthly carry-forward for all users (Admin function)
-export const processMonthlyCarryForward = async (req, res) => {
-  try {
-    const { year, month } = req.body;
-    
-    if (!year || !month || month < 1 || month > 12) {
-      return res.status(400).json({ message: 'Valid year and month (1-12) are required' });
-    }
-
-    // Get all unique users who have leave allocations
-    const users = await MonthlyLeaveAllocation.distinct('userId');
-    
-    let processedCount = 0;
-    const errors = [];
-
-    for (const userId of users) {
-      try {
-        // Get previous month allocation
-        const prevMonth = month === 1 ? 12 : month - 1;
-        const prevYear = month === 1 ? year - 1 : year;
-        
-        const prevAllocation = await MonthlyLeaveAllocation.findOne({
-          userId,
-          year: prevYear,
-          month: prevMonth
-        });
-
-        if (prevAllocation && prevAllocation.remainingLeaves > 0) {
-          // Create or update current month allocation with carry forward
-          await MonthlyLeaveAllocation.getOrCreateAllocation(userId, year, month);
-          processedCount++;
-        }
-      } catch (error) {
-        errors.push({ userId, error: error.message });
-      }
-    }
-
-    res.json({
-      message: `Processed carry-forward for ${processedCount} users`,
-      processedCount,
-      errors: errors.length > 0 ? errors : undefined
-    });
-  } catch (error) {
-    console.error('Process monthly carry forward error:', error);
-    res.status(500).json({ message: 'Server error while processing monthly carry forward' });
-  }
-};
-
 // Cancel a pending leave (employee only)
 export const cancelLeave = async (req, res) => {
   try {
@@ -640,32 +548,3 @@ export const cancelLeave = async (req, res) => {
   }
 };
 
-// Get user's monthly allocation details
-export const getMonthlyAllocation = async (req, res) => {
-  try {
-    const userId = req.user._id || req.user.id;
-    const { year, month } = req.query;
-    
-    const currentDate = new Date();
-    const targetYear = year ? parseInt(year) : currentDate.getFullYear();
-    const targetMonth = month ? parseInt(month) : currentDate.getMonth() + 1;
-
-    const allocation = await MonthlyLeaveAllocation.getOrCreateAllocation(
-      userId, 
-      targetYear, 
-      targetMonth
-    );
-
-    res.json({
-      allocation,
-      monthInfo: {
-        year: targetYear,
-        month: targetMonth,
-        monthName: new Date(targetYear, targetMonth - 1).toLocaleString('default', { month: 'long' })
-      }
-    });
-  } catch (error) {
-    console.error('Get monthly allocation error:', error);
-    res.status(500).json({ message: 'Server error while fetching monthly allocation' });
-  }
-};

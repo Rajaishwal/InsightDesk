@@ -11,12 +11,6 @@ const typeIcon = (type = "") => {
   return <File size={14} className="text-gray-400" />;
 };
 
-const fmtSize = (bytes) => {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-};
-
 /**
  * Props:
  *   attachments   — array of { url, name, type }

@@ -3,18 +3,15 @@ import Project from '../model/Project.js';
 import {
   createProject,
   getAllProjects,
-  getProjectById,
-  deleteProject,
-  getProjectStats,
   getMyProjects,
-  updateProject
+  updateProject,
 } from "../controllers/projectController.js";
 import { protect, hrOrAdmin } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
 // Get team members for a project by projectId
-router.get('/:projectId/team', async (req, res) => {
+router.get('/:projectId/team', protect, async (req, res) => {
   try {
     const project = await Project.findOne({ projectId: req.params.projectId });
     if (!project) {
@@ -45,13 +42,9 @@ router.get("/next-id", protect, async (req, res) => {
 // Public routes (require authentication)
 router.post("/", protect, createProject);                    // Create project
 router.get("/my-projects", protect, getMyProjects);          // Get user's projects
-router.get("/stats", protect, getProjectStats);              // Get project statistics
-router.get("/:id", protect, getProjectById);                 // Get project by ID
 
 // HR/Admin routes
 router.get("/", protect, hrOrAdmin, getAllProjects);         // Get all projects (HR/Admin only)
 router.put("/:id", protect, updateProject);                  // Update project
-router.delete("/:id", protect, hrOrAdmin, deleteProject);    // Delete project (HR/Admin only)
-
 
 export default router;

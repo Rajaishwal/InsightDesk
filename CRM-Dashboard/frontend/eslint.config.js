@@ -23,7 +23,11 @@ export default defineConfig([
       },
     },
     rules: {
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      // Names used only as JSX tags (<Icon />, <motion.div>) look unused to core ESLint, so they're allowed here;
+      // `const { a, ...rest } = obj` deliberately leaves `a` out of `rest`.
+      'no-unused-vars': ['error', { varsIgnorePattern: '^([A-Z_]|motion$)', argsIgnorePattern: '^[A-Z_]', ignoreRestSiblings: true }],
+      // Context files export their provider plus its use… hook — that's intended
+      'react-refresh/only-export-components': ['error', { allowConstantExport: true, allowExportNames: ['useAuth', 'useToast', 'useConfirm', 'useSocket'] }],
     },
   },
 ])

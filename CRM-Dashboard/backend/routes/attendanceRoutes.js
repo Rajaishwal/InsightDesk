@@ -1,12 +1,10 @@
 // routes/attendanceRoutes.js
 import express from "express";
-import { 
-  checkIn, 
-  checkOut, 
-  getAllAttendance, 
-  getTodayStatus, 
-  getUserAttendance,
-  getAttendanceStatus
+import {
+  checkIn,
+  checkOut,
+  getAllAttendance,
+  getTodayStatus,
 } from "../controllers/attendanceController.js";
 import { protect } from "../middleware/authMiddleware.js";
 
@@ -19,7 +17,5 @@ router.post("/checkout", protect, checkOut);
 // Get attendance records
 router.get("/logs", protect, getAllAttendance);
 router.get("/status/:userId", protect, getTodayStatus);
-router.get("/status/:userId/:date", protect, getAttendanceStatus);
-router.get("/user/:userId", protect, getUserAttendance);
 
 export default router;

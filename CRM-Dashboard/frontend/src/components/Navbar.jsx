@@ -8,7 +8,6 @@ import { UserCheck, LogOut, Coffee, MessageSquare } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Attendance from "../pages/Attendance.jsx";
 import ChatPanel from "./ChatPanel.jsx";
-import axios from "axios";
 import api from "../services/axios.js";
 
 const Navbar = () => {
@@ -36,7 +35,7 @@ const Navbar = () => {
     try {
       const res = await api.get(`/attendance/status/${user._id}`);
       setAttendanceStatus(res.data);
-    } catch { }
+    } catch { /* keep the last known status */ }
   };
 
   useEffect(() => {
@@ -81,9 +80,7 @@ const Navbar = () => {
   // --- Break logic ---
   const getTodayCompletedSeconds = async (userId) => {
     try {
-      const res = await axios.get(
-        `http://localhost:5000/api/breaks/logs/${userId}`
-      );
+      const res = await api.get(`/breaks/logs/${userId}`);
       // Compare India-time calendar days (toISOString is UTC — wrong day before 5:30 AM IST)
       const istDay = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date(d));
       const today = istDay(new Date());
@@ -103,8 +100,8 @@ const Navbar = () => {
     if (!user?._id) return;
     (async () => {
       const [statusRes, completedSecs] = await Promise.all([
-        axios
-          .get(`http://localhost:5000/api/breaks/status/${user._id}`)
+        api
+          .get(`/breaks/status/${user._id}`)
           .catch(() => null),
         getTodayCompletedSeconds(user._id),
       ]);
@@ -137,9 +134,7 @@ const Navbar = () => {
 
   const handleBreakStart = async () => {
     try {
-      await axios.post("http://localhost:5000/api/breaks/start", {
-        userId: user._id,
-      });
+      await api.post("/breaks/start"); // the server uses the logged-in user
       setIsOnBreak(true);
       window.dispatchEvent(new CustomEvent("crm:attendance:updated"));
     } catch (err) {
@@ -150,9 +145,7 @@ const Navbar = () => {
 
   const handleBreakEnd = async () => {
     try {
-      await axios.post("http://localhost:5000/api/breaks/stop", {
-        userId: user._id,
-      });
+      await api.post("/breaks/stop");
       setIsOnBreak(false);
       window.dispatchEvent(new CustomEvent("crm:attendance:updated"));
     } catch {

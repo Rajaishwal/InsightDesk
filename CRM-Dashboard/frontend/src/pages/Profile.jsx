@@ -154,8 +154,6 @@ export default function Profile() {
   };
 
   const initials = (name = "") => name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
-  const roleBadge = user?.role === "admin" ? "bg-purple-100 text-purple-700" : "bg-indigo-100 text-indigo-700";
-
   // Profile completion
   const completionFields = [
     form.phone, form.dateOfBirth, form.bloodGroup, form.gender,
