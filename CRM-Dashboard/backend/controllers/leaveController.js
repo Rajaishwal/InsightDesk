@@ -300,6 +300,9 @@ export const updateLeaveStatus = async (req, res) => {
     if (!leave) {
       return res.status(404).json({ message: 'Leave request not found' });
     }
+    if (String(leave.userId) === String(req.user._id)) {
+      return res.status(403).json({ message: "You can't approve or reject your own leave request." });
+    }
 
     const oldStatus = leave.status;
     const leaveYear = leave.startDate.getFullYear();

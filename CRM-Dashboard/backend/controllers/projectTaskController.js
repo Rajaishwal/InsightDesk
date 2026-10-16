@@ -7,6 +7,7 @@ import Break from '../models/Break.js';
 import Attendance from '../model/Attendance.js';
 import { getIo } from '../socket.js';
 import { istDayStart, findOpenAttendance } from '../utils/istDate.js';
+import { isOnProject, NOT_ON_PROJECT } from '../utils/projectAccess.js';
 
 const logActivity = async (data) => {
   try {
@@ -60,6 +61,7 @@ export const getProjectTasks = async (req, res) => {
     const { projectId } = req.params;
     const project = await Project.findOne({ projectId: projectId.toUpperCase() });
     if (!project) return res.status(404).json({ message: 'Project not found' });
+    if (!isOnProject(req.user, project)) return res.status(403).json({ message: NOT_ON_PROJECT });
 
     const tasks = await ProjectTask.find({ projectId: projectId.toUpperCase() })
       .sort({ createdAt: 1 });
@@ -85,6 +87,7 @@ export const addProjectTask = async (req, res) => {
 
     const project = await Project.findOne({ projectId: projectId.toUpperCase() });
     if (!project) return res.status(404).json({ message: 'Project not found' });
+    if (!isOnProject(user, project)) return res.status(403).json({ message: NOT_ON_PROJECT });
     if (project.status === 'Completed') {
       return res.status(409).json({ message: 'This project is completed and closed — no new tasks can be added.' });
     }
@@ -136,7 +139,8 @@ export const updateTaskStatus = async (req, res) => {
     }
 
     const project = await Project.findOne({ projectId: task.projectId });
-    if (project?.status === 'Completed') return res.status(409).json({ message: PROJECT_CLOSED });
+    if (!isOnProject(user, project)) return res.status(403).json({ message: NOT_ON_PROJECT });
+    if (project.status === 'Completed') return res.status(409).json({ message: PROJECT_CLOSED });
 
     // Only the task creator (or admin/manager) can mark a task as Completed
     if (status === 'Completed') {
@@ -219,7 +223,8 @@ export const startTimer = async (req, res) => {
     if (!task) return res.status(404).json({ message: 'Task not found' });
 
     const project = await Project.findOne({ projectId: task.projectId });
-    if (project?.status === 'Completed') return res.status(409).json({ message: PROJECT_CLOSED });
+    if (!isOnProject(req.user, project)) return res.status(403).json({ message: NOT_ON_PROJECT });
+    if (project.status === 'Completed') return res.status(409).json({ message: PROJECT_CLOSED });
 
     // Timers only run inside a working session: checked in (session may span midnight), and not on a break
     const [checkedIn, activeBreak] = await Promise.all([

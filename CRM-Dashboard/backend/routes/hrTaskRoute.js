@@ -9,23 +9,22 @@ import {
   startHrTimer,
   stopHrTimer,
 } from "../controllers/hrTaskController.js";
-import { protect } from "../middleware/authMiddleware.js";
+import { protect, hrOrAdmin } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.post("/", protect, assignTask);
+router.post("/", protect, hrOrAdmin, assignTask);
 
-// 👉 Get all HR tasks (Admin/HR)
-router.get("/", protect, getAllHRTasks);
+router.get("/", protect, hrOrAdmin, getAllHRTasks);
 
-router.get("/assigned-by-me", protect, getTasksAssignedByHR);
+router.get("/assigned-by-me", protect, hrOrAdmin, getTasksAssignedByHR);
 
 router.get("/my", protect, getMyAssignedTasks);
 
-// 👉 Update task (HR or Employee can update status)
+// HR can edit any field; an employee only the status of a task assigned to them (checked in the controller)
 router.put("/:id", protect, updateHRTask);
 
-router.delete("/:id", protect, deleteHRTask);
+router.delete("/:id", protect, hrOrAdmin, deleteHRTask);
 
 router.post("/:id/timer/start", protect, startHrTimer);
 router.post("/:id/timer/stop",  protect, stopHrTimer);

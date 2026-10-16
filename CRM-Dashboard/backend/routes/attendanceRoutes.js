@@ -6,15 +6,15 @@ import {
   getAllAttendance,
   getTodayStatus,
 } from "../controllers/attendanceController.js";
-import { protect } from "../middleware/authMiddleware.js";
+import { protect, hrOrAdmin, selfOrAdmin, asSelf } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// Check-in and Check-out routes
-router.post("/checkin", protect, checkIn);
-router.post("/checkout", protect, checkOut);
+// Always for the logged-in user, whatever userId the request sends
+router.post("/checkin", protect, asSelf, checkIn);
+router.post("/checkout", protect, asSelf, checkOut);
 
-router.get("/logs", protect, getAllAttendance);
-router.get("/status/:userId", protect, getTodayStatus);
+router.get("/logs", protect, hrOrAdmin, getAllAttendance);
+router.get("/status/:userId", protect, selfOrAdmin("userId"), getTodayStatus);
 
 export default router;

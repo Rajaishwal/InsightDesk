@@ -150,6 +150,9 @@ export const startHrTimer = async (req, res) => {
 
     const task = await HRTask.findById(id);
     if (!task) return res.status(404).json({ message: 'Task not found' });
+    if (req.user.role !== 'admin' && task.assignedTo !== req.user.employeeId) {
+      return res.status(403).json({ message: 'You can only time tasks assigned to you.' });
+    }
     if (task.status === 'Completed') return res.status(400).json({ message: 'Task already completed' });
 
     // Timers only run inside a working session: checked in (session may span midnight), and not on a break

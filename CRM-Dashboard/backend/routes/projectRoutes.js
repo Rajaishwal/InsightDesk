@@ -7,6 +7,7 @@ import {
   updateProject,
 } from "../controllers/projectController.js";
 import { protect, hrOrAdmin } from "../middleware/authMiddleware.js";
+import { isOnProject, NOT_ON_PROJECT } from "../utils/projectAccess.js";
 
 const router = express.Router();
 
@@ -15,6 +16,9 @@ router.get('/:projectId/team', protect, async (req, res) => {
     const project = await Project.findOne({ projectId: req.params.projectId });
     if (!project) {
       return res.status(404).json({ success: false, message: 'Project not found', teamMembers: [] });
+    }
+    if (!isOnProject(req.user, project)) {
+      return res.status(403).json({ success: false, message: NOT_ON_PROJECT, teamMembers: [] });
     }
     const teamMembers = (project.teamMembers || []).map(member => ({
       empId: member.empId,
@@ -27,7 +31,7 @@ router.get('/:projectId/team', protect, async (req, res) => {
 });
 
 // Next auto-generated project ID preview
-router.get("/next-id", protect, async (req, res) => {
+router.get("/next-id", protect, hrOrAdmin, async (req, res) => {
   try {
     const last = await Project.findOne().sort({ createdAt: -1 }).select("projectId");
     const lastId = last ? last.projectId : "PRJ-000";
@@ -38,12 +42,11 @@ router.get("/next-id", protect, async (req, res) => {
   }
 });
 
-// Public routes (require authentication)
-router.post("/", protect, createProject);
 router.get("/my-projects", protect, getMyProjects);
 
 // HR/Admin routes
+router.post("/", protect, hrOrAdmin, createProject);
 router.get("/", protect, hrOrAdmin, getAllProjects);
-router.put("/:id", protect, updateProject);
+router.put("/:id", protect, hrOrAdmin, updateProject);
 
 export default router;
