@@ -1,16 +1,31 @@
-// Projects.jsx — Project list table for employees and HR (view, task drawer, team members)
+// Projects.jsx — Project list table for employees and HR (view, task drawer, team members).
+// Same columns as before (ID, title, description, manager, status, view, tracklist, team), styled like the other
+// dashboard sections: light card, soft header row, status chips, pill buttons. The first 4 rows show; the rest scroll
+// inside the card under a pinned header row.
 import { useState, useEffect } from "react";
 import { useAutoRefresh } from "../hooks/useAutoRefresh";
-import { Eye, Search, Users2, ListChecks } from "lucide-react";
+import { Eye, Search, Users2, ListChecks, X, CheckCircle2, Timer, Hourglass, FolderOpen, AlertCircle } from "lucide-react";
 import ProjectModal from "../components/ProjectModal";
 import ProjectTeamModal from "../components/ProjectTeamModal";
 import ProjectTaskDrawer from "../components/ProjectTaskDrawer";
+import PersonAvatar from "../components/PersonAvatar";
 import api from "../services/axios";
 import { useAuth } from "../context/AuthContext";
 import { getCache, setCache } from "../utils/pageCache";
+import { useCapToFirstN, capClass, capStyle } from "../hooks/useCapToFirstN";
+
+const STATUS = {
+  Ongoing:   { chip: "bg-blue-50 text-blue-700 ring-blue-200",          Icon: Timer },
+  Completed: { chip: "bg-emerald-50 text-emerald-700 ring-emerald-200", Icon: CheckCircle2 },
+  Pending:   { chip: "bg-amber-50 text-amber-700 ring-amber-200",       Icon: Hourglass },
+};
+const COLUMNS = ["Project ID", "Title", "Description", "Project Manager", "Status", "Action", "Tracklist", "Team Members"];
+
+const pill = "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300";
 
 const Projects = () => {
   const { user } = useAuth();
+  const isEmployee = user?.role === "employee";
   const [searchTerm, setSearchTerm] = useState("");
   const [projects, setProjects] = useState(getCache("projects") || []);
   const [loading, setLoading] = useState(!getCache("projects"));
@@ -41,15 +56,15 @@ const Projects = () => {
     const cached = !!getCache("projects");
     try {
       if (!cached) setLoading(true);
-      const isEmployee = user?.role === "employee";
       const endpoint = isEmployee ? "/projects/my-projects" : "/projects";
       const { data } = await api.get(endpoint);
       if (data.success) {
         setProjects(data.projects);
         setCache("projects", data.projects);   // persist for next navigation
+        setError("");
       } else if (!cached) setError("Failed to load projects");
     } catch (err) {
-      if (!cached) setError(err.response?.data?.message || "Failed to load projects");
+      if (!cached) setError(!err?.response ? "Can't reach the server — make sure the backend is running." : err.response.data?.message || "Failed to load projects");
     } finally {
       setLoading(false);
     }
@@ -74,6 +89,9 @@ const Projects = () => {
     );
   });
 
+  // Show the first few rows; the rest scroll (re-measured when the list changes or the window resizes)
+  const SHOW = 4;
+  const [tableRef, tableMaxH] = useCapToFirstN(SHOW, [filteredProjects.map((p) => p.projectId).join(","), loading], "tbody tr");
 
   const handleView = (project) => {
     setSelectedProject(project);
@@ -81,176 +99,145 @@ const Projects = () => {
   };
 
   return (
-    <div className="bg-gray-50 p-6 min-h-screen">
-      <div className="bg-white rounded-xl shadow-lg p-6">
-        {/* Header + Search */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4 md:mb-0">
-            Projects
-          </h1>
-
-          <div className="relative w-full md:w-1/3">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-            <input
-              type="text"
-              placeholder="Search by title, description, or manager..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-white border border-gray-300  shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-            />
-          </div>
+    <div className="min-h-screen bg-gray-50 p-6">
+      {/* Header + Search */}
+      <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Projects</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            {isEmployee ? "Projects you're part of — open the tracklist to log and follow your work." : "Every active project — details, tracklist and team at a glance."}
+          </p>
         </div>
+        <div className="flex w-full items-center gap-2 rounded-full border border-gray-200 bg-white px-3.5 py-2 shadow-sm transition focus-within:border-indigo-300 focus-within:ring-4 focus-within:ring-indigo-50 md:w-96">
+          <Search className="h-4 w-4 flex-shrink-0 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search by title, description, or manager…"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full min-w-0 bg-transparent text-sm text-gray-700 outline-none placeholder:text-gray-400"
+          />
+          {searchTerm && (
+            <button type="button" onClick={() => setSearchTerm("")} aria-label="Clear search" className="rounded-full p-0.5 text-gray-400 hover:bg-gray-100">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
 
-        {/* Table */}
-        <div className="overflow-x-auto shadow">
-          <table className="min-w-full border-gray-200 overflow-hidden">
-            <thead className="bg-gray-800 text-white">
+      {/* Table */}
+      <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+        <div ref={tableRef} className={`overflow-x-auto ${capClass(tableMaxH)}`} style={capStyle(tableMaxH)}>
+          <table className="min-w-full">
+            <thead className="sticky top-0 z-10 bg-gray-50">
               <tr>
-                <th className="py-3 px-6 text-left text-sm font-semibold">
-                  Project ID
-                </th>
-                <th className="py-3 px-6 text-left text-sm font-semibold">
-                  Title
-                </th>
-                <th className="py-3 px-6 text-left text-sm font-semibold">
-                  Description
-                </th>
-                <th className="py-3 px-6 text-left text-sm font-semibold">
-                  Project Manager
-                </th>
-                <th className="py-3 px-6 text-left text-sm font-semibold">
-                  Status
-                </th>
-                <th className="py-3 px-6 text-left text-sm font-semibold">
-                  Action
-                </th>
-                <th className="py-3 px-6 text-left text-sm font-semibold">
-                  Tracklist
-                </th>
-                <th className="py-3 px-6 text-left text-sm font-semibold">
-                  Team Members
-                </th>
+                {COLUMNS.map((c) => (
+                  <th key={c} className="whitespace-nowrap px-5 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-gray-400">{c}</th>
+                ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className="divide-y divide-gray-100">
               {loading ? (
-                <tr>
-                  <td
-                    colSpan="6"
-                    className="py-6 text-center text-gray-500 text-sm"
-                  >
-                    Loading projects...
-                  </td>
-                </tr>
+                Array.from({ length: 4 }, (_, i) => (
+                  <tr key={i} className="animate-pulse">
+                    {COLUMNS.map((c, j) => (
+                      <td key={c} className="px-5 py-4"><div className={`h-3.5 rounded bg-gray-100 ${j === 2 ? "w-64" : "w-16"}`} /></td>
+                    ))}
+                  </tr>
+                ))
               ) : error ? (
                 <tr>
-                  <td
-                    colSpan="6"
-                    className="py-6 text-center text-red-500 text-sm"
-                  >
-                    {error}
+                  <td colSpan={COLUMNS.length} className="px-5 py-12 text-center">
+                    <AlertCircle className="mx-auto h-8 w-8 text-red-300" />
+                    <p className="mt-2 text-sm font-medium text-gray-700">{error}</p>
+                    <button type="button" onClick={() => { setLoading(true); fetchProjects(); }} className="mt-3 text-xs font-semibold text-indigo-600 hover:underline">Try again</button>
                   </td>
                 </tr>
               ) : filteredProjects.length > 0 ? (
-                filteredProjects.map((project) => (
-                  <tr
-                    key={project.projectId}
-                    className="hover:bg-gray-50 transition"
-                  >
-                    <td className="py-3 px-6 text-sm text-gray-700 font-medium">
-                      {project.projectId}
-                    </td>
-                    <td className="py-3 px-6 text-sm text-gray-700">
-                      {project.title}
-                    </td>
-                    <td className="py-3 px-6 text-sm text-gray-600">
-                      {project.description}
-                    </td>
-                    <td className="py-3 px-6 text-sm text-gray-700">
-                      {project.manager}
-                    </td>
-                    <td className="py-3 px-6 text-sm">
-                      <span
-                        className={`px-3 py-1 inline-flex text-xs font-semibold rounded-full ${project.status === "Completed"
-                          ? "border border-emerald-400 text-emerald-600"
-                          : project.status === "Ongoing"
-                            ? "border border-blue-400 text-blue-600"
-                            : "border border-amber-400 text-amber-600"
-                          }`}
-                        style={{ minWidth: 100 }}
-                      >
-                        {project.status}
-                      </span>
-                    </td>
-                    <td className="py-3 px-6 text-sm">
-                      <button
-                        onClick={() => handleView(project)}
-                        className="flex items-center gap-2 bg-gray-100 text-gray-700 px-3 py-2 rounded-lg shadow-sm hover:bg-gray-800 hover:text-white cursor-pointer transition-all duration-200 ease-in-out transform hover:scale-105"
-                        title="View Project Details"
-                      >
-                        <Eye className="w-5 h-5" />
-                        <span className="font-medium">View</span>
-                      </button>
-                      <div className="mt-2"></div>
-                    </td>
-                    <td className="py-3 px-6 text-sm">
-                      <button
-                        onClick={() => setTracklistProject(project)}
-                        className="flex items-center gap-2 bg-indigo-50 text-indigo-700 px-3 py-2 rounded-lg shadow-sm hover:bg-indigo-600 hover:text-white cursor-pointer transition-all duration-200 ease-in-out transform hover:scale-105"
-                        title="View Task Tracklist"
-                      >
-                        <ListChecks className="w-5 h-5" />
-                        <span className="font-medium">Tasks</span>
-                      </button>
-                    </td>
-                    <td className="py-3 px-6 text-sm">
-                      <button
-                        onClick={() => handleTeamView(project.projectId, project.title)}
-                        className="flex items-center gap-2 bg-gray-100 text-gray-700 px-3 py-2 rounded-lg shadow-sm hover:bg-gray-800 hover:text-white cursor-pointer transition-all duration-200 ease-in-out transform hover:scale-105"
-                        title="View Team Members"
-                      >
-                        <Users2 className="w-5 h-5" />
-                        <span className="font-medium">Show</span>
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                filteredProjects.map((project) => {
+                  const st = STATUS[project.status] || STATUS.Pending;
+                  return (
+                    <tr key={project.projectId} className="transition hover:bg-gray-50/70">
+                      <td className="whitespace-nowrap px-5 py-4">
+                        <span className="rounded-md bg-gray-100 px-1.5 py-0.5 font-mono text-[11px] font-bold text-gray-500">{project.projectId}</span>
+                      </td>
+                      <td className="px-5 py-4 text-sm font-semibold text-gray-800">{project.title}</td>
+                      <td className="px-5 py-4 text-sm text-gray-500">{project.description}</td>
+                      <td className="px-5 py-4">
+                        {project.manager ? (
+                          <span className="flex items-center gap-2 whitespace-nowrap text-sm text-gray-700">
+                            <PersonAvatar name={project.manager} size={24} />{project.manager}
+                          </span>
+                        ) : <span className="text-sm text-gray-300">—</span>}
+                      </td>
+                      <td className="px-5 py-4">
+                        <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${st.chip}`}>
+                          <st.Icon className="h-3.5 w-3.5" /> {project.status}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4">
+                        <button type="button" onClick={() => handleView(project)} title="View project details"
+                          className={`${pill} border border-gray-200 bg-white text-gray-600 hover:border-indigo-200 hover:text-indigo-600`}>
+                          <Eye className="h-3.5 w-3.5" /> View
+                        </button>
+                      </td>
+                      <td className="px-5 py-4">
+                        <button type="button" onClick={() => setTracklistProject(project)} title="Open the task tracklist"
+                          className={`${pill} bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100 hover:bg-indigo-600 hover:text-white hover:ring-indigo-600`}>
+                          <ListChecks className="h-3.5 w-3.5" /> Tasks
+                        </button>
+                      </td>
+                      <td className="px-5 py-4">
+                        <button type="button" onClick={() => handleTeamView(project.projectId, project.title)} title="View team members"
+                          className={`${pill} border border-gray-200 bg-white text-gray-600 hover:border-indigo-200 hover:text-indigo-600`}>
+                          <Users2 className="h-3.5 w-3.5" /> Show
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
-                  <td
-                    colSpan="7"
-                    className="py-6 text-center text-gray-500 text-sm"
-                  >
-                    No matching projects found.
+                  <td colSpan={COLUMNS.length} className="px-5 py-12 text-center">
+                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gray-50"><FolderOpen className="h-6 w-6 text-gray-300" /></div>
+                    <p className="mt-3 text-sm font-medium text-gray-700">{projects.length ? "No matching projects found" : "No projects yet"}</p>
+                    {searchTerm && <button type="button" onClick={() => setSearchTerm("")} className="mt-2 text-xs font-semibold text-indigo-600 hover:underline">Clear search</button>}
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-        {tracklistProject && (
-          <ProjectTaskDrawer
-            project={tracklistProject}
-            onClose={() => setTracklistProject(null)}
-            isManager={user?.role !== "employee"}
-          />
-        )}
-
-        {showTeamModal && (
-          <ProjectTeamModal
-            teamMembers={teamMembers}
-            projectTitle={teamModalTitle}
-            onClose={() => setShowTeamModal(false)}
-          />
-        )}
-
-        {showModal && (
-          <ProjectModal
-            project={selectedProject}
-            onClose={() => setShowModal(false)}
-          />
+        {!loading && !error && filteredProjects.length > 0 && (
+          <div className="border-t border-gray-100 px-5 py-3 text-xs text-gray-500">
+            Showing <span className="font-semibold text-gray-700">{filteredProjects.length}</span> of {projects.length} {projects.length === 1 ? "project" : "projects"}
+            {tableMaxH && <span className="text-gray-400"> · scroll for {filteredProjects.length - SHOW} more</span>}
+          </div>
         )}
       </div>
+
+      {tracklistProject && (
+        <ProjectTaskDrawer
+          project={tracklistProject}
+          onClose={() => setTracklistProject(null)}
+          isManager={!isEmployee}
+        />
+      )}
+
+      {showTeamModal && (
+        <ProjectTeamModal
+          teamMembers={teamMembers}
+          projectTitle={teamModalTitle}
+          onClose={() => setShowTeamModal(false)}
+        />
+      )}
+
+      {showModal && (
+        <ProjectModal
+          project={selectedProject}
+          onClose={() => setShowModal(false)}
+        />
+      )}
     </div>
   );
 };
