@@ -212,7 +212,12 @@ router.get('/employee/:employeeId', protect, admin, async (req, res) => {
     const completedProject = projectTasks.filter(t => t.status === 'Completed' && inPeriod(doneAt(t)));
     const completedHr = hrTasks.filter(t => t.status === 'Completed' && inPeriod(doneAt(t)));
     const completedAll = [...completedProject, ...completedHr];
-    const openProject = projectTasks.filter(t => t.status !== 'Completed').length;
+    // Tasks of a deleted project stay in the database — they aren't open work any more
+    const liveProjectIds = new Set((await Project.find({
+      projectId: { $in: [...new Set(projectTasks.map(t => t.projectId))] },
+      statusFlag: true,
+    }).select('projectId').lean()).map(p => p.projectId));
+    const openProject = projectTasks.filter(t => t.status !== 'Completed' && liveProjectIds.has(t.projectId)).length;
     const openHr = hrTasks.filter(t => t.status === 'Assigned' || t.status === 'In Progress').length;
     const avgCompletionHours = completedAll.length
       ? completedAll.reduce((s, t) => s + hoursBetween(t.createdAt, doneAt(t)), 0) / completedAll.length

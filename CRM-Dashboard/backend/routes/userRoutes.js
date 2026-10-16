@@ -314,8 +314,11 @@ router.get('/employee-dashboard', protect, async (req, res) => {
       ? await ProjectTask.find({ projectId: { $in: projectIds } }).lean()
       : [];
 
-    // Combine project tasks + HR tasks for the Tasks Done card
-    const tasks = [...projectTasks, ...hrTasks];
+    // Tasks Done card: only the user's own work — project tasks they created or have a timer on (teammates' tasks in
+    // the same projects don't count; same rule as the Employee Report) + the HR tasks assigned to them
+    const uidStr = String(userId);
+    const isMine = (t) => String(t.createdBy) === uidStr || (t.timers || []).some(tm => tm.userId?.toString() === uidStr);
+    const tasks = [...projectTasks.filter(isMine), ...hrTasks];
 
     // Build leave date sets — track half-day leaves separately
     const leaveDates = new Set();

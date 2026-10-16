@@ -49,9 +49,9 @@ const fmtAgo = (ts) => {
 
 /* ── Period presets ─────────────────────────────────────────────────────── */
 const PERIODS = [
-  { id: "this-month",  label: "This month" },
-  { id: "last-month",  label: "Last month" },
-  { id: "last-3",      label: "Last 3 months" },
+  { id: "this-month", label: "This month" },
+  { id: "last-month", label: "Last month" },
+  { id: "last-3", label: "Last 3 months" },
 ];
 const periodRange = (id) => {
   const now = new Date();
@@ -64,14 +64,14 @@ const periodRange = (id) => {
 
 /* ── Status vocab (validated palette: CVD-safe across all pairs) ───────── */
 const DAY_STATUS = {
-  present:      { label: "Present",  color: "#10b981" },
-  late:         { label: "Late",     color: "#f59e0b" },
-  leave:        { label: "On leave", color: "#3b82f6" },
+  present: { label: "Present", color: "#10b981" },
+  late: { label: "Late", color: "#f59e0b" },
+  leave: { label: "On leave", color: "#3b82f6" },
   "half-leave": { label: "Half-day leave", color: "linear-gradient(135deg, #10b981 50%, #3b82f6 50%)" },
-  absent:       { label: "Absent",   color: "#ef4444" },
-  weekend:      { label: "Weekend",  color: "#f1f5f9" },
-  today:        { label: "Today · not checked in yet", color: "#ffffff" },
-  future:       { label: "Upcoming", color: "#ffffff" },
+  absent: { label: "Absent", color: "#ef4444" },
+  weekend: { label: "Weekend", color: "#f1f5f9" },
+  today: { label: "Today · not checked in yet", color: "#ffffff" },
+  future: { label: "Upcoming", color: "#ffffff" },
 };
 const CHIP = {
   Ongoing: "border-blue-400 text-blue-600", Completed: "border-emerald-400 text-emerald-600",
@@ -124,11 +124,11 @@ const ScrollHint = ({ total, shown = 3 }) => total > shown
 /* ── Live status chip ───────────────────────────────────────────────────── */
 function LiveStatus({ live }) {
   const map = {
-    working:       { cls: "border-indigo-300 text-indigo-600", dot: "bg-indigo-500 animate-pulse", text: `Working on "${live.taskTitle}" since ${fmtTime(live.since)}` },
-    "checked-in":  { cls: "border-emerald-400 text-emerald-600", dot: "bg-emerald-500", text: `Checked in at ${fmtTime(live.since)} · no timer running` },
-    "on-break":    { cls: "border-amber-400 text-amber-600", dot: "bg-amber-500 animate-pulse", text: `On break since ${fmtTime(live.since)}` },
+    working: { cls: "border-indigo-300 text-indigo-600", dot: "bg-indigo-500 animate-pulse", text: `Working on "${live.taskTitle}" since ${fmtTime(live.since)}` },
+    "checked-in": { cls: "border-emerald-400 text-emerald-600", dot: "bg-emerald-500", text: `Checked in at ${fmtTime(live.since)} · no timer running` },
+    "on-break": { cls: "border-amber-400 text-amber-600", dot: "bg-amber-500 animate-pulse", text: `On break since ${fmtTime(live.since)}` },
     "checked-out": { cls: "border-gray-300 text-gray-500", dot: "bg-gray-400", text: `Checked out at ${fmtTime(live.since)}` },
-    offline:       { cls: "border-gray-300 text-gray-500", dot: "bg-gray-300", text: "Not checked in today" },
+    offline: { cls: "border-gray-300 text-gray-500", dot: "bg-gray-300", text: "Not checked in today" },
   };
   const s = map[live?.state] || map.offline;
   return (
@@ -252,12 +252,12 @@ function FocusChart({ days }) {
         <BarChart data={data} margin={{ top: 16, right: 8, bottom: 0, left: -18 }}>
           <CartesianGrid vertical={false} stroke="#f1f5f9" />
           <XAxis dataKey="date" ticks={xTicks} tickFormatter={xLabel} tick={{ fontSize: 10, fill: "#9ca3af" }}
-                 axisLine={{ stroke: "#e5e7eb" }} tickLine={false} interval={long ? 0 : "preserveStartEnd"} minTickGap={8} />
+            axisLine={{ stroke: "#e5e7eb" }} tickLine={false} interval={long ? 0 : "preserveStartEnd"} minTickGap={8} />
           <YAxis domain={[0, maxH]} ticks={Array.from({ length: maxH / 2 + 1 }, (_, i) => i * 2)}
-                 tickFormatter={(v) => `${v}h`} tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+            tickFormatter={(v) => `${v}h`} tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
           <Tooltip content={<FocusTooltip />} cursor={{ fill: "#f8fafc" }} />
           <ReferenceLine y={6.5} stroke="#9ca3af" strokeWidth={1}
-                         label={{ value: "6.5h target", position: "insideTopRight", fontSize: 10, fill: "#6b7280" }} />
+            label={{ value: "6.5h target", position: "insideTopRight", fontSize: 10, fill: "#6b7280" }} />
           <Bar dataKey="focusH" fill="#6366f1" radius={[4, 4, 0, 0]} maxBarSize={24} activeBar={{ fill: "#818cf8" }} />
         </BarChart>
       </ResponsiveContainer>
@@ -280,7 +280,7 @@ function TaskRing({ done, total, completed }) {
   const pct = total ? done / total : 0;
   return (
     <MeterRing pct={pct} fill={completed ? "#10b981" : "#6366f1"} track={completed ? "#d1fae5" : "#e0e7ff"}
-               label={`${done} of ${total} tasks done`}>
+      label={`${done} of ${total} tasks done`}>
       {completed
         ? <Check className="h-4 w-4 text-emerald-600" strokeWidth={3} />
         : <span className="text-[11px] font-black text-gray-700">{total ? `${Math.round(pct * 100)}%` : "—"}</span>}
@@ -299,7 +299,7 @@ function LeaveTile({ t }) {
   const rule = t.monthly > 0 ? `Earns ${t.monthly}/month · max ${t.yearly} a year` : `${t.yearly} a year, available up front`;
   return (
     <li className="flex items-center gap-4 rounded-xl border p-3.5 transition hover:shadow-sm"
-        style={{ borderColor: `${t.color}26`, background: `${t.color}08` }}>
+      style={{ borderColor: `${t.color}26`, background: `${t.color}08` }}>
       <MeterRing pct={pct} fill={t.color} track={t.light} label={`${t.used} of ${t.available} days used`}>
         <span className="text-[11px] font-black text-gray-700">{t.available ? `${Math.round(Math.min(1, pct) * 100)}%` : "—"}</span>
         <span className="mt-0.5 text-[8px] font-semibold text-gray-400">used</span>
@@ -370,11 +370,11 @@ function ProjectTile({ p }) {
           {completed
             ? <>Finished {fmtShortDate(p.completedAt)}{took && <> · took {took}</>}{p.startedAt && <> (from {fmtShortDate(p.startedAt)})</>}</>
             : <>
-                {p.tasksOngoing > 0 ? `${p.tasksOngoing} in progress`
-                  : p.tasksTotal > 0 && p.tasksDone === p.tasksTotal ? "Your tasks done"
+              {p.tasksOngoing > 0 ? `${p.tasksOngoing} in progress`
+                : p.tasksTotal > 0 && p.tasksDone === p.tasksTotal ? "Your tasks done"
                   : "Not started"}
-                {p.lastWorkedAt && <> · worked {fmtAgo(p.lastWorkedAt)}</>}
-              </>}
+              {p.lastWorkedAt && <> · worked {fmtAgo(p.lastWorkedAt)}</>}
+            </>}
           {p.manager && <> · Manager {p.manager}</>}
         </p>
       </div>
@@ -520,38 +520,38 @@ export default function EmployeeReport() {
         {/* ── Key numbers ── */}
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
           <Stat label="Attendance" Icon={CalendarDays} accent="border-l-emerald-400"
-                value={k.attendanceRate == null ? "—" : `${k.attendanceRate}%`}
-                sub={`${k.presentDays} of ${p.expectedDays} working days${k.weekendDays ? ` · +${k.weekendDays} weekend day${k.weekendDays === 1 ? "" : "s"}` : ""}`} />
+            value={k.attendanceRate == null ? "—" : `${k.attendanceRate}%`}
+            sub={`${k.presentDays} of ${p.expectedDays} working days${k.weekendDays ? ` · +${k.weekendDays} weekend day${k.weekendDays === 1 ? "" : "s"}` : ""}`} />
           <Stat label="Punctuality" Icon={Target} accent="border-l-amber-400"
-                value={k.punctualityRate == null ? "—" : `${k.punctualityRate}%`}
-                sub={`${k.lateDays} late (in after ${fmtClockMin(k.lateAfterMin)}) · avg in ${fmtClockMin(k.avgCheckInMin)}`} />
+            value={k.punctualityRate == null ? "—" : `${k.punctualityRate}%`}
+            sub={`${k.lateDays} late (in after ${fmtClockMin(k.lateAfterMin)}) · avg in ${fmtClockMin(k.avgCheckInMin)}`} />
           <Stat label="Avg hours" Icon={Clock} accent="border-l-indigo-400"
-                value={k.avgHoursPerDay == null ? "—" : `${k.avgHoursPerDay}h`}
-                sub={k.avgHoursPerDay == null
-                  ? (k.missedCheckouts
-                      ? `no hours recorded — ${k.missedCheckouts} day${k.missedCheckouts === 1 ? "" : "s"} never checked out`
-                      : "no checked-out days yet")
-                  : `per day at work${k.missedCheckouts ? ` · ${k.missedCheckouts} missed check-out${k.missedCheckouts === 1 ? "" : "s"}` : ""}`} />
+            value={k.avgHoursPerDay == null ? "—" : `${k.avgHoursPerDay}h`}
+            sub={k.avgHoursPerDay == null
+              ? (k.missedCheckouts
+                ? `no hours recorded — ${k.missedCheckouts} day${k.missedCheckouts === 1 ? "" : "s"} never checked out`
+                : "no checked-out days yet")
+              : `per day at work${k.missedCheckouts ? ` · ${k.missedCheckouts} missed check-out${k.missedCheckouts === 1 ? "" : "s"}` : ""}`} />
           <Stat label="Focus time" Icon={Timer} accent="border-l-violet-400"
-                value={k.avgFocusSecPerDay == null ? "—" : fmtHM(k.avgFocusSecPerDay)}
-                sub={`avg per day worked · ${k.daysMeetingTarget} day${k.daysMeetingTarget === 1 ? "" : "s"} reached 6.5h`} />
+            value={k.avgFocusSecPerDay == null ? "—" : fmtHM(k.avgFocusSecPerDay)}
+            sub={`avg per day worked · ${k.daysMeetingTarget} day${k.daysMeetingTarget === 1 ? "" : "s"} reached 6.5h`} />
           <Stat label="Tasks done" Icon={CheckSquare} accent="border-l-blue-400"
-                value={k.tasksCompleted}
-                sub={`${k.tasksOpen} still open`} />
+            value={k.tasksCompleted}
+            sub={`${k.tasksOpen} still open`} />
           <Stat label="Leave" Icon={Plane} accent="border-l-sky-400"
-                value={`${p.leaveDays}d`}
-                sub="approved leave in period" />
+            value={`${p.leaveDays}d`}
+            sub="approved leave in period" />
         </div>
 
         {/* ── Attendance + Focus ── */}
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
           <Card title="Attendance" Icon={CalendarDays}
-                right={<span className="text-[11px] text-gray-400">{k.breakCount} breaks · avg {fmtHM(k.avgBreakSec)}{k.daysOverBreakLimit ? ` · ${k.daysOverBreakLimit} day(s) over 60m` : ""}</span>}>
+            right={<span className="text-[11px] text-gray-400">{k.breakCount} breaks · avg {fmtHM(k.avgBreakSec)}{k.daysOverBreakLimit ? ` · ${k.daysOverBreakLimit} day(s) over 60m` : ""}</span>}>
             <AttendanceGrid days={days} />
           </Card>
 
           <Card title="Focus hours per day" Icon={Timer}
-                right={<span className="text-[11px] text-gray-400">{fmtHM(k.focusSec)} total</span>}>
+            right={<span className="text-[11px] text-gray-400">{fmtHM(k.focusSec)} total</span>}>
             <FocusChart days={days} />
             {excludedSessions.length > 0 && (
               <div className="mt-3 flex gap-2 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
@@ -576,33 +576,33 @@ export default function EmployeeReport() {
           </button>
           {showLog && (
             <>
-            {/* Shows one week (7 rows); the rest scroll under a pinned header */}
-            <div ref={logRef} className={`overflow-x-auto border-t border-gray-100 ${capClass(logMaxH)}`} style={capStyle(logMaxH)}>
-              <table className="w-full text-xs">
-                <thead className="sticky top-0 z-10 bg-gray-50 text-[10px] uppercase tracking-wider text-gray-400">
-                  <tr>{["Date", "Status", "Check-in", "Check-out", "At work", "Focus", "Breaks"].map(h => <th key={h} className="px-4 py-2 text-left font-bold">{h}</th>)}</tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50 tabular-nums">
-                  {days.filter(d => d.status !== "future").slice().reverse().map(d => (
-                    <tr key={d.date} className="hover:bg-gray-50">
-                      <td className="px-4 py-2 font-semibold text-gray-700">{fmtDay(d.date)}</td>
-                      <td className="px-4 py-2">
-                        <span className="flex items-center gap-1.5 text-gray-600">
-                          <span className="h-2 w-2 rounded-[3px]" style={{ background: DAY_STATUS[d.status].color }} />
-                          {DAY_STATUS[d.status].label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2 text-gray-500">{fmtTime(d.checkIn)}</td>
-                      <td className="px-4 py-2 text-gray-500">{fmtTime(d.checkOut)}</td>
-                      <td className="px-4 py-2 text-gray-500">{d.hours ? `${d.hours}h` : "—"}</td>
-                      <td className="px-4 py-2 text-gray-500">{d.focusSec ? fmtHM(d.focusSec) : "—"}</td>
-                      <td className="px-4 py-2 text-gray-500">{d.breakSec ? fmtHM(d.breakSec) : "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="pb-2"><ScrollHint total={days.filter(d => d.status !== "future").length} shown={7} /></div>
+              {/* Shows one week (7 rows); the rest scroll under a pinned header */}
+              <div ref={logRef} className={`overflow-x-auto border-t border-gray-100 ${capClass(logMaxH)}`} style={capStyle(logMaxH)}>
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0 z-10 bg-gray-50 text-[10px] uppercase tracking-wider text-gray-400">
+                    <tr>{["Date", "Status", "Check-in", "Check-out", "At work", "Focus", "Breaks"].map(h => <th key={h} className="px-4 py-2 text-left font-bold">{h}</th>)}</tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50 tabular-nums">
+                    {days.filter(d => d.status !== "future").slice().reverse().map(d => (
+                      <tr key={d.date} className="hover:bg-gray-50">
+                        <td className="px-4 py-2 font-semibold text-gray-700">{fmtDay(d.date)}</td>
+                        <td className="px-4 py-2">
+                          <span className="flex items-center gap-1.5 text-gray-600">
+                            <span className="h-2 w-2 rounded-[3px]" style={{ background: DAY_STATUS[d.status].color }} />
+                            {DAY_STATUS[d.status].label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2 text-gray-500">{fmtTime(d.checkIn)}</td>
+                        <td className="px-4 py-2 text-gray-500">{fmtTime(d.checkOut)}</td>
+                        <td className="px-4 py-2 text-gray-500">{d.hours ? `${d.hours}h` : "—"}</td>
+                        <td className="px-4 py-2 text-gray-500">{d.focusSec ? fmtHM(d.focusSec) : "—"}</td>
+                        <td className="px-4 py-2 text-gray-500">{d.breakSec ? fmtHM(d.breakSec) : "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="pb-2"><ScrollHint total={days.filter(d => d.status !== "future").length} shown={7} /></div>
             </>
           )}
         </section>
@@ -610,11 +610,11 @@ export default function EmployeeReport() {
         {/* ── Projects + Tasks ── */}
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
           <Card title="Projects" Icon={Layers}
-                right={projects.length > 0 && (
-                  <span className="text-[11px] text-gray-400">
-                    {fmtHM(projects.reduce((s, x) => s + x.totalSec, 0))} total work
-                  </span>
-                )}>
+            right={projects.length > 0 && (
+              <span className="text-[11px] text-gray-400">
+                {fmtHM(projects.reduce((s, x) => s + x.totalSec, 0))} total work
+              </span>
+            )}>
             {projects.length === 0 ? <Empty>Not assigned to any project.</Empty> : (
               <>
                 <div ref={projectsRef} className={`space-y-4 ${capClass(projectsMaxH)}`} style={capStyle(projectsMaxH)}>
@@ -651,21 +651,21 @@ export default function EmployeeReport() {
             </div>
             {tasks.length === 0 ? <Empty>No task activity in this period.</Empty> : (
               <>
-              <ul ref={tasksRef} className={`divide-y divide-gray-50 ${capClass(tasksMaxH)}`} style={capStyle(tasksMaxH)}>
-                {tasks.map(t => (
-                  <li key={t.id} className="flex items-center gap-3 py-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-gray-800" title={t.title}>
-                        {t.title}
-                        {t.isRevision && <span className="ml-1.5 rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold uppercase text-amber-600">Revision</span>}
-                      </p>
-                      <p className="truncate text-[11px] text-gray-400">{t.kind === "HR" ? "HR task" : t.project}{t.periodSec ? ` · ${fmtHM(t.periodSec)} logged` : ""}</p>
-                    </div>
-                    <Chip tone={t.status}>{t.status}</Chip>
-                  </li>
-                ))}
-              </ul>
-              <ScrollHint total={tasks.length} />
+                <ul ref={tasksRef} className={`divide-y divide-gray-50 ${capClass(tasksMaxH)}`} style={capStyle(tasksMaxH)}>
+                  {tasks.map(t => (
+                    <li key={t.id} className="flex items-center gap-3 py-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-gray-800" title={t.title}>
+                          {t.title}
+                          {t.isRevision && <span className="ml-1.5 rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold uppercase text-amber-600">Revision</span>}
+                        </p>
+                        <p className="truncate text-[11px] text-gray-400">{t.kind === "HR" ? "HR task" : t.project}{t.periodSec ? ` · ${fmtHM(t.periodSec)} logged` : ""}</p>
+                      </div>
+                      <Chip tone={t.status}>{t.status}</Chip>
+                    </li>
+                  ))}
+                </ul>
+                <ScrollHint total={tasks.length} />
               </>
             )}
           </Card>
@@ -674,7 +674,7 @@ export default function EmployeeReport() {
         {/* ── Leave + Recent activity ── */}
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
           <Card title={`Leave balance · ${p.to.slice(0, 4)}`} Icon={Plane}
-                right={<span className="text-[11px] text-gray-400">{leaveRows.reduce((s, t) => s + t.used, 0)} days used this year</span>}>
+            right={<span className="text-[11px] text-gray-400">{leaveRows.reduce((s, t) => s + t.used, 0)} days used this year</span>}>
             <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-gray-400">By leave type · {leaveRows.length}</p>
             <ul ref={leaveTypesRef} className={`space-y-2 ${capClass(leaveTypesMaxH)}`} style={capStyle(leaveTypesMaxH)}>
               {leaveRows.map(t => <LeaveTile key={t.key} t={t} />)}
@@ -694,11 +694,11 @@ export default function EmployeeReport() {
 
           {/* ── Recent activity (sits beside Leave) ── */}
           <Card title="Recent activity" Icon={Activity}
-                right={activity.length > 0 && (
-                  <span className="text-[11px] text-gray-400">
-                    {activity.length >= 15 ? "latest 15 events" : `${activity.length} event${activity.length === 1 ? "" : "s"} in period`}
-                  </span>
-                )}>
+            right={activity.length > 0 && (
+              <span className="text-[11px] text-gray-400">
+                {activity.length >= 15 ? "latest 15 events" : `${activity.length} event${activity.length === 1 ? "" : "s"} in period`}
+              </span>
+            )}>
             {activity.length === 0 ? <Empty>No project activity in this period.</Empty> : (
               <ol className="relative ml-1.5 space-y-3 border-l border-gray-100 pl-5">
                 {(showAllActivity ? activity : activity.slice(0, 8)).map(a => (
