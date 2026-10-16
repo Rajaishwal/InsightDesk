@@ -54,6 +54,9 @@ export const SocketProvider = ({ children }) => {
     socket.on("leave:updated", () =>
       window.dispatchEvent(new CustomEvent("crm:leave:updated"))
     );
+    socket.on("salary:updated", (detail) =>
+      window.dispatchEvent(new CustomEvent("crm:salary:updated", { detail }))
+    );
 
     socket.on("receive_message", (msg) => {
       const otherId =

@@ -1,9 +1,11 @@
-// Sidebar.jsx — Left navigation sidebar with role-based menu links
-import { useEffect } from "react";
+// Sidebar.jsx — Left navigation sidebar with role-based menu links.
+// "Payslips & Salary" shows a count of paid salaries you still need to confirm you received (refreshes live).
+import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useAuth } from "../context/AuthContext";
 import { prefetchAll } from "../utils/prefetch";
+import api from "../services/axios";
 import {
   LayoutDashboard, Users, FolderOpen,
   CalendarCheck2, BarChart,
@@ -18,6 +20,19 @@ const Sidebar = () => {
   useEffect(() => {
     if (user?._id) prefetchAll(user);
   }, [user?._id]);
+
+  // Paid salaries of mine that I haven't confirmed (or reported) yet
+  const [toConfirm, setToConfirm] = useState(0);
+  useEffect(() => {
+    if (!user?.employeeId) return;
+    const load = () => api.get("/salary/me")
+      .then((r) => setToConfirm((r.data || []).filter((s) => s.status === "Paid" && !s.receipt?.status).length))
+      .catch(() => {});
+    load();
+    const onUpdate = (e) => { if (!e.detail?.employeeId || e.detail.employeeId === user.employeeId) load(); };
+    window.addEventListener("crm:salary:updated", onUpdate);
+    return () => window.removeEventListener("crm:salary:updated", onUpdate);
+  }, [user?.employeeId]);
 
   const userProfileImage = user?.photo || null;
   const userName = user?.name || "User";
@@ -100,6 +115,12 @@ const Sidebar = () => {
                       {/* Icon + label sit above the animated background */}
                       <Icon size={20} className="relative z-10 shrink-0" />
                       <span className="relative z-10">{label}</span>
+                      {to === "/payslip" && toConfirm > 0 && (
+                        <span title={`${toConfirm} paid ${toConfirm === 1 ? "salary" : "salaries"} to confirm`}
+                          className="relative z-10 ml-auto mr-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1.5 text-[10px] font-bold text-white shadow-sm">
+                          {toConfirm}
+                        </span>
+                      )}
                     </>
                   )}
                 </NavLink>

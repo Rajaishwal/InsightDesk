@@ -1,10 +1,13 @@
-// Salary.jsx — Admin: every employee's monthly salary. Summary tiles (filter by status), month chips, search,
-// a table with the pay breakdown, and an add / edit form where net pay is worked out from the basic pay.
-// Your own salary is read-only here — another admin has to set it (the server enforces this too).
+// Salary.jsx — Admin: every employee's monthly salary. Summary tiles (filter by stage), month chips, search,
+// a table with the pay breakdown, and an "Add salary" form where net pay is worked out from the basic pay.
+// Adding a salary sends it straight to the employee, who confirms on their Payslips page that the money arrived.
+// No editing: a wrong salary is deleted and added again — until the employee confirms it, then it's locked for good.
+// "Send" re-sends one the employee reported as not received (or a failed one). Your own salary is managed by
+// another admin. The server enforces all of this too.
 import { useEffect, useMemo, useState } from "react";
 import {
-  IndianRupee, Plus, Search, X, Pencil, CheckCircle2, XCircle, Trash2, Lock, Wallet, Hourglass, AlertTriangle,
-  Loader2, AlertCircle, ReceiptIndianRupee,
+  IndianRupee, Plus, Search, X, XCircle, Trash2, Lock, Wallet, Hourglass, AlertTriangle,
+  Loader2, AlertCircle, ReceiptIndianRupee, CheckCheck, Clock, Send,
 } from "lucide-react";
 import { useToast } from "../context/ToastContext";
 import { useConfirm } from "../context/ConfirmContext";
@@ -40,34 +43,52 @@ const sumObj = (o) => Object.values(o || {}).reduce((n, v) => n + (Number(v) || 
 const inr = (n) => { const v = Number(n) || 0; return `₹${v.toLocaleString("en-IN", { minimumFractionDigits: v % 1 ? 2 : 0, maximumFractionDigits: 2 })}`; };
 const periodKey = (s) => `${s.year}-${String(MONTHS.indexOf(s.month) + 1).padStart(2, "0")}`;
 
-const STATUS = {
-  Paid:    { chip: "bg-emerald-50 text-emerald-700 ring-emerald-200", Icon: CheckCircle2 },
-  Pending: { chip: "bg-amber-50 text-amber-700 ring-amber-200",       Icon: Hourglass },
-  Failed:  { chip: "bg-rose-50 text-rose-700 ring-rose-200",          Icon: XCircle },
+// Where a salary is: sent and waiting for the employee, confirmed, or needing the admin's attention
+const stageOf = (s) =>
+  s.status === "Pending" ? "unsent"                       // added before salaries were sent automatically
+  : s.status === "Failed" ? "failed"
+  : s.receipt?.status === "Received" ? "received"
+  : s.receipt?.status === "Not received" ? "not-received"
+  : "awaiting";
+const STAGE = {
+  awaiting:       { label: "Awaiting confirmation", chip: "bg-amber-50 text-amber-700 ring-amber-200",       Icon: Clock },
+  received:       { label: "Received",              chip: "bg-emerald-50 text-emerald-700 ring-emerald-200", Icon: CheckCheck },
+  "not-received": { label: "Not received",          chip: "bg-rose-50 text-rose-700 ring-rose-200",          Icon: AlertTriangle },
+  failed:         { label: "Payment failed",        chip: "bg-rose-50 text-rose-700 ring-rose-200",          Icon: XCircle },
+  unsent:         { label: "Not sent",              chip: "bg-gray-100 text-gray-600 ring-gray-200",         Icon: Hourglass },
 };
+const NEEDS_ATTENTION = ["not-received", "failed", "unsent"];
+
+// The line under the stage chip: when it was sent / confirmed, or the ticket the employee opened
+const fmtShort = (d) => (d ? new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "");
+function StageDetail({ s, stage }) {
+  const text = {
+    awaiting: `sent ${fmtShort(s.paymentDate || s.processedAt || s.createdAt)}${s.receipt?.ticketId ? ` again · ${s.receipt.ticketId}` : ""}`,
+    received: `confirmed ${fmtShort(s.receipt?.at)}`,
+    "not-received": s.receipt?.ticketId ? `ticket ${s.receipt.ticketId}` : "reported by employee",
+    failed: "send it again",
+    unsent: "send it to the employee",
+  }[stage];
+  return <p className="mt-1 whitespace-nowrap pl-1 text-[11px] text-gray-400" title={s.receipt?.note || undefined}>{text}</p>;
+}
 
 const EMPTY_FORM = { employee: "", month: MONTHS[new Date().getMonth()], year: String(new Date().getFullYear()), basicPay: "" };
 
-// Add / edit a salary
-function SalaryForm({ editing, people, peopleState, onRetryPeople, salaries, selfId, onClose, onSaved }) {
+// Add a salary — it goes straight to the employee
+function SalaryForm({ people, peopleState, onRetryPeople, salaries, selfId, onClose, onSaved }) {
   const toast = useToast();
-  const [form, setForm] = useState(() =>
-    editing
-      ? { employee: people.find((p) => p.employeeId === editing.userId)?._id || "", month: editing.month, year: String(editing.year), basicPay: String(editing.basicPay ?? "") }
-      : EMPTY_FORM
-  );
+  const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   // You can't choose yourself (your own salary is set by another admin)
   const choices = people.filter((p) => p.employeeId && p.employeeId !== selfId);
-  // When editing, the employee is fixed — find them even if the list arrived after the form opened
-  const person = people.find((p) => p._id === form.employee) || (editing ? people.find((p) => p.employeeId === editing.userId) : undefined);
+  const person = people.find((p) => p._id === form.employee);
   const calc = breakdown(form.basicPay);
 
-  // Months this person already has a salary for (except the one being edited)
+  // Months this person already has a salary for
   const taken = new Set(
-    salaries.filter((s) => person && s.userId === person.employeeId && s._id !== editing?._id).map((s) => `${s.month}-${s.year}`)
+    salaries.filter((s) => person && s.userId === person.employeeId).map((s) => `${s.month}-${s.year}`)
   );
   const clash = person && taken.has(`${form.month}-${form.year}`);
   const years = Array.from({ length: 6 }, (_, i) => String(new Date().getFullYear() - 2 + i));
@@ -85,9 +106,8 @@ function SalaryForm({ editing, people, peopleState, onRetryPeople, salaries, sel
         userId: person.employeeId, month: form.month, year: Number(form.year),
         basicPay: Number(form.basicPay), allowances: calc.allowances, deductions: calc.deductions,
       };
-      if (editing) await api.put(`/salary/${editing._id}`, body);
-      else await api.post("/salary", body);
-      toast.success(editing ? "Salary updated." : `Salary added for ${person.name}.`);
+      await api.post("/salary", body);
+      toast.success(`Salary sent to ${person.name} — they'll confirm when the money arrives.`);
       onSaved();
     } catch (err) {
       setError(!err?.response ? "Can't reach the server — make sure the backend is running." : err.response.data?.error || "Couldn't save the salary.");
@@ -106,8 +126,8 @@ function SalaryForm({ editing, people, peopleState, onRetryPeople, salaries, sel
         <div className="flex items-start gap-3 px-6 pt-5">
           <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-indigo-50"><IndianRupee className="h-5 w-5 text-indigo-600" /></div>
           <div className="min-w-0 flex-1">
-            <h2 className="text-lg font-bold text-gray-900">{editing ? "Edit salary" : "Add salary"}</h2>
-            <p className="text-sm text-gray-500">Allowances, deductions and net pay are worked out from the basic pay.</p>
+            <h2 className="text-lg font-bold text-gray-900">Add salary</h2>
+            <p className="text-sm text-gray-500">It goes to {person ? person.name.split(" ")[0] : "the employee"} straight away — they confirm on their Payslips page once the money arrives.</p>
           </div>
           <button type="button" onClick={onClose} aria-label="Close" className="-mr-1 rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"><X className="h-4 w-4" /></button>
         </div>
@@ -119,7 +139,7 @@ function SalaryForm({ editing, people, peopleState, onRetryPeople, salaries, sel
               <p className="mb-1.5 text-[11px] font-bold uppercase tracking-widest text-gray-400">Employee</p>
               <PersonPicker people={choices} value={person?._id || ""} onChange={(id) => set({ employee: id })}
                 allowAll={false} placeholder={peopleState === "loading" && !people.length ? "Loading employees…" : "Choose an employee"}
-                disabled={!!editing || (peopleState !== "ok" && !people.length)} full />
+                disabled={peopleState !== "ok" && !people.length} full />
               {peopleState === "error" && !people.length && (
                 <p className="mt-1.5 flex items-center gap-1.5 text-xs text-red-600">
                   <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" /> Couldn't load the employee list.
@@ -148,7 +168,7 @@ function SalaryForm({ editing, people, peopleState, onRetryPeople, salaries, sel
             <div className="relative">
               <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-400">₹</span>
               <input type="number" min="0" step="1" inputMode="numeric" value={form.basicPay} onChange={(e) => set({ basicPay: e.target.value })}
-                placeholder="e.g. 60000" className={`${fieldCls} h-11 pl-8 text-base font-semibold`} autoFocus={!!editing} />
+                placeholder="e.g. 60000" className={`${fieldCls} h-11 pl-8 text-base font-semibold`} />
             </div>
           </div>
 
@@ -194,8 +214,8 @@ function SalaryForm({ editing, people, peopleState, onRetryPeople, salaries, sel
           <button type="button" onClick={onClose} className="rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">Cancel</button>
           <button type="submit" disabled={saving}
             className="inline-flex items-center gap-1.5 rounded-full bg-gray-800 px-5 py-2 text-sm font-semibold text-white transition hover:bg-gray-900 disabled:opacity-60">
-            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-            {editing ? "Save changes" : "Add salary"}
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            Add & send
           </button>
         </div>
       </form>
@@ -217,7 +237,7 @@ const Salary = () => {
   const [search, setSearch]     = useState("");
   const [status, setStatus]     = useState("all");
   const [period, setPeriod]     = useState("all");
-  const [form, setForm]         = useState(null); // null | { editing: record | null }
+  const [formOpen, setFormOpen] = useState(false);
   const [busyId, setBusyId]     = useState(null);
 
   const fetchSalaries = async () => {
@@ -245,10 +265,17 @@ const Salary = () => {
     loadPeople();
   }, []);
 
-  // Open the add / edit form — and try the employee list again if it didn't load (e.g. the server was down)
-  const openForm = (editing) => {
+  // Live: an employee confirmed / reported a salary, or another admin changed one
+  useEffect(() => {
+    const onUpdate = () => fetchSalaries();
+    window.addEventListener("crm:salary:updated", onUpdate);
+    return () => window.removeEventListener("crm:salary:updated", onUpdate);
+  }, []);
+
+  // Open the add form — and try the employee list again if it didn't load (e.g. the server was down)
+  const openForm = () => {
     if (peopleState === "error" || (peopleState === "ok" && !people.length)) loadPeople();
-    setForm({ editing });
+    setFormOpen(true);
   };
 
   const byEmpId = useMemo(() => Object.fromEntries(people.map((p) => [p.employeeId, p])), [people]);
@@ -262,21 +289,26 @@ const Salary = () => {
 
   const q = search.trim().toLowerCase();
   const inPeriod = salaries.filter((s) => period === "all" || periodKey(s) === period);
+  const inGroup = (s, g) => (g === "attention" ? NEEDS_ATTENTION.includes(stageOf(s)) : stageOf(s) === g);
   const visible = inPeriod
-    .filter((s) => status === "all" || s.status === status)
+    .filter((s) => status === "all" || inGroup(s, status))
     .filter((s) => !q || [s.userName, s.userEmail, s.userId].some((v) => (v || "").toLowerCase().includes(q)))
     .sort((a, b) => periodKey(b).localeCompare(periodKey(a)) || (a.userName || "").localeCompare(b.userName || ""));
 
-  const count = (st) => inPeriod.filter((s) => s.status === st).length;
+  const count = (g) => inPeriod.filter((s) => inGroup(s, g)).length;
   const totalNet = inPeriod.reduce((n, s) => n + (Number(s.netPay) || 0), 0);
-  const paidNet = inPeriod.filter((s) => s.status === "Paid").reduce((n, s) => n + (Number(s.netPay) || 0), 0);
+  const receivedNet = inPeriod.filter((s) => stageOf(s) === "received").reduce((n, s) => n + (Number(s.netPay) || 0), 0);
+  const stageCount = (st) => inPeriod.filter((s) => stageOf(s) === st).length;
   const periodLabel = period === "all" ? "all months" : periods.find(([k]) => k === period)?.[1];
 
+  // "Paid" = send (again) to the employee, who is asked to confirm; "Failed" = the transfer didn't go through
   const setStatusOf = async (s, next) => {
     setBusyId(s._id);
     try {
       await api.patch(`/salary/${s._id}/status`, { status: next });
-      toast.success(`${s.userName}'s ${s.month} salary marked ${next.toLowerCase()}.`);
+      toast.success(next === "Paid"
+        ? `${s.userName}'s ${s.month} salary sent${stageOf(s) === "unsent" ? "" : " again"} — they'll confirm when it arrives.`
+        : `${s.userName}'s ${s.month} salary marked as failed.`);
       fetchSalaries();
     } catch (err) {
       toast.error(err?.response?.data?.error || "Couldn't update the status.");
@@ -322,7 +354,7 @@ const Salary = () => {
               className="w-full min-w-0 bg-transparent text-sm text-gray-700 outline-none placeholder:text-gray-400" />
             {search && <button type="button" onClick={() => setSearch("")} aria-label="Clear search" className="rounded-full p-0.5 text-gray-400 hover:bg-gray-100"><X className="h-3.5 w-3.5" /></button>}
           </div>
-          <button type="button" onClick={() => openForm(null)}
+          <button type="button" onClick={openForm}
             className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-full bg-gray-800 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-gray-900">
             <Plus className="h-4 w-4" /> Add salary
           </button>
@@ -334,12 +366,13 @@ const Salary = () => {
         <StatTile tone="violet" Icon={Wallet} label="Net payroll" value={loading ? "—" : inr(totalNet)}
           sub={`${inPeriod.length} ${inPeriod.length === 1 ? "salary" : "salaries"} · ${periodLabel}`}
           active={status === "all"} onClick={() => setStatus("all")} />
-        <StatTile tone="emerald" Icon={CheckCircle2} label="Paid" value={loading ? "—" : count("Paid")}
-          sub={`${inr(paidNet)} paid out`} active={status === "Paid"} onClick={() => toggleStatus("Paid")} />
-        <StatTile tone="amber" Icon={Hourglass} label="Pending" value={loading ? "—" : count("Pending")}
-          sub={count("Pending") ? "waiting to be paid" : "nothing waiting"} active={status === "Pending"} onClick={() => toggleStatus("Pending")} />
-        <StatTile tone="rose" Icon={AlertTriangle} label="Failed" value={loading ? "—" : count("Failed")}
-          sub={count("Failed") ? "need another try" : "no failed payments"} active={status === "Failed"} onClick={() => toggleStatus("Failed")} />
+        <StatTile tone="amber" Icon={Clock} label="Awaiting confirmation" value={loading ? "—" : count("awaiting")}
+          sub={count("awaiting") ? "sent — employee hasn't confirmed yet" : "nothing waiting"} active={status === "awaiting"} onClick={() => toggleStatus("awaiting")} />
+        <StatTile tone="emerald" Icon={CheckCheck} label="Received" value={loading ? "—" : count("received")}
+          sub={`${inr(receivedNet)} confirmed by employees`} active={status === "received"} onClick={() => toggleStatus("received")} />
+        <StatTile tone="rose" Icon={AlertTriangle} label="Needs attention" value={loading ? "—" : count("attention")}
+          sub={[stageCount("not-received") && `${stageCount("not-received")} not received`, stageCount("failed") && `${stageCount("failed")} failed`, stageCount("unsent") && `${stageCount("unsent")} not sent`].filter(Boolean).join(" · ") || "all good"}
+          active={status === "attention"} onClick={() => toggleStatus("attention")} />
       </div>
 
       {/* Month chips */}
@@ -392,15 +425,18 @@ const Salary = () => {
                   {salaries.length > 0 ? (
                     <button type="button" onClick={() => { setSearch(""); setStatus("all"); setPeriod("all"); }} className="mt-2 text-xs font-semibold text-indigo-600 hover:underline">Clear filters</button>
                   ) : (
-                    <button type="button" onClick={() => openForm(null)} className="mt-2 text-xs font-semibold text-indigo-600 hover:underline">Add the first salary</button>
+                    <button type="button" onClick={openForm} className="mt-2 text-xs font-semibold text-indigo-600 hover:underline">Add the first salary</button>
                   )}
                 </td></tr>
               ) : (
                 visible.map((s) => {
                   const mine = !!selfId && s.userId === selfId;
                   const person = byEmpId[s.userId];
-                  const st = STATUS[s.status] || STATUS.Pending;
+                  const stage = stageOf(s);
+                  const st = STAGE[stage];
                   const busy = busyId === s._id;
+                  const locked = stage === "received"; // confirmed by the employee — read-only for everyone
+                  const canSend = stage === "unsent" || stage === "failed" || stage === "not-received";
                   return (
                     <tr key={s._id} className={`transition hover:bg-gray-50/70 ${mine ? "bg-indigo-50/30" : ""}`}>
                       <td className="px-5 py-3.5">
@@ -422,24 +458,29 @@ const Salary = () => {
                       <td className="whitespace-nowrap px-4 py-3.5 text-right text-sm font-bold tabular-nums text-gray-900">{inr(s.netPay)}</td>
                       <td className="px-4 py-3.5">
                         <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${st.chip}`}>
-                          {st.Icon && <st.Icon className="h-3.5 w-3.5" />} {s.status}
+                          {st.Icon && <st.Icon className="h-3.5 w-3.5" />} {st.label}
                         </span>
+                        <StageDetail s={s} stage={stage} />
                       </td>
                       <td className="px-5 py-3.5">
                         {mine ? (
                           <span className="flex items-center justify-end gap-1 text-[11px] text-gray-400" title="Your own salary is managed by another admin">
                             <Lock className="h-3.5 w-3.5" /> Managed by another admin
                           </span>
+                        ) : locked ? (
+                          <span className="flex items-center justify-end gap-1 text-[11px] text-gray-400" title={`${s.userName} confirmed receiving it — the record can't be changed or deleted`}>
+                            <Lock className="h-3.5 w-3.5" /> Confirmed · locked
+                          </span>
                         ) : (
                           <div className="flex items-center justify-end gap-0.5">
-                            <button type="button" onClick={() => openForm(s)} disabled={busy} title="Edit" aria-label="Edit"
-                              className="rounded-full p-1.5 text-gray-400 transition hover:bg-indigo-50 hover:text-indigo-600 disabled:opacity-40"><Pencil className="h-4 w-4" /></button>
-                            {s.status !== "Paid" && (
-                              <button type="button" onClick={() => setStatusOf(s, "Paid")} disabled={busy} title="Mark as paid" aria-label="Mark as paid"
-                                className="rounded-full p-1.5 text-gray-400 transition hover:bg-emerald-50 hover:text-emerald-600 disabled:opacity-40"><CheckCircle2 className="h-4 w-4" /></button>
+                            {canSend && (
+                              <button type="button" onClick={() => setStatusOf(s, "Paid")} disabled={busy}
+                                title={stage === "unsent" ? "Send to the employee" : "Send again — they'll be asked to confirm again"}
+                                aria-label={stage === "unsent" ? "Send to the employee" : "Send again"}
+                                className="rounded-full p-1.5 text-gray-400 transition hover:bg-indigo-50 hover:text-indigo-600 disabled:opacity-40"><Send className="h-4 w-4" /></button>
                             )}
-                            {s.status !== "Failed" && (
-                              <button type="button" onClick={() => setStatusOf(s, "Failed")} disabled={busy} title="Mark as failed" aria-label="Mark as failed"
+                            {(stage === "awaiting" || stage === "not-received") && (
+                              <button type="button" onClick={() => setStatusOf(s, "Failed")} disabled={busy} title="Mark payment as failed" aria-label="Mark payment as failed"
                                 className="rounded-full p-1.5 text-gray-400 transition hover:bg-amber-50 hover:text-amber-600 disabled:opacity-40"><XCircle className="h-4 w-4" /></button>
                             )}
                             <button type="button" onClick={() => remove(s)} disabled={busy} title="Delete" aria-label="Delete"
@@ -461,16 +502,15 @@ const Salary = () => {
         )}
       </div>
 
-      {form && (
+      {formOpen && (
         <SalaryForm
-          editing={form.editing}
           people={people}
           peopleState={peopleState}
           onRetryPeople={loadPeople}
           salaries={salaries}
           selfId={selfId}
-          onClose={() => setForm(null)}
-          onSaved={() => { setForm(null); fetchSalaries(); }}
+          onClose={() => setFormOpen(false)}
+          onSaved={() => { setFormOpen(false); fetchSalaries(); }}
         />
       )}
     </div>

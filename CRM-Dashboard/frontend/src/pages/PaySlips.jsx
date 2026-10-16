@@ -1,11 +1,17 @@
 // PaySlips.jsx — "Payslips & Salary": your own monthly payslips (read-only — salaries are added by an admin).
 // Summary tiles, the selected payslip laid out like a real slip (earnings / deductions / net pay in words),
 // and the full history beside it (↑ ↓ moves between months). "Download" opens the print dialog → Save as PDF.
+// Once payroll marks a salary Paid, you confirm it reached you: "Yes, received" locks the record for good;
+// "Not received" opens a Payroll support ticket. Updates arrive live ("crm:salary:updated").
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   Wallet, CheckCircle2, Hourglass, XCircle, Receipt, Download, AlertCircle, ReceiptIndianRupee, CalendarDays, Info,
+  CheckCheck, AlertTriangle, Loader2, Lock, BadgeCheck,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
+import { useConfirm } from "../context/ConfirmContext";
 import api from "../services/axios";
 import { getCache, setCache } from "../utils/pageCache";
 import StatTile from "../components/StatTile";
@@ -126,8 +132,113 @@ function Line({ label, value, sign, strong }) {
   );
 }
 
+// Paid and not yet confirmed / reported by the employee
+const awaitingConfirm = (s) => s.status === "Paid" && !s.receipt?.status;
+
+// "Did the money arrive?" — under the payslip header
+function ReceiptPanel({ p, onChanged }) {
+  const toast = useToast();
+  const confirm = useConfirm();
+  const [reporting, setReporting] = useState(false);
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState("");
+  useEffect(() => { setReporting(false); setNote(""); }, [p._id]);
+
+  const send = async (received) => {
+    setBusy(received ? "yes" : "no");
+    try {
+      const { data } = await api.patch(`/salary/${p._id}/receipt`, { received, note: received ? "" : note });
+      onChanged(data);
+      if (received) toast.success(`Thanks — payroll can see you received your ${p.month} salary.`);
+      else toast.success(`Reported to payroll — ticket ${data.receipt?.ticketId} is open on the Support page.`);
+    } catch (err) {
+      toast.error(err?.response?.data?.error || "Couldn't save that — please try again.");
+    } finally {
+      setBusy("");
+    }
+  };
+  const yes = async () => {
+    const ok = await confirm({
+      tone: "success",
+      title: `Confirm you received ${inr(p.netPay)}?`,
+      message: `Your ${p.month} ${p.year} salary will be marked as received. After that it's locked — payroll can't change or delete it.`,
+      confirmText: "Yes, I received it",
+      cancelText: "Not yet",
+    });
+    if (ok) send(true);
+  };
+
+  const shell = "flex flex-wrap items-center gap-x-3 gap-y-2 border-b px-6 py-3 text-sm";
+  if (p.status === "Pending") {
+    return <div className={`${shell} border-gray-100 bg-gray-50 text-gray-500`}><Hourglass className="h-4 w-4 text-gray-400" /> Once payroll marks this salary as paid, you'll be asked to confirm you received it.</div>;
+  }
+  if (p.status === "Failed") {
+    return <div className={`${shell} border-rose-100 bg-rose-50 text-rose-700`}><XCircle className="h-4 w-4" /> This payment failed — payroll will send it again.</div>;
+  }
+  const r = p.receipt?.status;
+  if (r === "Received") {
+    return (
+      <div className={`${shell} border-emerald-100 bg-emerald-50 text-emerald-800`}>
+        <BadgeCheck className="h-4 w-4 text-emerald-600" />
+        <span>You confirmed receiving this salary on <b>{fmtDate(p.receipt.at)}</b>.</span>
+        <span className="ml-auto inline-flex items-center gap-1 text-xs text-emerald-600"><Lock className="h-3.5 w-3.5" /> Locked</span>
+      </div>
+    );
+  }
+  if (r === "Not received") {
+    return (
+      <div className={`${shell} border-rose-100 bg-rose-50 text-rose-800`}>
+        <AlertTriangle className="h-4 w-4 text-rose-600" />
+        <span className="min-w-0 flex-1">
+          You reported this as not received on {fmtDate(p.receipt.at)}
+          {p.receipt.ticketId && <> · <Link to="/support" className="font-semibold underline underline-offset-2">ticket {p.receipt.ticketId}</Link></>}
+        </span>
+        <button type="button" onClick={yes} disabled={!!busy}
+          className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200 transition hover:bg-emerald-50 disabled:opacity-60">
+          {busy === "yes" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCheck className="h-3.5 w-3.5" />} It has arrived
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="border-b border-indigo-100 bg-indigo-50/70 px-6 py-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-indigo-600 shadow-sm"><CheckCheck className="h-4 w-4" /></span>
+        <span className="min-w-0 flex-1 text-gray-700">
+          <b className="text-gray-900">Did you receive {inr(p.netPay)}?</b> Payroll marked your {p.month} salary as paid on {fmtDate(paidOn(p))}.
+        </span>
+        {!reporting && (
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setReporting(true)} disabled={!!busy}
+              className="rounded-full px-3 py-1.5 text-xs font-semibold text-rose-600 ring-1 ring-rose-200 transition hover:bg-rose-50 disabled:opacity-60">Not received</button>
+            <button type="button" onClick={yes} disabled={!!busy}
+              className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-60">
+              {busy === "yes" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCheck className="h-3.5 w-3.5" />} Yes, received
+            </button>
+          </div>
+        )}
+      </div>
+      {reporting && (
+        <div className="mt-3 space-y-2">
+          <textarea rows={2} maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} autoFocus
+            placeholder="Anything payroll should know? e.g. which account you checked (optional)"
+            className="w-full resize-none rounded-xl border border-rose-100 bg-white px-3 py-2 text-sm text-gray-800 outline-none transition placeholder:text-gray-300 focus:border-rose-300 focus:ring-4 focus:ring-rose-50" />
+          <div className="flex items-center justify-end gap-2">
+            <span className="mr-auto text-[11px] text-gray-500">This opens a High-priority Payroll ticket so payroll can look into it.</span>
+            <button type="button" onClick={() => setReporting(false)} disabled={!!busy} className="rounded-full px-3 py-1.5 text-xs font-semibold text-gray-500 hover:bg-white">Cancel</button>
+            <button type="button" onClick={() => send(false)} disabled={!!busy}
+              className="inline-flex items-center gap-1.5 rounded-full bg-rose-600 px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-rose-700 disabled:opacity-60">
+              {busy === "no" && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Report to payroll
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // The selected payslip, laid out like the printed one
-function Slip({ p, user }) {
+function Slip({ p, user, onChanged }) {
   const earnings = num(p.basicPay) + sumObj(p.allowances);
   const deductions = sumObj(p.deductions);
 
@@ -158,6 +269,8 @@ function Slip({ p, user }) {
           </div>
         </div>
       </div>
+
+      <ReceiptPanel p={p} onChanged={onChanged} />
 
       {/* Who */}
       <div className="grid grid-cols-2 gap-px border-b border-gray-100 bg-gray-100 sm:grid-cols-3">
@@ -199,6 +312,7 @@ function Slip({ p, user }) {
 
 const PaySlips = () => {
   const { user } = useAuth();
+  const toast = useToast();
   const [slips, setSlips]       = useState(getCache("payslips") || []);
   const [loading, setLoading]   = useState(!getCache("payslips"));
   const [error, setError]       = useState("");
@@ -220,8 +334,40 @@ const PaySlips = () => {
 
   useEffect(() => { load(); }, []);
 
+  // Live: payroll marked one of my salaries paid (or changed it) → reload, and nudge if there's something to confirm
+  const slipsRef = useRef(slips);
+  useEffect(() => { slipsRef.current = slips; }, [slips]);
+  useEffect(() => {
+    const onUpdate = async (e) => {
+      if (e.detail?.local || (e.detail?.employeeId && e.detail.employeeId !== user?.employeeId)) return;
+      const before = Object.fromEntries(slipsRef.current.map((s) => [s._id, s]));
+      try {
+        const { data } = await api.get("/salary/me");
+        const list = Array.isArray(data) ? data : [];
+        setSlips(list);
+        setCache("payslips", list);
+        const newlyPaid = list.find((s) => awaitingConfirm(s) && (!before[s._id] || !awaitingConfirm(before[s._id])));
+        if (newlyPaid) toast.info(`Your ${newlyPaid.month} salary was marked paid — please confirm you received it.`);
+      } catch { /* the next update or a reload will catch up */ }
+    };
+    window.addEventListener("crm:salary:updated", onUpdate);
+    return () => window.removeEventListener("crm:salary:updated", onUpdate);
+  }, [user?.employeeId, toast]);
+
+  // After I confirm / report: swap the record in place and let the sidebar badge recount
+  const onChanged = (updated) => {
+    setSlips((prev) => {
+      const next = prev.map((s) => (s._id === updated._id ? updated : s));
+      setCache("payslips", next);
+      return next;
+    });
+    window.dispatchEvent(new CustomEvent("crm:salary:updated", { detail: { id: updated._id, employeeId: updated.userId, local: true } }));
+  };
+
   const sorted = useMemo(() => [...slips].sort((a, b) => periodKey(b) - periodKey(a)), [slips]);
-  const current = sorted.find((s) => s._id === selected) || sorted[0];
+  // Open on a payslip waiting for my confirmation, if there is one
+  const current = sorted.find((s) => s._id === selected) || sorted.find(awaitingConfirm) || sorted[0];
+  const toConfirm = sorted.filter(awaitingConfirm).length;
   const latest = sorted[0];
   const year = new Date().getFullYear();
   const paidThisYear = sorted.filter((s) => s.status === "Paid" && s.year === year);
@@ -252,8 +398,8 @@ const PaySlips = () => {
           sub={latest ? `${latest.month} ${latest.year}` : "no payslips yet"} />
         <StatTile tone="emerald" Icon={CheckCircle2} label={`Received in ${year}`} value={loading ? "—" : inr(paidThisYear.reduce((n, s) => n + num(s.netPay), 0))}
           sub={`${paidThisYear.length} paid ${paidThisYear.length === 1 ? "payslip" : "payslips"}`} />
-        <StatTile tone="amber" Icon={Hourglass} label="Pending" value={loading ? "—" : pending}
-          sub={failed ? `${failed} failed — contact HR` : pending ? "waiting to be paid" : "nothing waiting"} />
+        <StatTile tone="amber" Icon={Hourglass} label="To confirm" value={loading ? "—" : toConfirm}
+          sub={toConfirm ? "paid — tell payroll you got it" : failed ? `${failed} failed — contact HR` : pending ? `${pending} waiting to be paid` : "all caught up"} />
         <StatTile tone="blue" Icon={Receipt} label="Payslips" value={loading ? "—" : sorted.length}
           sub={sorted.length ? `since ${sorted[sorted.length - 1].month.slice(0, 3)} ${sorted[sorted.length - 1].year}` : "none yet"} />
       </div>
@@ -277,7 +423,7 @@ const PaySlips = () => {
         </div>
       ) : (
         <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <Slip p={current} user={user} />
+          <Slip p={current} user={user} onChanged={onChanged} />
 
           {/* History */}
           <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
@@ -303,14 +449,19 @@ const PaySlips = () => {
                         {s.status === "Paid" && paidOn(s) && <span className="text-gray-400">· {fmtDate(paidOn(s))}</span>}
                       </p>
                     </div>
-                    <span className="text-sm font-bold tabular-nums text-gray-900">{inr(s.netPay)}</span>
+                    <span className="text-right">
+                      <span className="block text-sm font-bold tabular-nums text-gray-900">{inr(s.netPay)}</span>
+                      {awaitingConfirm(s) && <span className="mt-0.5 inline-block rounded-full bg-indigo-600 px-1.5 py-px text-[9.5px] font-bold uppercase tracking-wide text-white">Confirm</span>}
+                      {s.receipt?.status === "Not received" && <span className="mt-0.5 inline-block rounded-full bg-rose-50 px-1.5 py-px text-[9.5px] font-bold uppercase tracking-wide text-rose-600 ring-1 ring-rose-100">Not received</span>}
+                      {s.receipt?.status === "Received" && <span className="mt-0.5 inline-flex items-center gap-0.5 text-[10px] font-semibold text-emerald-600"><CheckCheck className="h-3 w-3" /> Received</span>}
+                    </span>
                   </button>
                 );
               })}
             </div>
             <div className="flex items-start gap-2 border-t border-gray-100 px-5 py-3 text-[11px] text-gray-500">
               <Info className="mt-px h-3.5 w-3.5 flex-shrink-0 text-gray-400" />
-              <span>Payslips are read-only. Use “Download PDF” and choose “Save as PDF” in the print dialog.</span>
+              <span>Confirm each paid salary once it reaches your account. Use “Download PDF” and choose “Save as PDF” in the print dialog.</span>
             </div>
           </div>
         </div>

@@ -61,7 +61,16 @@ const salarySchema = new mongoose.Schema(
       type: String, // ✅ Changed from ObjectId → String (to accept EMP codes)
     },
     processedAt: Date,
-    
+
+    // The employee's confirmation that the money arrived — only possible once the salary is Paid.
+    // "Received" locks the record (no edit / status change / delete). "Not received" opens a Payroll ticket.
+    receipt: {
+      status: { type: String, enum: ["Received", "Not received"] },
+      at: Date,
+      note: { type: String, maxlength: 300 },
+      ticketId: String,
+    },
+
     remarks: {
       type: String,
       maxlength: 300,
