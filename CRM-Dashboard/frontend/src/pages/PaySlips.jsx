@@ -1,286 +1,320 @@
-// PaySlips.jsx — Employee payslip viewer with month/year filter and download
-﻿import { useState, useEffect } from "react";
-import { Calendar, Receipt, Download, ReceiptIndianRupee, Check, X } from "lucide-react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faIndianRupee } from "@fortawesome/free-solid-svg-icons";
-import axios from "axios";
+// PaySlips.jsx — "Payslips & Salary": your own monthly payslips (read-only — salaries are added by an admin).
+// Summary tiles, the selected payslip laid out like a real slip (earnings / deductions / net pay in words),
+// and the full history beside it (↑ ↓ moves between months). "Download" opens the print dialog → Save as PDF.
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Wallet, CheckCircle2, Hourglass, XCircle, Receipt, Download, AlertCircle, ReceiptIndianRupee, CalendarDays, Info,
+} from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import api from "../services/axios";
 import { getCache, setCache } from "../utils/pageCache";
+import StatTile from "../components/StatTile";
 
-const PaySlips = () => {
-  const [salary, setSalary]               = useState(getCache("payslips-latest") || {});
-  const [loading, setLoading]             = useState(!getCache("payslips"));
-  const [error, setError]                 = useState("");
-  const [dynamicPayslips, setDynamicPayslips] = useState(getCache("payslips") || []);
-  const { user } = useAuth();
-  const loggedInUserId = user?.employeeId;
-  const isHR = user?.role === "HR";
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const EARNINGS = [
+  { key: "housing",          label: "House rent allowance (HRA)" },
+  { key: "medical",          label: "Medical allowance" },
+  { key: "performanceBonus", label: "Performance bonus" },
+];
+const DEDUCTIONS = [
+  { key: "providentFund",   label: "Provident fund (PF)" },
+  { key: "incomeTax",       label: "Income tax" },
+  { key: "healthInsurance", label: "Employee state insurance (ESI)" },
+];
+const STATUS = {
+  Paid:    { chip: "bg-emerald-50 text-emerald-700 ring-emerald-200", dot: "bg-emerald-500", Icon: CheckCircle2 },
+  Pending: { chip: "bg-amber-50 text-amber-700 ring-amber-200",       dot: "bg-amber-400",   Icon: Hourglass },
+  Failed:  { chip: "bg-rose-50 text-rose-700 ring-rose-200",          dot: "bg-rose-500",    Icon: XCircle },
+};
 
-  // Download handler
-  const handleDownload = (payslip) => {
-    const link = document.createElement("a");
-    link.href = payslip.downloadUrl || `/sample-payslip.pdf`;
-    link.download = `${payslip.month}-Payslip.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+const num = (v) => Number(v) || 0;
+const inr = (n) => `₹${num(n).toLocaleString("en-IN", { minimumFractionDigits: num(n) % 1 ? 2 : 0, maximumFractionDigits: 2 })}`;
+// When it was paid (older records have no payment date — fall back to when it was marked paid)
+const paidOn = (p) => p.paymentDate || p.processedAt || p.updatedAt;
+const sumObj = (o) => Object.values(o || {}).reduce((n, v) => n + num(v), 0);
+const periodKey = (s) => s.year * 100 + MONTHS.indexOf(s.month);
+const fmtDate = (d) => (d ? new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—");
+
+// Indian-style amount in words (lakh / crore), e.g. 185625 → "One Lakh Eighty Five Thousand Six Hundred Twenty Five Rupees only"
+const ONES = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen",
+  "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+const TENS = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+const two = (n) => (n < 20 ? ONES[n] : `${TENS[Math.floor(n / 10)]}${n % 10 ? ` ${ONES[n % 10]}` : ""}`);
+const three = (n) => [Math.floor(n / 100) ? `${ONES[Math.floor(n / 100)]} Hundred` : "", n % 100 ? two(n % 100) : ""].filter(Boolean).join(" ");
+function inWords(amount) {
+  const total = Math.round(num(amount) * 100);
+  let r = Math.floor(total / 100);
+  const paise = total % 100;
+  if (!r && !paise) return "Zero Rupees only";
+  const parts = [];
+  const crore = Math.floor(r / 1e7); r %= 1e7;
+  const lakh = Math.floor(r / 1e5); r %= 1e5;
+  const thousand = Math.floor(r / 1000); r %= 1000;
+  if (crore) parts.push(`${crore > 999 ? crore.toLocaleString("en-IN") : three(crore)} Crore`);
+  if (lakh) parts.push(`${two(lakh)} Lakh`);
+  if (thousand) parts.push(`${two(thousand)} Thousand`);
+  if (r) parts.push(three(r));
+  const rupees = parts.length ? `${parts.join(" ")} Rupees` : "";
+  return `${[rupees, paise ? `${two(paise)} Paise` : ""].filter(Boolean).join(" and ")} only`;
+}
+
+// Print one payslip on its own (the browser's print dialog has "Save as PDF")
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+function printPayslip(p, user) {
+  const rows = (list, values) => list.map((x) => `<tr><td>${esc(x.label)}</td><td class="n">${esc(inr(values?.[x.key]))}</td></tr>`).join("");
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Payslip ${esc(p.month)} ${esc(p.year)} — ${esc(p.userName)}</title>
+<style>
+  *{box-sizing:border-box} body{font:13px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#111827;margin:0;padding:40px}
+  .top{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #111827;padding-bottom:16px}
+  .brand{font-size:22px;font-weight:800;color:#1e3a8a}.brand span{color:#f59e0b}.muted{color:#6b7280}
+  h1{font-size:16px;margin:0;text-align:right} .meta{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:20px 0}
+  .meta div{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:8px 10px}.meta b{display:block;font-size:13px}
+  .meta small{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#6b7280}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:20px} table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#6b7280;border-bottom:1px solid #e5e7eb;padding:6px 0}
+  td{padding:6px 0;border-bottom:1px solid #f3f4f6}.n{text-align:right;font-variant-numeric:tabular-nums}
+  tr.t td{font-weight:700;border-top:1px solid #e5e7eb;border-bottom:0}
+  .net{margin-top:24px;display:flex;justify-content:space-between;align-items:center;background:#111827;color:#fff;border-radius:10px;padding:14px 18px}
+  .net b{font-size:22px}.words{margin-top:8px}.foot{margin-top:40px;font-size:11px;color:#9ca3af;text-align:center}
+</style></head><body>
+<div class="top"><div><div class="brand">Insight<span>Desk</span></div><div class="muted">Track your performance</div></div>
+<div><h1>Payslip — ${esc(p.month)} ${esc(p.year)}</h1><div class="muted" style="text-align:right">Status: ${esc(p.status || "Pending")}</div></div></div>
+<div class="meta">
+  <div><small>Employee</small><b>${esc(p.userName)}</b></div>
+  <div><small>Employee ID</small><b>${esc(p.userId)}</b></div>
+  <div><small>Designation</small><b>${esc(user?.designation || "—")}</b></div>
+  <div><small>${p.status === "Paid" ? "Paid on" : "Added on"}</small><b>${esc(fmtDate(p.status === "Paid" ? paidOn(p) : p.createdAt))}</b></div>
+</div>
+<div class="cols">
+  <table><tr><th>Earnings</th><th class="n">Amount</th></tr>
+    <tr><td>Basic pay</td><td class="n">${esc(inr(p.basicPay))}</td></tr>${rows(EARNINGS, p.allowances)}
+    <tr class="t"><td>Total earnings</td><td class="n">${esc(inr(num(p.basicPay) + sumObj(p.allowances)))}</td></tr></table>
+  <table><tr><th>Deductions</th><th class="n">Amount</th></tr>${rows(DEDUCTIONS, p.deductions)}
+    <tr class="t"><td>Total deductions</td><td class="n">${esc(inr(sumObj(p.deductions)))}</td></tr></table>
+</div>
+<div class="net"><span>Net pay</span><b>${esc(inr(p.netPay))}</b></div>
+<div class="words muted">${esc(inWords(p.netPay))}</div>
+<div class="foot">This is a computer-generated payslip from InsightDesk and needs no signature.</div>
+</body></html>`;
+
+  const frame = document.createElement("iframe");
+  frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
+  frame.onload = () => {
+    frame.contentWindow.focus();
+    frame.contentWindow.print();
+    setTimeout(() => frame.remove(), 1000);
   };
+  frame.srcdoc = html;
+  document.body.appendChild(frame);
+}
 
-  // Fetch payslips
-  const fetchPayslips = async () => {
-    try {
-      const payslipRes = await axios.get(
-        `http://localhost:5000/api/salary/user/${loggedInUserId}`
-      );
+function StatusChip({ status }) {
+  const st = STATUS[status] || STATUS.Pending;
+  return (
+    <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${st.chip}`}>
+      {st.Icon && <st.Icon className="h-3.5 w-3.5" />} {status || "Pending"}
+    </span>
+  );
+}
 
-      // ✅ Sort payslips by paymentDate or createdAt
-      const sorted = payslipRes.data.sort(
-        (a, b) =>
-          new Date(b.paymentDate || b.createdAt) -
-          new Date(a.paymentDate || a.createdAt)
-      );
+function Line({ label, value, sign, strong }) {
+  return (
+    <div className={`flex items-center justify-between gap-3 py-2 text-sm ${strong ? "border-t border-gray-100 font-semibold text-gray-900" : "text-gray-600"}`}>
+      <span>{label}</span>
+      <span className={`tabular-nums ${strong ? "" : "text-gray-800"}`}>{sign}{inr(value)}</span>
+    </div>
+  );
+}
 
-      setDynamicPayslips(sorted);
-      setCache("payslips", sorted);
-
-      // ✅ Set latest payslip as salary
-      if (sorted.length > 0) {
-        setSalary(sorted[0]);
-        setCache("payslips-latest", sorted[0]);
-      }
-    } catch (err2) {
-      if (err2.response && err2.response.status === 404) {
-        setDynamicPayslips([]);
-      } else {
-        setError(err2.response?.data?.error || "Error fetching payslips data");
-      }
-    }
-  };
-
-  useEffect(() => {
-    if (!loggedInUserId) {
-      setError("No employeeId found. Please log in again.");
-      return;
-    }
-    // Only show spinner on true first visit — skip if cache already warm
-    if (!getCache("payslips")) setLoading(true);
-    fetchPayslips().finally(() => setLoading(false));
-  }, [loggedInUserId]);
-
-  if (loading) return <div className="p-5">Loading...</div>;
-  if (error) return <div className="p-5 text-red-600">{error}</div>;
+// The selected payslip, laid out like the printed one
+function Slip({ p, user }) {
+  const earnings = num(p.basicPay) + sumObj(p.allowances);
+  const deductions = sumObj(p.deductions);
 
   return (
-    <div className="p-5 bg-gray-50 space-y-8 pl-7">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <h1 className="text-gray-500 text-1xl font-bold mb-4 uppercase">
-          Payslips & Salary
-        </h1>
-      </div>
-
-      {/* Overview Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-4 bg-white shadow-md hover:shadow-lg transition">
-          <p className="text-sm text-gray-500">Basic Pay</p>
-          <h3 className="text-xl font-bold text-green-700">
-            <FontAwesomeIcon icon={faIndianRupee} /> {salary.basicPay || 0}
-          </h3>
-        </div>
-        <div className="p-4 bg-white shadow-md hover:shadow-lg transition">
-          <p className="text-sm text-gray-500">Allowances</p>
-          <h3 className="text-xl font-bold text-blue-700">
-            <FontAwesomeIcon icon={faIndianRupee} />{" "}
-            {salary.allowances && typeof salary.allowances === "object"
-              ? Object.values(salary.allowances).reduce(
-                  (sum, val) => sum + Number(val || 0),
-                  0
-                )
-              : salary.allowances || 0}
-          </h3>
-        </div>
-        <div className="p-4 bg-white shadow-md hover:shadow-lg transition">
-          <p className="text-sm text-gray-500">Deductions</p>
-          <h3 className="text-xl font-bold text-red-700">
-            <FontAwesomeIcon icon={faIndianRupee} />{" "}
-            {salary.deductions && typeof salary.deductions === "object"
-              ? Object.values(salary.deductions).reduce(
-                  (sum, val) => sum + Number(val || 0),
-                  0
-                )
-              : salary.deductions || 0}
-          </h3>
-        </div>
-        <div className="p-4 bg-white shadow-md hover:shadow-lg transition">
-          <p className="text-sm text-gray-500">Net Salary</p>
-          <h3 className="text-xl font-bold text-purple-700">
-            <FontAwesomeIcon icon={faIndianRupee} /> {salary.netPay || 0}
-          </h3>
-        </div>
-      </div>
-
-      {/* Payslip History */}
-      <div className="bg-white shadow-md rounded-lg shadow-sm p-6 space-y-4">
-        <h2 className="text-lg font-semibold flex items-center gap-2 text-gray-800">
-          <Calendar className="h-5 w-5" /> Payslips History
-        </h2>
-
-        {dynamicPayslips.length === 0 ? (
-          <p className="text-gray-500">No payslips found.</p>
-        ) : (
-          dynamicPayslips.slice(0, 3).map((p, idx) => (
-            <div
-              key={idx}
-              className="flex justify-between items-center border border-gray-300 rounded-md p-4 hover:border-blue-300 hover:shadow-sm transition duration-200"
-            >
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-md">
-                  <Receipt className="h-5 w-5 text-blue-600" />
-                </div>
-                <div>
-                  <p className="font-medium text-gray-800">
-                    {p.month} {p.year}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    Generated on{" "}
-                    {p.paymentDate
-                      ? new Date(p.paymentDate).toLocaleDateString()
-                      : new Date(p.createdAt).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <span
-                  className={`inline-block text-xs font-semibold px-2 py-1 rounded-full ${
-                    p.status === "Paid"
-                      ? "bg-green-100 text-green-700"
-                      : p.status === "Rejected"
-                      ? "bg-red-100 text-red-700"
-                      : "bg-yellow-100 text-yellow-700"
-                  }`}
-                >
-                  {p.status || "Pending"}
-                </span>
-                <span className="font-semibold text-gray-700">
-                  <FontAwesomeIcon icon={faIndianRupee} /> {p.netPay || 0}
-                </span>
-
-                {isHR && (
-                  <>
-                    <button
-                      className="text-sm px-2 py-1 hover:bg-green-50 flex items-center gap-1"
-                      onClick={async () => {
-                        await axios.patch(
-                          `http://localhost:5000/api/salary/${p._id}/status`,
-                          { status: "Paid" }
-                        );
-                        fetchPayslips();
-                      }}
-                    >
-                      <Check className="h-4 w-4 text-green-600" />
-                    </button>
-                    <button
-                      className="text-sm px-2 py-1 hover:bg-red-50 flex items-center gap-1"
-                      onClick={async () => {
-                        await axios.patch(
-                          `http://localhost:5000/api/salary/${p._id}/status`,
-                          { status: "Rejected" }
-                        );
-                        fetchPayslips();
-                      }}
-                    >
-                      <X className="h-4 w-4 text-red-600" />
-                    </button>
-                  </>
-                )}
-
-                <button
-                  className="text-sm px-3 py-1 hover:bg-blue-50 flex items-center gap-1"
-                  onClick={() => handleDownload(p)}
-                >
-                  <Download className="h-4 w-4 hover:h-6 hover:w-6 transition-all duration-300 cursor-pointer" />
-                </button>
-              </div>
+    <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+      {/* Top band */}
+      <div className="relative overflow-hidden bg-gray-900 px-6 py-5 text-white">
+        <div className="pointer-events-none absolute -right-10 -top-16 h-48 w-48 rounded-full bg-indigo-500/20 blur-2xl" />
+        <div className="relative flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Payslip</p>
+            <h2 className="mt-0.5 text-xl font-bold">{p.month} {p.year}</h2>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-400">
+              <StatusChip status={p.status} />
+              <span className="inline-flex items-center gap-1">
+                <CalendarDays className="h-3.5 w-3.5" />
+                {p.status === "Paid" ? `Paid on ${fmtDate(paidOn(p))}` : `Added on ${fmtDate(p.createdAt)}`}
+              </span>
             </div>
-          ))
-        )}
-      </div>
-
-      {/* Monthly Breakdown */}
-      <div className="bg-white shadow-md border-2 border-gray-200 rounded-lg p-6 space-y-4 mt-6">
-        <h2 className="text-lg font-semibold flex items-center gap-2 text-gray-800">
-          <ReceiptIndianRupee className="h-5 w-5" /> Current Month Breakdown
-        </h2>
-
-        {/* Basic Pay */}
-        <div className="flex justify-between text-sm text-gray-700">
-          <span>Base Salary</span>
-          <span className="text-green-600">
-            + <FontAwesomeIcon icon={faIndianRupee} /> {salary.basicPay || 0}
-          </span>
-        </div>
-
-        {/* Allowances */}
-        {salary.allowances &&
-          typeof salary.allowances === "object" &&
-          Object.entries(salary.allowances).map(([key, value]) => {
-            let label = key.replace(/([A-Z])/g, " $1").replace(/^./, (str) =>
-              str.toUpperCase()
-            );
-            if (key.toLowerCase().includes("housing"))
-              label = "Housing Rent Allowance (HRA)";
-            if (key.toLowerCase().includes("medical"))
-              label = "Medical Allowance";
-            return (
-              <div
-                key={key}
-                className="flex justify-between text-sm text-gray-700"
-              >
-                <span>{label}</span>
-                <span className="text-green-600">
-                  + <FontAwesomeIcon icon={faIndianRupee} /> {Number(value) || 0}
-                </span>
-              </div>
-            );
-          })}
-
-        {/* Deductions */}
-        {salary.deductions &&
-          typeof salary.deductions === "object" &&
-          Object.entries(salary.deductions).map(([key, value]) => {
-            let label = key.replace(/([A-Z])/g, " $1").replace(/^./, (str) =>
-              str.toUpperCase()
-            );
-            if (key.toLowerCase().includes("provident"))
-              label = "Provident Fund (PF)";
-            if (key.toLowerCase().includes("income")) label = "Income Tax";
-            if (
-              key.toLowerCase().includes("insurance") ||
-              key.toLowerCase().includes("esi")
-            )
-              label = "Employee State Insurance (ESI)";
-            return (
-              <div
-                key={key}
-                className="flex justify-between text-sm text-gray-700"
-              >
-                <span>{label}</span>
-                <span className="text-red-600">
-                  - <FontAwesomeIcon icon={faIndianRupee} /> {Number(value) || 0}
-                </span>
-              </div>
-            );
-          })}
-
-        {/* Net Salary */}
-        <div className="border-t pt-3 mt-3 flex justify-between items-center font-semibold text-purple-800">
-          <span>Net Salary</span>
-          <span className="text-lg text-primary">
-            <FontAwesomeIcon icon={faIndianRupee} /> {salary.netPay || 0}
-          </span>
+          </div>
+          <div className="text-right">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Net pay</p>
+            <p className="mt-0.5 text-3xl font-bold tabular-nums">{inr(p.netPay)}</p>
+            <button type="button" onClick={() => printPayslip(p, user)}
+              className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3.5 py-1.5 text-xs font-semibold text-white ring-1 ring-white/20 transition hover:bg-white/20">
+              <Download className="h-3.5 w-3.5" /> Download PDF
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Who */}
+      <div className="grid grid-cols-2 gap-px border-b border-gray-100 bg-gray-100 sm:grid-cols-3">
+        {[["Employee", p.userName], ["Employee ID", p.userId], ["Designation", user?.designation || "—"]].map(([k, v]) => (
+          <div key={k} className="bg-white px-6 py-3">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{k}</p>
+            <p className="truncate text-sm font-semibold text-gray-800">{v}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Earnings / deductions */}
+      <div className="grid gap-x-8 px-6 py-4 md:grid-cols-2">
+        <div>
+          <p className="pb-1 text-[10px] font-bold uppercase tracking-widest text-emerald-700">Earnings</p>
+          <Line label="Basic pay" value={p.basicPay} />
+          {EARNINGS.map((e) => <Line key={e.key} label={e.label} value={p.allowances?.[e.key]} />)}
+          <Line label="Total earnings" value={earnings} strong />
+        </div>
+        <div className="mt-4 md:mt-0">
+          <p className="pb-1 text-[10px] font-bold uppercase tracking-widest text-rose-700">Deductions</p>
+          {DEDUCTIONS.map((d) => <Line key={d.key} label={d.label} value={p.deductions?.[d.key]} sign="− " />)}
+          <div className="py-2 text-sm">&nbsp;</div>
+          <Line label="Total deductions" value={deductions} sign="− " strong />
+        </div>
+      </div>
+
+      {/* Net pay */}
+      <div className="mx-6 mb-5 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-indigo-50/60 px-4 py-3 ring-1 ring-indigo-100">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-gray-900">Net pay <span className="font-normal text-gray-500">= earnings − deductions</span></p>
+          <p className="text-xs italic text-gray-500">{inWords(p.netPay)}</p>
+        </div>
+        <p className="text-lg font-bold tabular-nums text-indigo-700">{inr(p.netPay)}</p>
+      </div>
+    </div>
+  );
+}
+
+const PaySlips = () => {
+  const { user } = useAuth();
+  const [slips, setSlips]       = useState(getCache("payslips") || []);
+  const [loading, setLoading]   = useState(!getCache("payslips"));
+  const [error, setError]       = useState("");
+  const [selected, setSelected] = useState(null);
+  const listRef = useRef(null);
+
+  const load = async () => {
+    try {
+      const { data } = await api.get("/salary/me");
+      setSlips(Array.isArray(data) ? data : []);
+      setCache("payslips", data);
+      setError("");
+    } catch (err) {
+      if (!getCache("payslips")) setError(!err?.response ? "Can't reach the server — make sure the backend is running." : err.response.data?.error || "Couldn't load your payslips.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const sorted = useMemo(() => [...slips].sort((a, b) => periodKey(b) - periodKey(a)), [slips]);
+  const current = sorted.find((s) => s._id === selected) || sorted[0];
+  const latest = sorted[0];
+  const year = new Date().getFullYear();
+  const paidThisYear = sorted.filter((s) => s.status === "Paid" && s.year === year);
+  const pending = sorted.filter((s) => s.status === "Pending").length;
+  const failed = sorted.filter((s) => s.status === "Failed").length;
+
+  // ↑ ↓ in the history list move to the next / previous month
+  const onListKey = (e) => {
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    e.preventDefault();
+    const i = sorted.findIndex((s) => s._id === current?._id);
+    const next = (i + (e.key === "ArrowDown" ? 1 : -1) + sorted.length) % sorted.length;
+    setSelected(sorted[next]._id);
+    listRef.current?.querySelector(`[data-slip="${sorted[next]._id}"]`)?.focus();
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-6">
+      {/* Header */}
+      <div className="mb-5">
+        <h1 className="text-2xl font-bold text-gray-900">Payslips & Salary</h1>
+        <p className="mt-1 text-sm text-gray-500">Your monthly payslips. Salaries are added by an admin — contact HR if something looks wrong.</p>
+      </div>
+
+      {/* Tiles */}
+      <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatTile tone="violet" Icon={Wallet} label="Latest net pay" value={loading ? "—" : latest ? inr(latest.netPay) : "₹0"}
+          sub={latest ? `${latest.month} ${latest.year}` : "no payslips yet"} />
+        <StatTile tone="emerald" Icon={CheckCircle2} label={`Received in ${year}`} value={loading ? "—" : inr(paidThisYear.reduce((n, s) => n + num(s.netPay), 0))}
+          sub={`${paidThisYear.length} paid ${paidThisYear.length === 1 ? "payslip" : "payslips"}`} />
+        <StatTile tone="amber" Icon={Hourglass} label="Pending" value={loading ? "—" : pending}
+          sub={failed ? `${failed} failed — contact HR` : pending ? "waiting to be paid" : "nothing waiting"} />
+        <StatTile tone="blue" Icon={Receipt} label="Payslips" value={loading ? "—" : sorted.length}
+          sub={sorted.length ? `since ${sorted[sorted.length - 1].month.slice(0, 3)} ${sorted[sorted.length - 1].year}` : "none yet"} />
+      </div>
+
+      {loading ? (
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="h-96 animate-pulse rounded-2xl bg-white shadow-sm" />
+          <div className="h-96 animate-pulse rounded-2xl bg-white shadow-sm" />
+        </div>
+      ) : error ? (
+        <div className="rounded-2xl border border-gray-100 bg-white px-6 py-14 text-center shadow-sm">
+          <AlertCircle className="mx-auto h-8 w-8 text-red-300" />
+          <p className="mt-2 text-sm font-medium text-gray-700">{error}</p>
+          <button type="button" onClick={() => { setLoading(true); load(); }} className="mt-3 text-xs font-semibold text-indigo-600 hover:underline">Try again</button>
+        </div>
+      ) : !current ? (
+        <div className="rounded-2xl border border-gray-100 bg-white px-6 py-14 text-center shadow-sm">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gray-50"><ReceiptIndianRupee className="h-6 w-6 text-gray-300" /></div>
+          <p className="mt-3 text-sm font-semibold text-gray-700">No payslips yet</p>
+          <p className="mt-1 text-xs text-gray-500">Your payslips appear here once an admin adds your salary.</p>
+        </div>
+      ) : (
+        <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <Slip p={current} user={user} />
+
+          {/* History */}
+          <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+            <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3.5">
+              <h2 className="text-sm font-bold text-gray-900">All payslips</h2>
+              <span className="text-[11px] text-gray-400">↑ ↓ to move</span>
+            </div>
+            <div ref={listRef} role="listbox" aria-label="Payslips" onKeyDown={onListKey} className="max-h-[520px] overflow-y-auto p-2 [scrollbar-width:thin]">
+              {sorted.map((s) => {
+                const on = s._id === current._id;
+                const st = STATUS[s.status] || STATUS.Pending;
+                return (
+                  <button key={s._id} type="button" role="option" aria-selected={on} data-slip={s._id} onClick={() => setSelected(s._id)}
+                    className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 ${on ? "bg-indigo-50 ring-1 ring-indigo-100" : "hover:bg-gray-50"}`}>
+                    <div className={`flex h-9 w-9 flex-shrink-0 flex-col items-center justify-center rounded-lg ${on ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-600"}`}>
+                      <span className="text-[10px] font-bold uppercase leading-none">{s.month.slice(0, 3)}</span>
+                      <span className="text-[9px] leading-tight opacity-80">{String(s.year).slice(2)}</span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className={`truncate text-sm font-semibold ${on ? "text-indigo-900" : "text-gray-800"}`}>{s.month} {s.year}</p>
+                      <p className="flex items-center gap-1.5 text-[11px] text-gray-500">
+                        <span className={`h-1.5 w-1.5 rounded-full ${st.dot}`} /> {s.status || "Pending"}
+                        {s.status === "Paid" && paidOn(s) && <span className="text-gray-400">· {fmtDate(paidOn(s))}</span>}
+                      </p>
+                    </div>
+                    <span className="text-sm font-bold tabular-nums text-gray-900">{inr(s.netPay)}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex items-start gap-2 border-t border-gray-100 px-5 py-3 text-[11px] text-gray-500">
+              <Info className="mt-px h-3.5 w-3.5 flex-shrink-0 text-gray-400" />
+              <span>Payslips are read-only. Use “Download PDF” and choose “Save as PDF” in the print dialog.</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

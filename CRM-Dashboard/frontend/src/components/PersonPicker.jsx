@@ -1,11 +1,13 @@
 // PersonPicker.jsx — "All employees" / one-employee picker: a pill button opening an avatar list with a search box.
 // `people` = users ({ _id, name, photo, employeeId, designation, role }); `value` = selected _id or "".
+// allowAll=false hides the "All employees" row (when exactly one person must be chosen); `placeholder` is the empty label;
+// `disabled` locks the choice; `full` stretches the button to the container width.
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Search, Check, Users } from "lucide-react";
 import PersonAvatar from "./PersonAvatar";
 import { useListNav } from "../hooks/useListNav";
 
-export default function PersonPicker({ people, value, onChange }) {
+export default function PersonPicker({ people, value, onChange, allowAll = true, placeholder = "All employees", disabled = false, full = false }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const ref = useRef(null);
@@ -24,23 +26,26 @@ export default function PersonPicker({ people, value, onChange }) {
   const shown = people.filter((p) => p.name?.toLowerCase().includes(q.trim().toLowerCase()));
 
   // ↓ / ↑ / Enter / Esc from the search box. Rows: "All employees" (when not searching), then the people.
-  const ids = [...(!q ? [""] : []), ...shown.map((p) => p._id)];
+  const showAll = allowAll && !q;
+  const ids = [...(showAll ? [""] : []), ...shown.map((p) => p._id)];
   const nav = useListNav({
     count: ids.length,
     open,
     onSelect: (i) => pick(ids[i]),
     onClose: () => setOpen(false),
   });
-  const offset = !q ? 1 : 0;
+  const offset = showAll ? 1 : 0;
 
   return (
     <div className="relative" ref={ref}>
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => !disabled && setOpen((o) => !o)}
+        disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-gray-200 bg-white py-1 pl-1 pr-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-indigo-50"
+        className={`inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white py-1 pl-1 pr-3 text-sm font-medium text-gray-700 transition focus:outline-none focus-visible:ring-4 focus-visible:ring-indigo-50
+          ${disabled ? "cursor-not-allowed opacity-70" : "cursor-pointer hover:bg-gray-50"} ${full ? "w-full" : ""}`}
       >
         {selected ? (
           <PersonAvatar person={selected} size={26} />
@@ -49,12 +54,12 @@ export default function PersonPicker({ people, value, onChange }) {
             <Users className="h-3.5 w-3.5 text-gray-500" />
           </span>
         )}
-        <span className="max-w-[10rem] truncate">{selected ? selected.name : "All employees"}</span>
+        <span className={`truncate ${full ? "flex-1 text-left" : "max-w-[10rem]"} ${selected ? "" : "text-gray-500"}`}>{selected ? selected.name : placeholder}</span>
         <ChevronDown className={`h-3.5 w-3.5 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
       {open && (
-        <div className="animate-dialog-in absolute left-0 z-40 mt-2 w-64 rounded-xl border border-gray-100 bg-white p-1 shadow-lg shadow-gray-900/10">
+        <div className={`animate-dialog-in absolute left-0 z-40 mt-2 ${full ? "w-full" : "w-64"} rounded-xl border border-gray-100 bg-white p-1 shadow-lg shadow-gray-900/10`}>
           <div className="flex items-center gap-2 border-b border-gray-100 px-2.5 pb-2 pt-1.5">
             <Search className="h-3.5 w-3.5 text-gray-400" />
             <input
@@ -67,7 +72,7 @@ export default function PersonPicker({ people, value, onChange }) {
             />
           </div>
           <div role="listbox" ref={nav.listRef} className="max-h-64 overflow-y-auto py-1 [scrollbar-width:thin]">
-            {!q && (
+            {showAll && (
               <button type="button" role="option" aria-selected={!value} onClick={() => pick("")} {...nav.itemProps(0)}
                 className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm transition ${nav.active === 0 ? "bg-indigo-50" : !value ? "bg-gray-50" : ""}`}>
                 <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-gray-100"><Users className="h-3.5 w-3.5 text-gray-500" /></span>

@@ -97,6 +97,11 @@ export const addReply = async (req, res) => {
       return res.status(403).json({ message: 'Access denied' });
     }
 
+    // Closed is permanent — no more replies (raise a new ticket instead)
+    if (ticket.status === 'Closed') {
+      return res.status(400).json({ message: 'This ticket is closed. Raise a new ticket if you still need help.' });
+    }
+
     ticket.replies.push({
       authorId:    req.user._id,
       authorName:  req.user.name,

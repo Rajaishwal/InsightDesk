@@ -10,13 +10,13 @@ const TYPES = [
 export const LEAVE_TYPE_KEYS = TYPES.map(t => t.key);
 export const LEAVE_TYPES = TYPES; // yearly / monthly accrual rules, shared with the Employee Report
 
-const SIZE  = 180;
-const THICK = 20;
-const R     = (SIZE - THICK) / 2;   // 80  — outer ring edge = SIZE/2 = 90, inner = 70
+const SIZE  = 140;
+const THICK = 15;
+const R     = (SIZE - THICK) / 2;   // 62.5 — outer ring edge = SIZE/2 = 70, inner = 55
 const CX    = SIZE / 2;
 const CY    = SIZE / 2;
 const CIRC  = 2 * Math.PI * R;
-const GAP   = -12; // badge overlaps the ring edge
+const GAP   = -10; // badge overlaps the ring edge
 
 export const normalizeType = (lt) => ({
   "Sick Leave":      "Wellness Leave",
@@ -100,7 +100,7 @@ function SingleDonut({ type, used, hovering, onEnter, onLeave }) {
 
   return (
     <div
-      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, cursor: "default" }}
+      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, cursor: "default" }}
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
     >
@@ -129,8 +129,8 @@ function SingleDonut({ type, used, hovering, onEnter, onLeave }) {
           pointerEvents: "none", userSelect: "none",
         }}>
           <>
-            <span style={{ fontSize: 22, fontWeight: 800, color: type.color, lineHeight: 1 }}>{available}</span>
-            <span style={{ fontSize: 10, color: "#9ca3af", marginTop: 2 }}>available</span>
+            <span style={{ fontSize: 20, fontWeight: 800, color: type.color, lineHeight: 1 }}>{available}</span>
+            <span style={{ fontSize: 9.5, color: "#9ca3af", marginTop: 3, letterSpacing: "0.04em" }}>available</span>
           </>
         </div>
 
@@ -145,7 +145,7 @@ function SingleDonut({ type, used, hovering, onEnter, onLeave }) {
 
       {/* Type label */}
       <div style={{ textAlign: "center" }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>
+        <div style={{ fontSize: 12.5, fontWeight: 600, color: "#374151" }}>
           {type.key.replace(" (LOP)", "")}
         </div>
         {type.key.includes("LOP") && (
@@ -156,7 +156,7 @@ function SingleDonut({ type, used, hovering, onEnter, onLeave }) {
   );
 }
 
-export default function LeaveDonutChart({ leaves = [], year }) {
+export default function LeaveDonutChart({ leaves = [], year, className = "mx-6 mt-4" }) {
   const currentYear = year || new Date().getFullYear();
   const [hovered, setHovered] = useState(null);
 
@@ -173,15 +173,20 @@ export default function LeaveDonutChart({ leaves = [], year }) {
   }, [leaves, currentYear]);
 
   return (
-    <div className="mx-6 mt-4">
-      <div className="bg-white rounded-2xl shadow-lg p-6" style={{ overflow: "visible" }}>
-        <div className="mb-6">
-          <h2 className="text-base font-semibold text-gray-700 uppercase tracking-wide">
-            Leave Breakdown — {currentYear}
-          </h2>
+    <div className={className}>
+      <div className="bg-white rounded-2xl shadow-lg px-6 pb-6 pt-5" style={{ overflow: "visible" }}>
+        <div className="mb-5 flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-[17px] font-bold tracking-tight text-gray-900">
+              Leave <span className="bg-gradient-to-r from-indigo-600 to-violet-500 bg-clip-text text-transparent">breakdown</span>
+            </h2>
+            <p className="mt-0.5 text-xs text-gray-400">Hover a ring to see available, remaining and used days</p>
+          </div>
+          <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-bold tabular-nums text-indigo-600 ring-1 ring-indigo-100">{currentYear}</span>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 place-items-center" style={{ gap: "48px 80px" }}>
+        {/* items-start keeps every ring on the same line (Unplanned has an extra "(Loss of Pay)" line) */}
+        <div className="grid grid-cols-2 md:grid-cols-4 items-start justify-items-center" style={{ gap: "40px 48px" }}>
           {TYPES.map(type => (
             <SingleDonut
               key={type.key}

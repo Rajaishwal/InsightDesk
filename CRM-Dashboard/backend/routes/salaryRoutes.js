@@ -1,138 +1,141 @@
+// /api/salary — salary records (one per employee per month).
+// Every route needs a login. Managing salaries is admin-only, and an admin can never create, edit, mark or delete
+// their OWN salary (another admin has to). Anyone can read their own records via GET /me (the Payslips page).
+// `userId` on a record is the employee's current Employee ID (e.g. IDE002); name & email are copied from the user.
 import express from "express";
 import Salary from "../model/Salary.js";
+import User from "../model/User.js";
+import { protect, admin } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
+router.use(protect);
 
-router.post("/", async (req, res) => {
-  try {
-    const { userId, month, year } = req.body;
+const SELF_MSG = "You can't create or change your own salary — another admin has to do it.";
+const isSelf = (req, employeeId) => !!req.user.employeeId && String(employeeId) === String(req.user.employeeId);
+const STATUSES = ["Pending", "Paid", "Failed"];
 
-    // if (req.body.userId === userId) {
-    //   return res.status(403).json({ error: "HR cannot create salary for themselves." });
-    // }
-
-
-    // Check if salary already exists before inserting
-    const existing = await Salary.findOne({ userId, month, year });
-    if (existing) {
-      return res.status(409).json({
-        error: `Salary for ${userId} in ${month} ${year} already exists.`,
-      });
-    }
-
-    const salary = new Salary(req.body);
-    await salary.save();
-    res.status(201).json(salary);
-  } catch (err) {
-    if (err.code === 11000) {
-      // Fallback in case duplicate slips through
-      return res.status(409).json({
-        error: "Duplicate salary record. Salary for this employee/month/year already exists.",
-      });
-    }
-    res.status(400).json({ error: err.message });
+// Only these fields can be written from the form
+const pickFields = (body) => {
+  const out = {};
+  for (const k of ["basicPay", "allowances", "deductions", "month", "year", "remarks"]) {
+    if (body[k] !== undefined) out[k] = body[k];
   }
-});
+  return out;
+};
 
-/**
- * @route   GET /api/salary
- * @desc    Get all salaries
- * @access  Admin / HR
- */
-router.get("/", async (req, res) => {
+// GET /api/salary/me — my own salary records, newest first
+router.get("/me", async (req, res) => {
   try {
-    const { userId } = req.query;
-    let query = {};
-    if (userId) query.userId = userId;
-    const salaries = await Salary.find(query).sort({ createdAt: -1 });
-    res.json(salaries);
+    if (!req.user.employeeId) return res.json([]);
+    const rows = await Salary.find({ userId: req.user.employeeId }).sort({ year: -1, createdAt: -1 });
+    res.json(rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// // GET /api/salary/user/:userId
-// router.get('/user/:userId', async (req, res) => {
-//   try {
-//     const payslips = await Salary.find({ userId: req.params.userId });
-//     if (!payslips) return res.status(404).json({ error: "Salary not found for this employeeId" });
-//     // Always return an array, even if empty
-//     return res.status(200).json(payslips);
-//   } catch (err) {
-//     return res.status(500).json({ error: 'Server error' });
-//   }
-// });
-
-
-// GET /api/salary/user/:userId
-router.get('/user/:userId', async (req, res) => {
+// GET /api/salary/user/:userId — one person's records (admin, or yourself)
+router.get("/user/:userId", async (req, res) => {
   try {
-    const payslips = await Salary.find({ userId: req.params.userId });
+    if (req.user.role !== "admin" && !isSelf(req, req.params.userId)) {
+      return res.status(403).json({ error: "You can only see your own payslips." });
+    }
+    const rows = await Salary.find({ userId: req.params.userId }).sort({ year: -1, createdAt: -1 });
+    res.json(rows);
+  } catch {
+    res.status(500).json({ error: "Server error" });
+  }
+});
 
-    if (!payslips || payslips.length === 0) {
-      return res.status(200).json([]); // Always return an empty array instead of 404
+// GET /api/salary — all records, optional ?userId= (admin)
+router.get("/", admin, async (req, res) => {
+  try {
+    const query = req.query.userId ? { userId: req.query.userId } : {};
+    const rows = await Salary.find(query).sort({ createdAt: -1 });
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/salary — add a month's salary for an employee (admin, not for yourself)
+router.post("/", admin, async (req, res) => {
+  try {
+    const { userId, month, year } = req.body;
+    if (!userId) return res.status(400).json({ error: "Choose an employee." });
+    if (isSelf(req, userId)) return res.status(403).json({ error: SELF_MSG });
+
+    const employee = await User.findOne({ employeeId: userId }).select("name email employeeId").lean();
+    if (!employee) return res.status(404).json({ error: `No employee has the ID ${userId}.` });
+
+    if (await Salary.findOne({ userId, month, year })) {
+      return res.status(409).json({ error: `${employee.name} already has a salary for ${month} ${year}.` });
     }
 
-    return res.status(200).json(payslips);
+    const salary = new Salary({ ...pickFields(req.body), userId, userName: employee.name, userEmail: employee.email });
+    await salary.save(); // net pay is worked out in the model
+    res.status(201).json(salary);
   } catch (err) {
-    return res.status(500).json({ error: 'Server error' });
+    if (err.code === 11000) {
+      return res.status(409).json({ error: "This employee already has a salary for that month." });
+    }
+    res.status(400).json({ error: err.message });
   }
 });
 
-
-
-/**
- * @route   PUT /api/salary/:id
- * @desc    Update salary record
- * @access  Admin / HR
- */
-router.put("/:id", async (req, res) => {
+// PUT /api/salary/:id — edit a record (admin, not your own)
+router.put("/:id", admin, async (req, res) => {
   try {
-    const updatedSalary = await Salary.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true, runValidators: true }
-    );
-    if (!updatedSalary) return res.status(404).json({ error: "Salary record not found" });
-    res.json(updatedSalary);
+    const salary = await Salary.findById(req.params.id);
+    if (!salary) return res.status(404).json({ error: "Salary record not found" });
+    if (isSelf(req, salary.userId)) return res.status(403).json({ error: SELF_MSG });
+
+    // Moving the record to another employee
+    if (req.body.userId && req.body.userId !== salary.userId) {
+      if (isSelf(req, req.body.userId)) return res.status(403).json({ error: SELF_MSG });
+      const employee = await User.findOne({ employeeId: req.body.userId }).select("name email").lean();
+      if (!employee) return res.status(404).json({ error: `No employee has the ID ${req.body.userId}.` });
+      Object.assign(salary, { userId: req.body.userId, userName: employee.name, userEmail: employee.email });
+    }
+
+    Object.assign(salary, pickFields(req.body));
+    await salary.save(); // save (not findByIdAndUpdate) so net pay is recalculated
+    res.json(salary);
+  } catch (err) {
+    if (err.code === 11000) {
+      return res.status(409).json({ error: "This employee already has a salary for that month." });
+    }
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// PATCH /api/salary/:id/status — Pending / Paid / Failed (admin, not your own)
+router.patch("/:id/status", admin, async (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!STATUSES.includes(status)) return res.status(400).json({ error: "Status must be Pending, Paid or Failed." });
+    const salary = await Salary.findById(req.params.id);
+    if (!salary) return res.status(404).json({ error: "Salary record not found" });
+    if (isSelf(req, salary.userId)) return res.status(403).json({ error: SELF_MSG });
+
+    salary.status = status;
+    salary.processedBy = req.user.employeeId || String(req.user._id);
+    salary.processedAt = new Date();
+    if (status === "Paid") salary.paymentDate = salary.paymentDate || new Date();
+    await salary.save();
+    res.json(salary);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
 
-/**
- * @route   PATCH /api/salary/:id/status
- * @desc    Update salary status (Processed / Paid / Failed)
- * @access  Admin / HR
- */
-router.patch("/:id/status", async (req, res) => {
+// DELETE /api/salary/:id (admin, not your own)
+router.delete("/:id", admin, async (req, res) => {
   try {
-    const { status, processedBy } = req.body;
-    const updatedSalary = await Salary.findByIdAndUpdate(
-      req.params.id,
-      {
-        status,
-        processedBy,
-        processedAt: new Date(),
-      },
-      { new: true }
-    );
-    if (!updatedSalary) return res.status(404).json({ error: "Salary record not found" });
-    res.json(updatedSalary);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-/**
- * @route   DELETE /api/salary/:id
- * @desc    Delete salary record
- * @access  Admin / HR
- */
-router.delete("/:id", async (req, res) => {
-  try {
-    const deletedSalary = await Salary.findByIdAndDelete(req.params.id);
-    if (!deletedSalary) return res.status(404).json({ error: "Salary record not found" });
+    const salary = await Salary.findById(req.params.id);
+    if (!salary) return res.status(404).json({ error: "Salary record not found" });
+    if (isSelf(req, salary.userId)) return res.status(403).json({ error: SELF_MSG });
+    await salary.deleteOne();
     res.json({ message: "Salary record deleted successfully" });
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -8,14 +8,8 @@ import { getCache, setCache } from "./pageCache";
 async function prefetchPayslips(user) {
   if (getCache("payslips") || !user?.employeeId) return;
   try {
-    const r = await api.get(`/salary/user/${user.employeeId}`);
-    const sorted = (r.data || []).sort(
-      (a, b) =>
-        new Date(b.paymentDate || b.createdAt) -
-        new Date(a.paymentDate || a.createdAt)
-    );
-    setCache("payslips", sorted);
-    if (sorted.length > 0) setCache("payslips-latest", sorted[0]);
+    const r = await api.get("/salary/me");
+    setCache("payslips", r.data || []);
   } catch { /* silent */ }
 }
 
@@ -58,7 +52,7 @@ async function prefetchProjects(user) {
 async function prefetchLeaves() {
   if (getCache("leaves")) return;
   try {
-    const r = await api.get("/leaves/my-leaves");
+    const r = await api.get("/leaves/my-leaves", { params: { limit: 500 } });
     setCache("leaves", r.data.leaves || []);
   } catch { /* silent */ }
 }
@@ -71,7 +65,7 @@ export async function prefetchAll(user) {
     // Admin: prefetch all admin pages in parallel
     await Promise.all([
       prefetchAdminDashboard(),
-      prefetchSalaries(),
+      user.role === "admin" && prefetchSalaries(), // the salary list is admin-only
       prefetchPayslips(user),
     ]);
   } else {

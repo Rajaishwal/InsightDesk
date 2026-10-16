@@ -7,15 +7,15 @@ import {
   addReply,
   updateTicketStatus,
 } from '../controllers/ticketController.js';
-import { protect } from '../middleware/authMiddleware.js';
+import { protect, admin } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
 router.post('/',                        protect, createTicket);
 router.get('/my',                       protect, getMyTickets);
-router.get('/all',                      protect, getAllTickets);
+router.get('/all',                      protect, admin, getAllTickets);        // admin only
 router.get('/:ticketId',                protect, getTicketById);
 router.post('/:ticketId/reply',         protect, addReply);
-router.put('/:ticketId/status',         protect, updateTicketStatus);
+router.put('/:ticketId/status',         protect, admin, updateTicketStatus);   // admin only
 
 export default router;
