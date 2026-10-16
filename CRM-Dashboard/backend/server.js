@@ -3,7 +3,10 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
+import jwt from "jsonwebtoken";
 import connectDB from "./config/db.js";
+import User from "./model/User.js";
+import Message from "./models/Message.js";
 import "./config/cloudinary.js";
 import userRoutes from "./routes/userRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
@@ -29,10 +32,11 @@ connectDB();
 
 const app = express();
 
+// The local dev sites, plus the deployed frontend(s) from CLIENT_URL (comma-separated, e.g. "https://insightdesk.netlify.app")
 const allowedOrigins = [
-  "https://crm-dashboard-1-ldaf.netlify.app",
   "http://localhost:5173",
   "http://localhost:5174",
+  ...(process.env.CLIENT_URL || "").split(",").map((u) => u.trim().replace(/\/+$/, "")).filter(Boolean),
 ];
 
 app.use(
@@ -79,23 +83,35 @@ const io = new Server(httpServer, {
 // Share io instance with controllers so they can emit real-time events
 setIo(io);
 
+// A socket must carry a valid login token (sent by the app, or the login cookie). Who the user is comes from that token,
+// never from ids the client sends — otherwise anyone could read or send another person's messages.
+io.use(async (socket, next) => {
+  try {
+    const cookieToken = /(?:^|;\s*)token=([^;]+)/.exec(socket.handshake.headers.cookie || "")?.[1];
+    const token = socket.handshake.auth?.token || (cookieToken && decodeURIComponent(cookieToken));
+    const { id } = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(id).select("_id").lean();
+    if (!user) return next(new Error("Not authorised"));
+    socket.data.userId = String(user._id);
+    next();
+  } catch {
+    next(new Error("Not authorised"));
+  }
+});
+
 // userId -> socketId map
 const onlineUsers = new Map();
 
 io.on("connection", (socket) => {
-  const userId = socket.handshake.auth?.userId;
+  const userId = socket.data.userId;
 
-  if (userId) {
-    onlineUsers.set(userId, socket.id);
-    socket.join(userId);
-    io.emit("online_users", Array.from(onlineUsers.keys()));
-  }
+  onlineUsers.set(userId, socket.id);
+  socket.join(userId);
+  io.emit("online_users", Array.from(onlineUsers.keys()));
 
-  socket.on("send_message", async ({ senderId, receiverId, text, fileUrl, fileName, fileType, replyTo }) => {
+  socket.on("send_message", async ({ receiverId, text, fileUrl, fileName, fileType, replyTo }) => {
     try {
-      const Message = (await import("./models/Message.js")).default;
-      const User    = (await import("./model/User.js")).default;
-
+      const senderId = userId;
       const msg = await Message.create({
         senderId,
         receiverId,
@@ -119,11 +135,11 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("mark_read", async ({ senderId, receiverId }) => {
+  // Only your own inbox: messages from senderId to you
+  socket.on("mark_read", async ({ senderId }) => {
     try {
-      const Message = (await import("./models/Message.js")).default;
       await Message.updateMany(
-        { senderId, receiverId, read: false },
+        { senderId, receiverId: userId, read: false },
         { read: true }
       );
     } catch (err) {
@@ -131,11 +147,15 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("edit_message", async ({ messageId, text, receiverId }) => {
+  socket.on("edit_message", async ({ messageId, text }) => {
     try {
-      const Message = (await import("./models/Message.js")).default;
       const existing = await Message.findById(messageId);
       if (!existing) return;
+      if (String(existing.senderId) !== userId) {
+        socket.emit("edit_error", { messageId, reason: "You can only edit your own messages." });
+        return;
+      }
+      const receiverId = String(existing.receiverId);
 
       const ageMs = Date.now() - new Date(existing.createdAt).getTime();
       if (ageMs > 60 * 60 * 1000) {
@@ -155,11 +175,12 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("delete_message", async ({ messageId, receiverId }) => {
+  socket.on("delete_message", async ({ messageId }) => {
     try {
-      const Message = (await import("./models/Message.js")).default;
-      await Message.findByIdAndDelete(messageId);
-      io.to(receiverId).emit("message_deleted", { messageId });
+      const existing = await Message.findById(messageId);
+      if (!existing || String(existing.senderId) !== userId) return; // only the sender can delete
+      await existing.deleteOne();
+      io.to(String(existing.receiverId)).emit("message_deleted", { messageId });
       socket.emit("message_deleted", { messageId });
     } catch (err) {
       console.error("Socket delete_message error:", err.message);
@@ -167,10 +188,8 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
-    if (userId) {
-      onlineUsers.delete(userId);
-      io.emit("online_users", Array.from(onlineUsers.keys()));
-    }
+    onlineUsers.delete(userId);
+    io.emit("online_users", Array.from(onlineUsers.keys()));
   });
 });
 

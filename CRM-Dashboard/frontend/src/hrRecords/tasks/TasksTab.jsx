@@ -118,7 +118,7 @@ export default function TasksTab() {
 
   const loadCompleted = () => {
     setRecentLoading(true);
-    api.get("http://localhost:5000/api/hr-tasks/")
+    api.get("/hr-tasks/")
       .then(res => {
         const completed = (res.data.tasks || [])
           .filter(t => t.status === "Completed")
@@ -137,7 +137,7 @@ export default function TasksTab() {
     const t = setTimeout(async () => {
       setSearchLoading(true);
       try {
-        const res = await api.get(`http://localhost:5000/api/users/search?query=${encodeURIComponent(query)}`);
+        const res = await api.get(`/users/search?query=${encodeURIComponent(query)}`);
         setSuggestions(res.data || []);
         setDropOpen(true);
       } catch { setSuggestions([]); }
@@ -163,8 +163,8 @@ export default function TasksTab() {
     setTaskLoading(true);
     try {
       const [selfRes, hrRes] = await Promise.all([
-        api.get(`http://localhost:5000/api/tasks/user/${_id}`),
-        api.get("http://localhost:5000/api/hr-tasks/assigned-by-me"),
+        api.get(`/tasks/user/${_id}`),
+        api.get("/hr-tasks/assigned-by-me"),
       ]);
       const selfTasks = selfRes.data.tasks || [];
       const hrTasks   = (hrRes.data.tasks || []).filter(t => t.assignedTo === emp.employeeId);

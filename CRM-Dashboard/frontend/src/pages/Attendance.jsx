@@ -61,7 +61,7 @@ function Attendance({ onClose }) {
 
   const fetchTodayStatus = async () => {
     try {
-      const response = await api.get(`http://localhost:5000/api/attendance/status/${user._id}`);
+      const response = await api.get(`/attendance/status/${user._id}`);
       setAttendanceStatus(response.data);
     } catch (error) {
       console.error("Error fetching attendance status:", error);
@@ -75,7 +75,7 @@ function Attendance({ onClose }) {
     }
     setLoading(true);
     try {
-      const response = await api.post("http://localhost:5000/api/attendance/checkin", { userId: user._id });
+      const response = await api.post("/attendance/checkin", { userId: user._id });
 
       if (response.data.locationTrackingActivated) {
         startTracking();
@@ -109,7 +109,7 @@ function Attendance({ onClose }) {
     }
     setLoading(true);
     try {
-      const response = await api.post("http://localhost:5000/api/attendance/checkout", { userId: user._id });
+      const response = await api.post("/attendance/checkout", { userId: user._id });
 
       if (response.data.locationTrackingDeactivated) {
         stopTracking();

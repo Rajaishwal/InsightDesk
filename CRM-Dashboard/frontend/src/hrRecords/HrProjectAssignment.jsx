@@ -327,7 +327,7 @@ const HrProjectAssignment = () => {
       if (!ok) return;
     }
     try {
-      await axios.put(`http://localhost:5000/api/projects/${project.projectId}`, { status: newStatus });
+      await axios.put(`/projects/${project.projectId}`, { status: newStatus });
       if (newStatus === "Completed") toast.success(`${project.title} marked as completed.`);
       fetchData({ silent: true });
     } catch (err) {

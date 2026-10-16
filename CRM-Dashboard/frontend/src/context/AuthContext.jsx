@@ -16,7 +16,7 @@ export const AuthProvider = ({ children }) => {
     const load = async () => {
       // First try to authenticate with cookies (no localStorage check needed)
       try {
-        const res = await api.get("http://localhost:5000/api/auth/me");
+        const res = await api.get("/auth/me");
         setUser(res.data);
         
         // Check if user is currently checked in and start location tracking
@@ -28,7 +28,7 @@ export const AuthProvider = ({ children }) => {
         const token = localStorage.getItem("token");
         if (token) {
           try {
-            const res = await api.get("http://localhost:5000/api/auth/me");
+            const res = await api.get("/auth/me");
             setUser(res.data);
             await checkAttendanceAndStartTracking(res.data._id);
           } catch {
@@ -48,7 +48,7 @@ export const AuthProvider = ({ children }) => {
   const checkAttendanceAndStartTracking = async (userId) => {
     try {
       // Server works out "today" in India time and includes a session still open past midnight
-      const response = await api.get(`http://localhost:5000/api/attendance/status/${userId}`);
+      const response = await api.get(`/attendance/status/${userId}`);
       
       if (response.data.hasCheckedIn && !response.data.hasCheckedOut) {
         // User is currently checked in, start location tracking
@@ -61,7 +61,7 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      const res = await api.post("http://localhost:5000/api/auth/login", { email, password });
+      const res = await api.post("/auth/login", { email, password });
       const { token, ...userData } = res.data;
       localStorage.setItem("token", token);
       setUser(userData);
@@ -74,7 +74,7 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (payload) => {
     try {
-      const res = await api.post("http://localhost:5000/api/auth/register", payload);
+      const res = await api.post("/auth/register", payload);
       const { token, ...userData } = res.data;
       localStorage.setItem("token", token);
       setUser(userData);
@@ -87,7 +87,7 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     try {
       // Tell the backend to clear the HTTP-only cookie
-      await api.post("http://localhost:5000/api/auth/logout");
+      await api.post("/auth/logout");
     } catch {
       // ignore network errors — still clear client state
     }

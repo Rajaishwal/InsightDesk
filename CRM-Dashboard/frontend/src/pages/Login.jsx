@@ -165,14 +165,14 @@ export default function Login() {
     try {
       setPasswordLoading(true);
       setPwErr("");
-      const loginResponse = await axios.post("http://localhost:5000/api/auth/login", {
+      const loginResponse = await axios.post("/auth/login", {
         email: passwordData.email,
         password: passwordData.currentPassword,
       });
 
       if (loginResponse.data.token) {
         await axios.put(
-          "http://localhost:5000/api/auth/change-password",
+          "/auth/change-password",
           {
             currentPassword: passwordData.currentPassword,
             newPassword: passwordData.newPassword,

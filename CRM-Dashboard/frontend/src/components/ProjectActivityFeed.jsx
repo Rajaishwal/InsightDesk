@@ -37,8 +37,8 @@ export default function ProjectActivityFeed({ projectId }) {
     silent ? setRefreshing(true) : setLoading(true);
     try {
       const url = projectId
-        ? `http://localhost:5000/api/project-activity?projectId=${projectId}`
-        : "http://localhost:5000/api/project-activity";
+        ? `/project-activity?projectId=${projectId}`
+        : "/project-activity";
       const res = await axios.get(url);
       setActivities(res.data.activities || []);
     } catch {

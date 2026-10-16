@@ -80,7 +80,7 @@ export const useLocationTracker = (user) => {
 
   const saveLocation = async (position, addressData, hasLocationChanged) => {
     try {
-      await api.post('http://localhost:5000/api/location/update', {
+      await api.post('/location/update', {
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
         accuracy: position.coords.accuracy || 0,

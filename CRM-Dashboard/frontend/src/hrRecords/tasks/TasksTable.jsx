@@ -45,7 +45,7 @@ const TasksTable = ({ tasks, loading, setTasks }) => {
     });
     if (!ok) return;
     try {
-      await axios.delete(`http://localhost:5000/api/hr-tasks/${taskId}`);
+      await axios.delete(`/hr-tasks/${taskId}`);
       setTasks(prev => prev.filter(t => t._id !== taskId));
     } catch (err) {
       console.error(err);

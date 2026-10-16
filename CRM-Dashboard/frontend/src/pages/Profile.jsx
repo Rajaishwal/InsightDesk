@@ -100,8 +100,8 @@ export default function Profile() {
       setLoading(true);
       const fd = new FormData();
       fd.append("file", file);
-      const { data } = await axios.post("http://localhost:5000/api/upload", fd);
-      await axios.put(`http://localhost:5000/api/users/${user._id}/profile`, { photo: data.fileUrl });
+      const { data } = await axios.post("/upload", fd);
+      await axios.put(`/users/${user._id}/profile`, { photo: data.fileUrl });
       setPhotoUrl(data.fileUrl);
       toast.success("Profile photo updated!");
     } catch (err) {
@@ -141,7 +141,7 @@ export default function Profile() {
     setLoading(true);
     try {
       const { name, email, employeeId, ...rest } = form;
-      await axios.put(`http://localhost:5000/api/users/${user._id}/profile`, rest);
+      await axios.put(`/users/${user._id}/profile`, rest);
       toast.success("Profile updated successfully!");
       setSavedBefore(true);
       setEditing(false);

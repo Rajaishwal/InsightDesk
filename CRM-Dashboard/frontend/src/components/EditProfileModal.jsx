@@ -71,8 +71,8 @@ export default function EditProfileModal({ onClose }) {
       setPhotoLoading(true);
       const fd = new FormData();
       fd.append("file", file);
-      const up = await api.post("http://localhost:5000/api/upload", fd);
-      await api.put(`http://localhost:5000/api/users/${user._id}/profile`, { photo: up.data.fileUrl });
+      const up = await api.post("/upload", fd);
+      await api.put(`/users/${user._id}/profile`, { photo: up.data.fileUrl });
       window.location.reload();
     } catch (err) {
       toast.error(err?.response?.data?.message || "Photo upload failed");
@@ -83,7 +83,7 @@ export default function EditProfileModal({ onClose }) {
     setLoading(true);
     try {
       const { name, email, employeeId, ...rest } = form;
-      await api.put(`http://localhost:5000/api/users/${user._id}/profile`, rest);
+      await api.put(`/users/${user._id}/profile`, rest);
       setSaved(true);
       setTimeout(() => { setSaved(false); setEditing(false); }, 1400);
     } catch (err) {

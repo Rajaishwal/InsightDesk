@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { useAuth } from "./AuthContext";
-import api from "../services/axios";
+import api, { SERVER_URL } from "../services/axios";
 
 const SocketContext = createContext(null);
 
@@ -35,8 +35,9 @@ export const SocketProvider = ({ children }) => {
       .then((r) => setUnreadCount(r.data.count || 0))
       .catch(() => {});
 
-    const socket = io("http://localhost:5000", {
-      auth: { userId: user._id },
+    // The server reads who we are from the login token — never from an id the client sends
+    const socket = io(SERVER_URL, {
+      auth: { token: localStorage.getItem("token") },
       transports: ["websocket"],
     });
     socketRef.current = socket;

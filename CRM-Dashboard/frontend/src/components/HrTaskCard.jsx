@@ -40,7 +40,7 @@ export const HrTaskForm = ({ onClose }) => {
     const t = setTimeout(async () => {
       try {
         const res = await axios.get(
-          `http://localhost:5000/api/users/search?query=${encodeURIComponent(displayName)}`
+          `/users/search?query=${encodeURIComponent(displayName)}`
         );
         setSuggestions(res.data || []);
         setShowSuggestions(true);
@@ -88,7 +88,7 @@ export const HrTaskForm = ({ onClose }) => {
     setLoading(true);
     setMessage("");
     try {
-      const response = await axios.post("http://localhost:5000/api/hr-tasks/", {
+      const response = await axios.post("/hr-tasks/", {
         title,
         description,
         taskCompletionTime,

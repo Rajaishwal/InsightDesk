@@ -53,7 +53,7 @@ export default function ProjectTaskDrawer({ project, onClose, isManager }) {
   const fetchTasks = async () => {
     try {
       setLoading(true);
-      const res = await api.get(`http://localhost:5000/api/project-tasks/${project.projectId}`);
+      const res = await api.get(`/project-tasks/${project.projectId}`);
       setTasks(res.data.tasks || []);
     } catch {
       toast.error("Failed to load tasks");
@@ -66,7 +66,7 @@ export default function ProjectTaskDrawer({ project, onClose, isManager }) {
   const fetchAttendanceStatus = async () => {
     if (!myId) return;
     try {
-      const res = await api.get(`http://localhost:5000/api/attendance/status/${myId}`);
+      const res = await api.get(`/attendance/status/${myId}`);
       setIsCheckedIn(res.data.hasCheckedIn && !res.data.hasCheckedOut);
     } catch { /* leave isCheckedIn false — the server re-checks when a timer starts */ }
   };
@@ -81,7 +81,7 @@ export default function ProjectTaskDrawer({ project, onClose, isManager }) {
     if (!form.title.trim()) return;
     try {
       setSubmitting(true);
-      await api.post(`http://localhost:5000/api/project-tasks/${project.projectId}`, form);
+      await api.post(`/project-tasks/${project.projectId}`, form);
       setForm({ title: "", description: "", isRevision: false });
       setAddOpen(false);
       await fetchTasks();
@@ -97,7 +97,7 @@ export default function ProjectTaskDrawer({ project, onClose, isManager }) {
   const handleStatusChange = async (taskId, status, isRevision) => {
     try {
       setStatusLoading(taskId);
-      const res = await api.put(`http://localhost:5000/api/project-tasks/${taskId}/status`, { status });
+      const res = await api.put(`/project-tasks/${taskId}/status`, { status });
       // Use the server's response — not an optimistic update — so the timer
       // state (timerStartedAt: null) is reflected immediately after completion
       const updated = res.data.task;
@@ -124,7 +124,7 @@ export default function ProjectTaskDrawer({ project, onClose, isManager }) {
     }
     try {
       setTimerLoading(task._id);
-      const res = await api.post(`http://localhost:5000/api/project-tasks/${task._id}/timer/${action}`);
+      const res = await api.post(`/project-tasks/${task._id}/timer/${action}`);
       setTasks(prev => prev.map(t => t._id === task._id ? res.data.task : t));
       // Notify dashboard so it re-fetches activeTimerProjectId and re-sorts the project list
       window.dispatchEvent(new CustomEvent("crm:task:updated"));
