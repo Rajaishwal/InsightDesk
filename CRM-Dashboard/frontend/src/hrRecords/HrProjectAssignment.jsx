@@ -17,12 +17,13 @@ import AddProject from "./AddProject";
 import axios from "../services/axios";
 import { useToast } from "../context/ToastContext";
 import { useConfirm } from "../context/ConfirmContext";
+import Tooltip from "../components/Tooltip";
 
 // Overlapping avatars of the team (first 3, then +n)
 function TeamStack({ members }) {
   if (!members.length) return <span className="text-xs text-gray-400">No team yet</span>;
   return (
-    <div className="flex items-center gap-2" title={members.map((m) => m.name).join(", ")}>
+    <Tooltip text={members.map((m) => m.name).join(", ")}><div className="flex items-center gap-2">
       <div className="flex -space-x-2">
         {members.slice(0, 3).map((m) => <Avatar key={m.key} person={m.person} name={m.name} size={28} />)}
         {members.length > 3 && (
@@ -32,7 +33,7 @@ function TeamStack({ members }) {
         )}
       </div>
       <span className="whitespace-nowrap text-[11px] text-gray-400">{members.length} {members.length === 1 ? "member" : "members"}</span>
-    </div>
+    </div></Tooltip>
   );
 }
 
@@ -168,12 +169,11 @@ function ProjectStatusCell({ project, stats, onChange }) {
 
   if (project.status === "Completed") {
     return (
-      <span
-        title="Completed projects are locked"
+      <Tooltip text="Completed projects are locked"><span
         className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${STATUS_META.Completed.pill}`}
       >
         <Lock className="h-3 w-3" /> Completed
-      </span>
+      </span></Tooltip>
     );
   }
 
@@ -411,9 +411,9 @@ const HrProjectAssignment = () => {
                 <span className="inline-flex flex-shrink-0 items-center gap-1 rounded-full bg-indigo-50 py-0.5 pl-0.5 pr-1.5 text-xs font-semibold text-indigo-700">
                   <Avatar person={person} size={20} />
                   {person.name.split(" ")[0]}
-                  <button type="button" onClick={() => setPerson(null)} aria-label={`Stop filtering by ${person.name}`} className="rounded-full p-0.5 hover:bg-indigo-100">
+                  <Tooltip text={`Stop filtering by ${person.name}`}><button type="button" onClick={() => setPerson(null)} aria-label={`Stop filtering by ${person.name}`} className="rounded-full p-0.5 hover:bg-indigo-100">
                     <X className="h-3 w-3" />
-                  </button>
+                  </button></Tooltip>
                 </span>
               )}
               <input
@@ -426,9 +426,9 @@ const HrProjectAssignment = () => {
                 className="w-full min-w-0 bg-transparent text-sm text-gray-700 outline-none placeholder:text-gray-400"
               />
               {searchTerm && (
-                <button type="button" onClick={() => setSearchTerm("")} aria-label="Clear search" className="rounded-full p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+                <Tooltip text="Clear search"><button type="button" onClick={() => setSearchTerm("")} aria-label="Clear search" className="rounded-full p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
                   <X className="h-3.5 w-3.5" />
-                </button>
+                </button></Tooltip>
               )}
             </div>
 
@@ -492,10 +492,10 @@ const HrProjectAssignment = () => {
             {filtersActive && (
               <button type="button" onClick={clearFilters} className="text-xs font-semibold text-indigo-600 hover:underline">Clear filters</button>
             )}
-            <button type="button" onClick={() => fetchData({ silent: true })} title="Refresh" aria-label="Refresh"
+            <Tooltip text="Refresh"><button type="button" onClick={() => fetchData({ silent: true })} aria-label="Refresh"
               className="rounded-full p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600">
               <RefreshCw className="h-4 w-4" />
-            </button>
+            </button></Tooltip>
           </div>
         </div>
 
@@ -551,7 +551,7 @@ const HrProjectAssignment = () => {
                         <span className="text-sm font-semibold text-gray-800">{p.title}</span>
                       </div>
                       {p.description && (
-                        <p className="mt-1 max-w-md text-xs leading-relaxed text-gray-500 line-clamp-2" title={p.description}>{p.description}</p>
+                        <Tooltip text={p.description}><p className="mt-1 max-w-md text-xs leading-relaxed text-gray-500 line-clamp-2">{p.description}</p></Tooltip>
                       )}
                     </td>
                     <td className="px-4 py-4">
@@ -567,23 +567,21 @@ const HrProjectAssignment = () => {
                     <td className="px-4 py-4"><TaskProgress stats={taskStats[p.projectId]} /></td>
                     <td className="px-5 py-4">
                       <div className="flex items-center justify-end gap-1.5">
-                        <button
+                        <Tooltip text="Open the task tracklist"><button
                           type="button"
                           onClick={() => setTracklistProject(p)}
                           className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-600 hover:text-white"
-                          title="Open the task tracklist"
                         >
                           <ListChecks className="h-3.5 w-3.5" /> Tasks
-                        </button>
-                        <button
+                        </button></Tooltip>
+                        <Tooltip text="View project details"><button
                           type="button"
                           onClick={() => setViewProject(p)}
                           className="cursor-pointer rounded-full p-2 text-gray-400 transition hover:bg-gray-100 hover:text-indigo-600"
-                          title="View project details"
                           aria-label={`View ${p.title}`}
                         >
                           <Eye className="h-4 w-4" />
-                        </button>
+                        </button></Tooltip>
                       </div>
                     </td>
                   </tr>

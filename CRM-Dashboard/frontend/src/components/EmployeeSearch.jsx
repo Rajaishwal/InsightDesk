@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import axios from "../services/axios";
 import { useListNav } from "../hooks/useListNav";
+import Tooltip from "./Tooltip";
 
 const initials = (name = "") =>
   name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
@@ -209,16 +210,15 @@ export default function EmployeeSearch() {
                   <X size={15} className="text-gray-400 hover:text-red-500" />
                 </button>
               )}
-              <button
+              <Tooltip text="Search"><button
                 type="submit"
                 disabled={loading}
-                title="Search"
                 className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg transition flex items-center justify-center flex-shrink-0"
               >
                 {loading
                   ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   : <Search size={15} />}
-              </button>
+              </button></Tooltip>
             </div>
 
             {/* Dropdown suggestions */}

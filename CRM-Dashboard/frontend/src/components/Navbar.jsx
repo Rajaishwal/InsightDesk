@@ -9,6 +9,7 @@ import { useNavigate } from "react-router-dom";
 import Attendance from "../pages/Attendance.jsx";
 import ChatPanel from "./ChatPanel.jsx";
 import api from "../services/axios.js";
+import Tooltip from "./Tooltip";
 
 const Navbar = () => {
   const { user, logout } = useAuth();
@@ -218,17 +219,18 @@ const Navbar = () => {
             </button>
 
             {/* Break */}
-            <div className="relative group">
-              {!isCheckedIn ? (
+            {!isCheckedIn ? (
+              <Tooltip text={isCheckedOut ? "Break disabled after check-out" : "Check in first to use Break"}>
                 <button
                   disabled
-                  title={isCheckedOut ? "Break disabled after check-out" : "Check in first to use Break"}
                   className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed transition-all"
                 >
                   <Coffee className="w-4 h-4" />
                   <span className="hidden sm:inline">Break</span>
                 </button>
-              ) : isOnBreak ? (
+              </Tooltip>
+            ) : isOnBreak ? (
+              <Tooltip text={breakOverLimit ? `Overtime: ${formatBreakTime(breakElapsed - 60 * 60)}` : `${formatBreakTime(60 * 60 - breakElapsed)} remaining`}>
                 <button
                   onClick={handleBreakEnd}
                   className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all animate-pulse ${breakOverLimit
@@ -239,7 +241,9 @@ const Navbar = () => {
                   <Coffee className="w-4 h-4" />
                   <span className="hidden sm:inline">End {formatBreakTime(breakElapsed)}</span>
                 </button>
-              ) : (
+              </Tooltip>
+            ) : (
+              <Tooltip text="Max break: 60 min">
                 <button
                   onClick={handleBreakStart}
                   className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border border-amber-300 bg-amber-100 text-amber-700 hover:bg-amber-100 transition-all"
@@ -247,30 +251,14 @@ const Navbar = () => {
                   <Coffee className="w-4 h-4" />
                   <span className="hidden sm:inline">Break</span>
                 </button>
-              )}
-              {/* Break tooltip */}
-              {isCheckedIn && (
-                <div className="absolute right-0 top-full mt-2 z-50 hidden group-hover:block">
-                  <div className="relative">
-                    <div className="absolute -top-1 right-4 w-2 h-2 rotate-45 bg-white border-l border-t border-gray-200" />
-                    <div className="bg-white text-gray-600 text-xs font-semibold border border-gray-200 rounded-xl px-4 py-2.5 shadow-lg whitespace-nowrap">
-                      {breakOverLimit
-                        ? `Overtime: ${formatBreakTime(breakElapsed - 60 * 60)}`
-                        : isOnBreak
-                          ? `${formatBreakTime(60 * 60 - breakElapsed)} remaining`
-                          : "Max break: 60 min"}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
+              </Tooltip>
+            )}
 
             {/* Logout */}
-            <div className="relative group">
+            <Tooltip text={isCheckedIn ? "Check out first before logging out" : "Log out"}>
               <button
                 onClick={isCheckedIn ? undefined : logout}
                 disabled={isCheckedIn}
-                title={isCheckedIn ? "Please check out before logging out" : "Logout"}
                 className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all ${isCheckedIn
                   ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
                   : "bg-red-50 text-red-500 border-red-200 hover:bg-red-100"
@@ -279,17 +267,7 @@ const Navbar = () => {
                 <LogOut className="w-4 h-4" />
                 <span className="hidden sm:inline">Logout</span>
               </button>
-              {isCheckedIn && (
-                <div className="absolute right-0 top-full mt-2 z-50 hidden group-hover:block">
-                  <div className="relative">
-                    <div className="absolute -top-1 right-4 w-2 h-2 rotate-45 bg-white border-l border-t border-gray-200" />
-                    <div className="bg-white text-gray-600 text-xs font-semibold border border-gray-200 rounded-xl px-4 py-2.5 shadow-lg whitespace-nowrap">
-                      Check out first before logging out
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
+            </Tooltip>
           </div>
         ) : (
           <div className="flex items-center gap-4">

@@ -3,6 +3,7 @@ import { X, LogIn, LogOut } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import api from "../services/axios";
+import Tooltip from "../components/Tooltip";
 
 // IST clock parts → { hour, minute, second, dayPeriod }
 const istClock = new Intl.DateTimeFormat("en-US", {
@@ -184,13 +185,13 @@ function Attendance({ onClose }) {
               <h2 className="font-mono text-base font-bold tracking-wider text-gray-900">{user?.employeeId || "Attendance"}</h2>
               <p className="truncate text-[11px] text-gray-400">Welcome, {user?.name}</p>
             </div>
-            <button
+            <Tooltip text="Close"><button
               onClick={onClose}
               aria-label="Close"
               className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
             >
               <X className="h-4 w-4" />
-            </button>
+            </button></Tooltip>
           </div>
 
           {/* Digital clock with glowing border */}

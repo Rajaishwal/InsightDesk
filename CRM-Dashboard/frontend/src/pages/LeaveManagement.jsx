@@ -13,6 +13,7 @@ import { useAuth } from "../context/AuthContext";
 import api from "../services/axios";
 import { useToast } from "../context/ToastContext";
 import { useConfirm } from "../context/ConfirmContext";
+import Tooltip from "../components/Tooltip";
 
 const TYPE = Object.fromEntries(LEAVE_TYPES.map((t) => [t.key, t]));
 const HALF_DAY_TYPES = ["Planned Leave", "Wellness Leave", "Unplanned Leave (LOP)"]; // not Polling Leave
@@ -90,6 +91,16 @@ function RequestForm({ balances, monthLeft, onClose, onDone }) {
   const set = (patch) => { setForm((f) => ({ ...f, ...patch })); setError(""); };
 
   const days = form.halfDay ? 0.5 : calcWorkingDays(form.startDate, form.endDate);
+
+  // Date-picker hints — or the reason a picked date isn't allowed
+  const earliest = minDate();
+  const fmtPick = (d) => new Date(`${d}T00:00:00`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+  const startTip = form.startDate && form.startDate < earliest
+    ? `Leave can start from ${fmtPick(earliest)} at the earliest`
+    : `First day of your leave — the earliest is ${fmtPick(earliest)}. Weekends are skipped.`;
+  const endTip = form.halfDay ? "Half day — it ends the same day it starts"
+    : form.startDate && form.endDate && form.endDate < form.startDate ? "The last day can't be before the first day"
+    : "Last day of your leave — weekends in between aren't counted";
   const bal = balances.find((b) => b.key === form.leaveType);
   const overType = days > 0 && bal && days > bal.left;
 
@@ -154,7 +165,7 @@ function RequestForm({ balances, monthLeft, onClose, onDone }) {
             <h2 className="text-lg font-bold text-gray-900">Request leave</h2>
             <p className="text-sm text-gray-500">HR will approve or reject it — you'll be notified either way.</p>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="-mr-1 rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"><X className="h-4 w-4" /></button>
+          <Tooltip text="Close"><button type="button" onClick={onClose} aria-label="Close" className="-mr-1 rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"><X className="h-4 w-4" /></button></Tooltip>
         </div>
 
         <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
@@ -184,12 +195,16 @@ function RequestForm({ balances, monthLeft, onClose, onDone }) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label icon={CalendarDays}>From</Label>
-              <input type="date" value={form.startDate} min={minDate()} onChange={(e) => onDate("startDate", e.target.value)} className={fieldCls} />
+              <Tooltip text={startTip} align="start" full>
+                <input type="date" value={form.startDate} min={earliest} onChange={(e) => onDate("startDate", e.target.value)} className={fieldCls} />
+              </Tooltip>
             </div>
             <div>
               <Label icon={CalendarDays}>To</Label>
-              <input type="date" value={form.halfDay ? form.startDate : form.endDate} min={form.startDate || minDate()} disabled={form.halfDay}
-                onChange={(e) => onDate("endDate", e.target.value)} className={fieldCls} />
+              <Tooltip text={endTip} align="start" full>
+                <input type="date" value={form.halfDay ? form.startDate : form.endDate} min={form.startDate || earliest} disabled={form.halfDay}
+                  onChange={(e) => onDate("endDate", e.target.value)} className={fieldCls} />
+              </Tooltip>
             </div>
           </div>
 
@@ -350,10 +365,10 @@ export default function LeaveManagement() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={refresh} disabled={refreshing} title="Refresh" aria-label="Refresh"
+          <Tooltip text="Refresh"><button type="button" onClick={refresh} disabled={refreshing} aria-label="Refresh"
             className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm transition hover:text-indigo-600 disabled:opacity-60">
             <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-          </button>
+          </button></Tooltip>
           <button type="button" onClick={() => setShowForm(true)}
             className="inline-flex items-center gap-1.5 rounded-full bg-gray-800 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-gray-900">
             <Plus className="h-4 w-4" /> Request leave
@@ -425,12 +440,12 @@ export default function LeaveManagement() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="flex flex-wrap items-center gap-x-2 text-sm">
-                      <span className="font-semibold text-gray-800" title={normalizeType(l.leaveType) !== l.leaveType ? `Applied as “${l.leaveType}”` : undefined}>{shortName(normalizeType(l.leaveType))}</span>
+                      <Tooltip text={normalizeType(l.leaveType) !== l.leaveType ? `Applied as “${l.leaveType}”` : undefined}><span className="font-semibold text-gray-800">{shortName(normalizeType(l.leaveType))}</span></Tooltip>
                       <span className="text-gray-300">·</span>
                       <span className="text-gray-600">{fmtRange(l)}</span>
                       <span className={`rounded-full px-2 py-px text-[11px] font-semibold ${l.halfDay ? "bg-amber-50 text-amber-600" : "bg-gray-100 text-gray-600"}`}>{daysLabel(l)}</span>
                     </p>
-                    <p className="mt-0.5 truncate text-xs text-gray-500" title={l.reason}>{l.reason?.trim() ? `“${l.reason.trim()}”` : <span className="text-gray-300">No reason given</span>}</p>
+                    <Tooltip text={l.reason}><p className="mt-0.5 truncate text-xs text-gray-500">{l.reason?.trim() ? `“${l.reason.trim()}”` : <span className="text-gray-300">No reason given</span>}</p></Tooltip>
                     {note && <p className={`mt-0.5 text-xs ${l.status === "Rejected" ? "text-rose-600" : "text-gray-500"}`}>HR: {note}</p>}
                   </div>
                   {/* Cancel (pending only) sits left of the status, so every status chip lines up on the right edge */}

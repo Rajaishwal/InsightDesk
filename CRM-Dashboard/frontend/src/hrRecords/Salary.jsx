@@ -17,6 +17,7 @@ import { getCache, setCache } from "../utils/pageCache";
 import StatTile from "../components/StatTile";
 import PersonAvatar from "../components/PersonAvatar";
 import PersonPicker from "../components/PersonPicker";
+import Tooltip from "../components/Tooltip";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
@@ -69,7 +70,9 @@ function StageDetail({ s, stage }) {
     failed: "send it again",
     unsent: "send it to the employee",
   }[stage];
-  return <p className="mt-1 whitespace-nowrap pl-1 text-[11px] text-gray-400" title={s.receipt?.note || undefined}>{text}</p>;
+  const line = <p className="mt-1 whitespace-nowrap pl-1 text-[11px] text-gray-400">{text}</p>;
+  // The employee's note on a "not received" report shows on hover
+  return s.receipt?.note ? <Tooltip text={`“${s.receipt.note}”`} align="start">{line}</Tooltip> : line;
 }
 
 const EMPTY_FORM = { employee: "", month: MONTHS[new Date().getMonth()], year: String(new Date().getFullYear()), basicPay: "" };
@@ -129,7 +132,7 @@ function SalaryForm({ people, peopleState, onRetryPeople, salaries, selfId, onCl
             <h2 className="text-lg font-bold text-gray-900">Add salary</h2>
             <p className="text-sm text-gray-500">It goes to {person ? person.name.split(" ")[0] : "the employee"} straight away — they confirm on their Payslips page once the money arrives.</p>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="-mr-1 rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"><X className="h-4 w-4" /></button>
+          <Tooltip text="Close"><button type="button" onClick={onClose} aria-label="Close" className="-mr-1 rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"><X className="h-4 w-4" /></button></Tooltip>
         </div>
 
         <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
@@ -352,7 +355,7 @@ const Salary = () => {
             <Search className="h-4 w-4 flex-shrink-0 text-gray-400" />
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, ID or email…"
               className="w-full min-w-0 bg-transparent text-sm text-gray-700 outline-none placeholder:text-gray-400" />
-            {search && <button type="button" onClick={() => setSearch("")} aria-label="Clear search" className="rounded-full p-0.5 text-gray-400 hover:bg-gray-100"><X className="h-3.5 w-3.5" /></button>}
+            {search && <Tooltip text="Clear search"><button type="button" onClick={() => setSearch("")} aria-label="Clear search" className="rounded-full p-0.5 text-gray-400 hover:bg-gray-100"><X className="h-3.5 w-3.5" /></button></Tooltip>}
           </div>
           <button type="button" onClick={openForm}
             className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-full bg-gray-800 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-gray-900">
@@ -465,29 +468,37 @@ const Salary = () => {
                       <td className="px-5 py-3.5">
                         {locked ? (
                           <div className="flex justify-end">
-                            <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200"
-                              title={`${mine ? "You" : s.userName} confirmed receiving it — the record can't be changed or deleted`}>
-                              Confirmed
-                            </span>
+                            <Tooltip text={`${mine ? "You" : s.userName} confirmed receiving it — the record can't be changed or deleted.`}>
+                              <span tabIndex={0} className="cursor-default rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200 outline-none focus-visible:ring-2 focus-visible:ring-emerald-400">
+                                Confirmed
+                              </span>
+                            </Tooltip>
                           </div>
                         ) : mine ? (
-                          <span className="block text-right text-[11px] text-gray-400" title="Your own salary is managed by another admin">
-                            Managed by another admin
-                          </span>
+                          <div className="flex justify-end">
+                            <Tooltip text="Your own salary is managed by another admin.">
+                              <span className="cursor-default text-[11px] text-gray-400">Managed by another admin</span>
+                            </Tooltip>
+                          </div>
                         ) : (
                           <div className="flex items-center justify-end gap-0.5">
                             {canSend && (
-                              <button type="button" onClick={() => setStatusOf(s, "Paid")} disabled={busy}
-                                title={stage === "unsent" ? "Send to the employee" : "Send again — they'll be asked to confirm again"}
-                                aria-label={stage === "unsent" ? "Send to the employee" : "Send again"}
-                                className="rounded-full p-1.5 text-gray-400 transition hover:bg-indigo-50 hover:text-indigo-600 disabled:opacity-40"><Send className="h-4 w-4" /></button>
+                              <Tooltip text={stage === "unsent" ? "Send to the employee" : "Send again — they'll be asked to confirm again"}>
+                                <button type="button" onClick={() => setStatusOf(s, "Paid")} disabled={busy}
+                                  aria-label={stage === "unsent" ? "Send to the employee" : "Send again"}
+                                  className="rounded-full p-1.5 text-gray-400 transition hover:bg-indigo-50 hover:text-indigo-600 disabled:opacity-40"><Send className="h-4 w-4" /></button>
+                              </Tooltip>
                             )}
                             {(stage === "awaiting" || stage === "not-received") && (
-                              <button type="button" onClick={() => setStatusOf(s, "Failed")} disabled={busy} title="Mark payment as failed" aria-label="Mark payment as failed"
-                                className="rounded-full p-1.5 text-gray-400 transition hover:bg-amber-50 hover:text-amber-600 disabled:opacity-40"><XCircle className="h-4 w-4" /></button>
+                              <Tooltip text="Mark payment as failed">
+                                <button type="button" onClick={() => setStatusOf(s, "Failed")} disabled={busy} aria-label="Mark payment as failed"
+                                  className="rounded-full p-1.5 text-gray-400 transition hover:bg-amber-50 hover:text-amber-600 disabled:opacity-40"><XCircle className="h-4 w-4" /></button>
+                              </Tooltip>
                             )}
-                            <button type="button" onClick={() => remove(s)} disabled={busy} title="Delete" aria-label="Delete"
-                              className="rounded-full p-1.5 text-gray-400 transition hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40"><Trash2 className="h-4 w-4" /></button>
+                            <Tooltip text="Delete">
+                              <button type="button" onClick={() => remove(s)} disabled={busy} aria-label="Delete"
+                                className="rounded-full p-1.5 text-gray-400 transition hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40"><Trash2 className="h-4 w-4" /></button>
+                            </Tooltip>
                           </div>
                         )}
                       </td>

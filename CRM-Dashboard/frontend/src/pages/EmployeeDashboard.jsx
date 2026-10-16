@@ -12,6 +12,7 @@ import EditProfileModal from "../components/EditProfileModal";
 import HrTaskBoard from "../components/HrTaskBoard";
 import ProjectTaskDrawer from "../components/ProjectTaskDrawer";
 import LiveTaskTimer from "../components/LiveTaskTimer";
+import Tooltip from "../components/Tooltip";
 
 /* ── Calendar day status styles — soft solid fills, white text; Sat & Sun grey ── */
 const DAY_STYLE = {
@@ -290,26 +291,26 @@ export default function EmployeeDashboard() {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 {/* Month navigation */}
-                <button
+                <Tooltip text="Previous month"><button
                   onClick={() => handleMonthNav(-1)}
                   disabled={viewMonthOffset <= -2 || monthLoading}
                   aria-label="Previous month"
                   className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition"
                 >
                   <ChevronLeft className="w-4 h-4 text-gray-500" />
-                </button>
+                </button></Tooltip>
                 <div>
                   <h2 className="text-sm font-bold text-gray-800">Monthly Attendance</h2>
                   <p className="text-[11px] text-gray-400 mt-0.5">{monthLoading ? "Loading…" : effMonthYear}</p>
                 </div>
-                <button
+                <Tooltip text="Next month"><button
                   onClick={() => handleMonthNav(1)}
                   disabled={viewMonthOffset >= 0 || monthLoading}
                   aria-label="Next month"
                   className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition"
                 >
                   <ChevronRight className="w-4 h-4 text-gray-500" />
-                </button>
+                </button></Tooltip>
               </div>
               <div className="flex items-center gap-3 flex-wrap justify-end">
                 {[

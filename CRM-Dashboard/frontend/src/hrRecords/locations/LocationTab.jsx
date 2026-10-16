@@ -12,6 +12,7 @@ import LocationFilters from "./LocationFilters";
 import StatTile from "../../components/StatTile";
 import PersonAvatar from "../../components/PersonAvatar";
 import { useAutoRefresh } from "../../hooks/useAutoRefresh";
+import Tooltip from "../../components/Tooltip";
 
 const TZ = "Asia/Kolkata";
 const STALE_MINS = 35; // the tracker saves at least every 30 min while someone is checked in
@@ -92,7 +93,7 @@ function LocationRow({ emp }) {
             <MapPin className="h-3.5 w-3.5 text-indigo-500" />
           </span>
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-gray-800" title={addr.full || undefined}>{addr.street}</p>
+            <Tooltip text={addr.full || undefined}><p className="truncate text-sm font-medium text-gray-800">{addr.street}</p></Tooltip>
             <p className="truncate text-xs text-gray-500">
               {addr.area}
               {lat != null && (
@@ -112,12 +113,11 @@ function LocationRow({ emp }) {
           </span>
           <div className="min-w-0">
             <p className="text-sm text-gray-700">
-              {updated ? <>Updated <span className="font-semibold" title={fullTime(updated)}>{ago(updated)}</span></> : "Never updated"}
+              {updated ? <>Updated <Tooltip text={fullTime(updated)}><span className="font-semibold">{ago(updated)}</span></Tooltip></> : "Never updated"}
             </p>
-            <p className={`truncate text-[11px] ${stale ? "text-amber-600" : "text-gray-400"}`}
-              title={stale ? "Checked in, but no location update — their tab may be closed or location turned off" : undefined}>
+            <Tooltip text={stale ? "Checked in, but no location update — their tab may be closed or location turned off" : undefined}><p className={`truncate text-[11px] ${stale ? "text-amber-600" : "text-gray-400"}`}>
               {stale ? "Tab closed or location off?" : s === "offline" ? "last known location" : updated ? fullTime(updated) : ""}
-            </p>
+            </p></Tooltip>
           </div>
         </div>
 

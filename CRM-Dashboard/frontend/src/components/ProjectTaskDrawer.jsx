@@ -4,6 +4,7 @@ import { X, Plus, RefreshCw, GitCommitHorizontal, Play, Square, Clock, Lock } fr
 import api from "../services/axios";
 import { useToast } from "../context/ToastContext";
 import { useAuth } from "../context/AuthContext";
+import Tooltip from "./Tooltip";
 
 const STATUS_STYLES = {
   Pending:   { dot: "bg-amber-400",   badge: "border border-amber-400   text-amber-600" },
@@ -156,9 +157,9 @@ export default function ProjectTaskDrawer({ project, onClose, isManager }) {
               </p>
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0">
-              <button onClick={fetchTasks} className="p-1.5 rounded-lg hover:bg-white/15 transition" title="Refresh">
+              <Tooltip text="Refresh"><button onClick={fetchTasks} className="p-1.5 rounded-lg hover:bg-white/15 transition">
                 <RefreshCw size={14} />
-              </button>
+              </button></Tooltip>
               <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/15 transition">
                 <X size={17} />
               </button>
@@ -279,14 +280,13 @@ export default function ProjectTaskDrawer({ project, onClose, isManager }) {
 
                           {/* Timer button — task creator only */}
                           {isOwner && !isManager && task.status !== "Completed" && (
-                            <button
-                              onClick={() => handleTimerToggle(task)}
-                              disabled={busy || (!running && !isCheckedIn)}
-                              title={
+                            <Tooltip text={
                                 !running && !isCheckedIn
                                   ? "Check in to start a timer"
                                   : running ? "Stop timer" : "Start timer"
-                              }
+                              }><button
+                              onClick={() => handleTimerToggle(task)}
+                              disabled={busy || (!running && !isCheckedIn)}
                               className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed
                                 ${running
                                   ? "bg-red-100 text-red-600 hover:bg-red-200"
@@ -297,7 +297,7 @@ export default function ProjectTaskDrawer({ project, onClose, isManager }) {
                               {running
                                 ? <><Square size={11} className="fill-current" /> Stop</>
                                 : <><Play  size={11} className="fill-current" /> Start</>}
-                            </button>
+                            </button></Tooltip>
                           )}
                         </div>
                       </div>

@@ -13,6 +13,7 @@ import { useAuth } from "../context/AuthContext";
 import api from "../services/axios";
 import { getCache, setCache } from "../utils/pageCache";
 import { Users, UserPlus, Briefcase, CheckCircle2, AlertCircle, XCircle, X, Clock, Coffee, Pencil, MapPin, RefreshCw, FileBarChart } from "lucide-react";
+import HoverTip from "../components/Tooltip";
 
 const PROJECT_STATUS_COLORS = ["#7c3aed", "#06b6d4", "#f59e0b"];
 
@@ -256,7 +257,7 @@ const AdminDashboard = () => {
                 <div className="min-w-0">
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{label}</p>
                   <p className="text-2xl font-black text-gray-800 mt-1 leading-none">{value}</p>
-                  <p className="text-[11px] text-gray-400 mt-1.5 truncate" title={sub}>{sub}</p>
+                  <HoverTip text={sub}><p className="text-[11px] text-gray-400 mt-1.5 truncate">{sub}</p></HoverTip>
                 </div>
                 <div className={`${iconBg} p-2.5 rounded-xl flex-shrink-0 ml-2`}>
                   {Icon && <Icon className={`w-5 h-5 ${iconColor}`} />}
@@ -291,7 +292,7 @@ const AdminDashboard = () => {
                 <div key={label} className="rounded-xl bg-violet-50/50 border border-violet-100/70 px-3 py-2.5">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{label}</p>
                   <p className="mt-1 text-lg font-black leading-none text-gray-800">{value}</p>
-                  <p className="mt-1 truncate text-[10px] text-gray-400" title={sub}>{sub}</p>
+                  <HoverTip text={sub}><p className="mt-1 truncate text-[10px] text-gray-400">{sub}</p></HoverTip>
                 </div>
               ))}
             </div>
@@ -374,14 +375,13 @@ const AdminDashboard = () => {
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    <button
+                    <HoverTip text="Refresh"><button
                       onClick={refreshStats}
                       className="text-xs text-gray-400 hover:text-indigo-600 flex items-center gap-1 transition"
-                      title="Refresh"
                     >
                       <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
                       Refresh
-                    </button>
+                    </button></HoverTip>
                     {activeFilter && (
                       <button
                         onClick={() => setActiveFilter(null)}

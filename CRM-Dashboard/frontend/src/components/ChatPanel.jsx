@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { useSocket } from "../context/SocketContext";
 import api from "../services/axios";
 import { useListNav } from "../hooks/useListNav";
+import Tooltip from "./Tooltip";
 
 // Avatar initials helper
 const Avatar = ({ name, photo, size = "w-9 h-9" }) => {
@@ -509,31 +510,28 @@ const ChatPanel = ({ onClose }) => {
                                     {/* Actions — left of timestamp for mine, right for theirs */}
                                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
                                       {/* Reply — everyone */}
-                                      <button
+                                      <Tooltip text="Reply"><button
                                         onClick={() => setReplyTo({ _id: msg._id, senderId: msg.senderId, senderName: isMe ? "You" : activeChat.name, text: msg.text, fileName: msg.fileName, fileType: msg.fileType })}
-                                        title="Reply"
                                         className="p-1 rounded-full text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 transition"
                                       >
                                         <CornerUpLeft className="w-3.5 h-3.5" />
-                                      </button>
+                                      </button></Tooltip>
                                       {/* Edit — only mine, only within 60 min */}
                                       {isMe && !msg.fileType && (Date.now() - new Date(msg.createdAt).getTime() < 60 * 60 * 1000) && (
-                                        <button
+                                        <Tooltip text="Edit (available for 60 min)"><button
                                           onClick={() => { setEditingId(msg._id); setEditText(msg.text); }}
-                                          title="Edit (available for 60 min)"
                                           className="p-1 rounded-full text-gray-400 hover:text-amber-500 hover:bg-amber-50 transition"
                                         >
                                           <Pencil className="w-3.5 h-3.5" />
-                                        </button>
+                                        </button></Tooltip>
                                       )}
                                       {isMe && (
-                                        <button
+                                        <Tooltip text="Delete"><button
                                           onClick={() => deleteMessage(msg._id, activeChat._id)}
-                                          title="Delete"
                                           className="p-1 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition"
                                         >
                                           <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
+                                        </button></Tooltip>
                                       )}
                                     </div>
                                     <p className={`text-[10px] text-gray-400 ${isMe ? "text-right" : "text-left"}`}>
@@ -622,15 +620,14 @@ const ChatPanel = ({ onClose }) => {
 
                   <div className="flex items-end gap-2 bg-gray-50 rounded-2xl border border-gray-200 px-4 py-2 focus-within:border-indigo-400 focus-within:ring-1 focus-within:ring-indigo-200 transition">
                     {/* Paperclip */}
-                    <button
+                    <Tooltip text="Attach file"><button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       disabled={isUploading}
                       className="flex-shrink-0 text-gray-400 hover:text-indigo-500 transition disabled:opacity-40 mb-0.5"
-                      title="Attach file"
                     >
                       <Paperclip className="w-4 h-4" />
-                    </button>
+                    </button></Tooltip>
 
                     <textarea
                       ref={inputRef}

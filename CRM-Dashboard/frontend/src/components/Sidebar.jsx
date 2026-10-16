@@ -12,6 +12,7 @@ import {
   IndianRupeeIcon, User2Icon, FolderCheck,
   UserRoundCogIcon,
 } from "lucide-react";
+import Tooltip from "./Tooltip";
 
 const Sidebar = () => {
   const { user } = useAuth();
@@ -116,10 +117,10 @@ const Sidebar = () => {
                       <Icon size={20} className="relative z-10 shrink-0" />
                       <span className="relative z-10">{label}</span>
                       {to === "/payslip" && toConfirm > 0 && (
-                        <span title={`${toConfirm} paid ${toConfirm === 1 ? "salary" : "salaries"} to confirm`}
+                        <Tooltip text={`${toConfirm} paid ${toConfirm === 1 ? "salary" : "salaries"} to confirm`}><span
                           className="relative z-10 ml-auto mr-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1.5 text-[10px] font-bold text-white shadow-sm">
                           {toConfirm}
-                        </span>
+                        </span></Tooltip>
                       )}
                     </>
                   )}

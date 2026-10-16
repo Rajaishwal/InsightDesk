@@ -8,6 +8,7 @@ import { Eye, EyeOff, X, Mail, Lock, KeyRound, Loader2, ArrowRight, AlertCircle 
 import axios from "../services/axios";
 import { useToast } from "../context/ToastContext";
 import BrandOrbit from "../components/BrandOrbit";
+import Tooltip from "../components/Tooltip";
 
 // Live India-time clock (own component so the ticking doesn't re-render the form)
 function LiveClock() {
@@ -60,14 +61,14 @@ function PasswordInput({ shown, onToggle, ...props }) {
     <div className="relative">
       <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
       <input {...props} type={shown ? "text" : "password"} className={`${inputCls} pr-11`} />
-      <button
+      <Tooltip text={shown ? "Hide password" : "Show password"}><button
         type="button"
         onClick={onToggle}
         aria-label={shown ? "Hide password" : "Show password"}
         className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
       >
         {shown ? <EyeOff size={17} /> : <Eye size={17} />}
-      </button>
+      </button></Tooltip>
     </div>
   );
 }
@@ -318,14 +319,14 @@ export default function Login() {
                   <h3 id="change-pw-title" className="text-lg font-bold text-gray-900">Change password</h3>
                   <p className="mt-0.5 text-sm text-gray-500">Confirm your current password, then choose a new one.</p>
                 </div>
-                <button
+                <Tooltip text="Close"><button
                   type="button"
                   onClick={closeChangePassword}
                   aria-label="Close"
                   className="-mr-1 -mt-1 flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
                 >
                   <X size={18} />
-                </button>
+                </button></Tooltip>
               </div>
 
               <form onSubmit={onChangePasswordSubmit} className="mt-6 space-y-4">

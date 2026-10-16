@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import { X, FolderKanban, Mail, Users2, CheckCircle2, Timer, Hourglass, Sparkles, Wrench, CalendarDays } from "lucide-react";
 import ProjectTeamModal from "./ProjectTeamModal";
 import PersonAvatar from "./PersonAvatar";
+import Tooltip from "./Tooltip";
+import HoverTip from "./Tooltip";
 
 const STATUS = {
   Ongoing:   { chip: "bg-blue-50 text-blue-700 ring-blue-200",          Icon: Timer },
@@ -86,10 +88,10 @@ const ProjectModal = ({ project, onClose, isHrView = false }) => {
               {teamCount > 0 && <span className="inline-flex items-center gap-1"><Users2 className="h-3.5 w-3.5 text-gray-400" /> {teamCount} {teamCount === 1 ? "member" : "members"}</span>}
             </p>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close"
+          <HoverTip text="Close"><button type="button" onClick={onClose} aria-label="Close"
             className="-mr-1 rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600">
             <X className="h-4 w-4" />
-          </button>
+          </button></HoverTip>
         </div>
 
         {/* Body */}
@@ -139,11 +141,10 @@ const ProjectModal = ({ project, onClose, isHrView = false }) => {
               <Users2 className="h-4 w-4" /> Team members
             </button>
           ) : (
-            <button type="button" onClick={handleContact} disabled={!project.email}
-              title={project.email ? `Email ${project.manager}` : "No email for this manager"}
+            <Tooltip text={project.email ? `Email ${project.manager}` : "No email for this manager"}><button type="button" onClick={handleContact} disabled={!project.email}
               className="inline-flex items-center gap-1.5 rounded-full bg-gray-800 px-5 py-2 text-sm font-semibold text-white transition hover:bg-gray-900 disabled:opacity-50">
               <Mail className="h-4 w-4" /> Contact manager
-            </button>
+            </button></Tooltip>
           )}
         </div>
       </div>

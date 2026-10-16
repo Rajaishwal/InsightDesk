@@ -16,6 +16,7 @@ import RaiseTicket from "../components/RaiseTicket";
 import TicketDrawer from "../components/TicketDrawer";
 import { useCapToFirstN, capClass, capStyle } from "../hooks/useCapToFirstN";
 import { STATUS, STATUSES, PRIORITY, PRIORITIES, CATEGORIES, CATEGORY_ICON, lastFrom, fmtDate } from "../components/ticketMeta";
+import Tooltip from "../components/Tooltip";
 
 const FAQS = [
   { Icon: CalendarDays, q: "How do I apply for leave?", a: "Open Leave Management and click “Request leave”. Pick the type and dates (weekends aren't counted) and send it — HR approves or rejects it and you're notified." },
@@ -127,12 +128,12 @@ export default function Report() {
             <Search className="h-4 w-4 flex-shrink-0 text-gray-400" />
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={isAdmin ? "Search ID, problem or employee…" : "Search your tickets…"}
               className="w-full min-w-0 bg-transparent text-sm text-gray-700 outline-none placeholder:text-gray-400" />
-            {search && <button type="button" onClick={() => setSearch("")} aria-label="Clear search" className="rounded-full p-0.5 text-gray-400 hover:bg-gray-100"><X className="h-3.5 w-3.5" /></button>}
+            {search && <Tooltip text="Clear search"><button type="button" onClick={() => setSearch("")} aria-label="Clear search" className="rounded-full p-0.5 text-gray-400 hover:bg-gray-100"><X className="h-3.5 w-3.5" /></button></Tooltip>}
           </div>
-          <button type="button" onClick={() => fetchTickets(true)} disabled={refreshing} title="Refresh" aria-label="Refresh"
+          <Tooltip text="Refresh"><button type="button" onClick={() => fetchTickets(true)} disabled={refreshing} aria-label="Refresh"
             className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm transition hover:text-indigo-600 disabled:opacity-60">
             <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-          </button>
+          </button></Tooltip>
           {!isAdmin && (
             <button type="button" onClick={() => setShowRaise(true)}
               className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-full bg-gray-800 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-gray-900">

@@ -1,3 +1,4 @@
+import Tooltip from "./Tooltip";
 // StatTile.jsx — Summary card in the dashboard stat-card style (coloured left edge, label, big number, icon).
 // Pass onClick to make it a filter button (active = highlighted).
 const TONES = {
@@ -23,7 +24,7 @@ export default function StatTile({ label, value, sub, Icon, tone = "violet", act
         <div className="min-w-0">
           <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{label}</p>
           <p className="mt-1 text-2xl font-black leading-none text-gray-800">{value}</p>
-          <p className="mt-1.5 truncate text-[11px] text-gray-400" title={sub}>{sub}</p>
+          <Tooltip text={sub}><p className="mt-1.5 truncate text-[11px] text-gray-400">{sub}</p></Tooltip>
         </div>
         <div className={`ml-2 flex-shrink-0 rounded-xl p-2.5 ${t.iconBg}`}>
           {Icon && <Icon className={`h-5 w-5 ${t.icon}`} />}

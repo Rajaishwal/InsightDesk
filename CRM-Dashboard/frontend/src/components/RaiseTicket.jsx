@@ -5,6 +5,7 @@ import { X, LifeBuoy, Loader2, AlertCircle } from "lucide-react";
 import api from "../services/axios";
 import FileUploader from "./FileUploader";
 import { CATEGORIES, CATEGORY_ICON, PROBLEMS, PRIORITIES, PRIORITY } from "./ticketMeta";
+import Tooltip from "./Tooltip";
 
 const EMPTY = { category: "", problem: "", priority: "Low", description: "" };
 const MAX = 1000;
@@ -81,7 +82,7 @@ export default function RaiseTicket({ isOpen, onClose, onSubmit }) {
             <h2 className="text-lg font-bold text-gray-900">Raise a ticket</h2>
             <p className="text-sm text-gray-500">Tell the support team what's wrong — you can chat with them on the ticket.</p>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="-mr-1 rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"><X className="h-4 w-4" /></button>
+          <Tooltip text="Close"><button type="button" onClick={onClose} aria-label="Close" className="-mr-1 rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"><X className="h-4 w-4" /></button></Tooltip>
         </div>
 
         <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5">

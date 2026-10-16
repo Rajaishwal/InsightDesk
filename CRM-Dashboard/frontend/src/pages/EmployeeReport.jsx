@@ -13,6 +13,7 @@ import { useAuth } from "../context/AuthContext";
 import { LEAVE_TYPES, normalizeType } from "../utils/leaveTypes";
 import MeterRing from "../components/MeterRing";
 import { useCapToFirstN, capClass, capStyle } from "../hooks/useCapToFirstN";
+import HoverTip from "../components/Tooltip";
 
 /* ── Formatting ─────────────────────────────────────────────────────────── */
 const pad = (n) => String(n).padStart(2, "0");
@@ -339,11 +340,11 @@ function LeaveRequestTile({ l }) {
           <span className="h-2 w-2 flex-shrink-0 rounded-full" style={{ background: color }} />
           {l.leaveType}
         </p>
-        <p className="mt-0.5 truncate text-[11px] text-gray-400" title={l.reason || undefined}>
+        <HoverTip text={l.reason || undefined}><p className="mt-0.5 truncate text-[11px] text-gray-400">
           {multiDay && `${fmtLeaveDate(l.startDate)} – ${fmtLeaveDate(l.endDate)} · `}
           {l.halfDay ? "Half day" : fmtDays(l.totalDays)}
           {l.reason && ` · "${l.reason}"`}
-        </p>
+        </p></HoverTip>
       </div>
 
       <Chip tone={l.status}>{l.status}</Chip>
@@ -365,7 +366,7 @@ function ProjectTile({ p }) {
           <span className="font-mono text-[10px] font-bold tracking-widest text-gray-400">{p.projectId}</span>
           <Chip tone={p.status}>{p.status}</Chip>
         </div>
-        <p className="mt-0.5 truncate text-sm font-semibold text-gray-800" title={p.title}>{p.title}</p>
+        <HoverTip text={p.title}><p className="mt-0.5 truncate text-sm font-semibold text-gray-800">{p.title}</p></HoverTip>
         <p className="mt-1 text-[11px] leading-snug text-gray-400">
           {completed
             ? <>Finished {fmtShortDate(p.completedAt)}{took && <> · took {took}</>}{p.startedAt && <> (from {fmtShortDate(p.startedAt)})</>}</>
@@ -645,7 +646,7 @@ export default function EmployeeReport() {
                 <div key={label} className="rounded-lg bg-gray-50 px-3 py-2.5">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{label}</p>
                   <p className="mt-1 text-lg font-black leading-none text-gray-800">{value}</p>
-                  <p className="mt-1 truncate text-[10px] text-gray-400" title={sub}>{sub}</p>
+                  <HoverTip text={sub}><p className="mt-1 truncate text-[10px] text-gray-400">{sub}</p></HoverTip>
                 </div>
               ))}
             </div>
@@ -655,10 +656,10 @@ export default function EmployeeReport() {
                   {tasks.map(t => (
                     <li key={t.id} className="flex items-center gap-3 py-2">
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-gray-800" title={t.title}>
+                        <HoverTip text={t.title}><p className="truncate text-sm font-medium text-gray-800">
                           {t.title}
                           {t.isRevision && <span className="ml-1.5 rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold uppercase text-amber-600">Revision</span>}
-                        </p>
+                        </p></HoverTip>
                         <p className="truncate text-[11px] text-gray-400">{t.kind === "HR" ? "HR task" : t.project}{t.periodSec ? ` · ${fmtHM(t.periodSec)} logged` : ""}</p>
                       </div>
                       <Chip tone={t.status}>{t.status}</Chip>

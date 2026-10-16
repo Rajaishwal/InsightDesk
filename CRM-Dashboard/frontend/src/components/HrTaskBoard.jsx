@@ -6,6 +6,7 @@ import { useToast } from "../context/ToastContext";
 import { useConfirm } from "../context/ConfirmContext";
 import { useCapToFirstN } from "../hooks/useCapToFirstN";
 import api from "../services/axios";
+import Tooltip from "./Tooltip";
 
 const fmt = (s) => {
   const n = Math.max(0, s);
@@ -63,11 +64,10 @@ function StatusBadge({ status, taskId, onStatusChange }) {
   // Finished tasks are locked — plain chip, no dropdown
   if (FINAL_STATUSES.includes(status)) {
     return (
-      <span
-        title={`${status} — can't be changed`}
+      <Tooltip text={`${status} — can't be changed`}><span
         className={`flex flex-shrink-0 items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${CHIP[status] || "bg-gray-100 text-gray-500"}`}>
         <Lock className="w-2.5 h-2.5" />{status}
-      </span>
+      </span></Tooltip>
     );
   }
 
@@ -193,10 +193,9 @@ function HrTaskRow({ task, userId, onTaskUpdate }) {
               {fmt(elapsed)}
             </span>
             <div className="flex items-center gap-1">
-              <button
+              <Tooltip text={isRunning ? "Pause" : "Start"}><button
                 onClick={handleTimer}
                 disabled={busy}
-                title={isRunning ? "Pause" : "Start"}
                 className={`p-1.5 rounded-lg transition disabled:opacity-50 ${
                   isRunning
                     ? "bg-amber-50 hover:bg-amber-100 text-amber-600"
@@ -208,15 +207,14 @@ function HrTaskRow({ task, userId, onTaskUpdate }) {
                   ? <Pause className="w-3.5 h-3.5 fill-current" />
                   : <Play  className="w-3.5 h-3.5 fill-current" />
                 }
-              </button>
+              </button></Tooltip>
               {isRunning && (
-                <button
+                <Tooltip text="Stop"><button
                   onClick={handleTimer}
                   disabled={busy}
-                  title="Stop"
                   className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-500 transition disabled:opacity-30">
                   <Square className="w-3.5 h-3.5 fill-current" />
-                </button>
+                </button></Tooltip>
               )}
             </div>
           </>

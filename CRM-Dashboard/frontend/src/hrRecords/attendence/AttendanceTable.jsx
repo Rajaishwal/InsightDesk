@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { AlertCircle, CalendarX2, Moon } from "lucide-react";
 import PersonAvatar from "../../components/PersonAvatar";
 import Pagination from "../../components/Pagination";
+import Tooltip from "../../components/Tooltip";
 
 const TZ = "Asia/Kolkata";
 const FULL_DAY_SECS = 8 * 3600; // the working-hours bar fills at 8h; longer days are flagged as overtime
@@ -138,9 +139,9 @@ const AttendanceTable = ({ data, loading, error, onRetry, pagination, onPage, fi
                         <span className="inline-flex items-center gap-1 text-gray-700">
                           {fmtTime(r.checkOutTime)}
                           {nextDayOut && (
-                            <span title="Checked out the next day" className="inline-flex items-center gap-0.5 rounded bg-indigo-50 px-1 text-[10px] font-semibold text-indigo-600">
+                            <Tooltip text="Checked out the next day"><span className="inline-flex items-center gap-0.5 rounded bg-indigo-50 px-1 text-[10px] font-semibold text-indigo-600">
                               <Moon className="h-2.5 w-2.5" />+1
-                            </span>
+                            </span></Tooltip>
                           )}
                         </span>
                       ) : live ? (
@@ -156,10 +157,9 @@ const AttendanceTable = ({ data, loading, error, onRetry, pagination, onPage, fi
                         <span className="text-gray-300">—</span>
                       ) : (
                         <div className="w-32">
-                          <p className={`text-sm font-semibold tabular-nums ${live ? "text-blue-600" : overtime ? "text-amber-600" : "text-gray-800"}`}
-                            title={overtime ? "More than 8 hours" : undefined}>
+                          <Tooltip text={overtime ? "More than 8 hours" : undefined}><p className={`text-sm font-semibold tabular-nums ${live ? "text-blue-600" : overtime ? "text-amber-600" : "text-gray-800"}`}>
                             {fmtDur(workSecs)}
-                          </p>
+                          </p></Tooltip>
                           <div className="mt-1 h-1 overflow-hidden rounded-full bg-gray-100">
                             <div className={`h-full rounded-full ${live ? "bg-blue-500" : overtime ? "bg-amber-400" : "bg-emerald-500"}`}
                               style={{ width: `${Math.min(100, (workSecs / FULL_DAY_SECS) * 100)}%` }} />
@@ -183,10 +183,9 @@ const AttendanceTable = ({ data, loading, error, onRetry, pagination, onPage, fi
                     {/* Break */}
                     <td className="whitespace-nowrap px-4 py-3.5">
                       {r.breakSeconds > 0 ? (
-                        <span className={`text-sm font-semibold tabular-nums ${r.breakSeconds > 3600 ? "text-rose-600" : "text-gray-700"}`}
-                          title={r.breakSeconds > 3600 ? "Longer than an hour" : undefined}>
+                        <Tooltip text={r.breakSeconds > 3600 ? "Longer than an hour" : undefined}><span className={`text-sm font-semibold tabular-nums ${r.breakSeconds > 3600 ? "text-rose-600" : "text-gray-700"}`}>
                           {fmtDur(r.breakSeconds)}
-                        </span>
+                        </span></Tooltip>
                       ) : (
                         <span className="text-gray-300">—</span>
                       )}
@@ -194,11 +193,10 @@ const AttendanceTable = ({ data, loading, error, onRetry, pagination, onPage, fi
 
                     {/* Status */}
                     <td className="px-5 py-3.5">
-                      <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${st.chip}`}
-                        title={missed ? "This session was never checked out" : undefined}>
+                      <Tooltip text={missed ? "This session was never checked out" : undefined}><span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${st.chip}`}>
                         <span className={`h-1.5 w-1.5 rounded-full ${st.dot}`} />
                         {st.label}
-                      </span>
+                      </span></Tooltip>
                     </td>
                   </tr>
                 );

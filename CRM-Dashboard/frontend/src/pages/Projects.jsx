@@ -13,6 +13,7 @@ import api from "../services/axios";
 import { useAuth } from "../context/AuthContext";
 import { getCache, setCache } from "../utils/pageCache";
 import { useCapToFirstN, capClass, capStyle } from "../hooks/useCapToFirstN";
+import Tooltip from "../components/Tooltip";
 
 const STATUS = {
   Ongoing:   { chip: "bg-blue-50 text-blue-700 ring-blue-200",          Icon: Timer },
@@ -118,9 +119,9 @@ const Projects = () => {
             className="w-full min-w-0 bg-transparent text-sm text-gray-700 outline-none placeholder:text-gray-400"
           />
           {searchTerm && (
-            <button type="button" onClick={() => setSearchTerm("")} aria-label="Clear search" className="rounded-full p-0.5 text-gray-400 hover:bg-gray-100">
+            <Tooltip text="Clear search"><button type="button" onClick={() => setSearchTerm("")} aria-label="Clear search" className="rounded-full p-0.5 text-gray-400 hover:bg-gray-100">
               <X className="h-3.5 w-3.5" />
-            </button>
+            </button></Tooltip>
           )}
         </div>
       </div>
@@ -176,22 +177,22 @@ const Projects = () => {
                         </span>
                       </td>
                       <td className="px-5 py-4">
-                        <button type="button" onClick={() => handleView(project)} title="View project details"
+                        <Tooltip text="View project details"><button type="button" onClick={() => handleView(project)}
                           className={`${pill} border border-gray-200 bg-white text-gray-600 hover:border-indigo-200 hover:text-indigo-600`}>
                           <Eye className="h-3.5 w-3.5" /> View
-                        </button>
+                        </button></Tooltip>
                       </td>
                       <td className="px-5 py-4">
-                        <button type="button" onClick={() => setTracklistProject(project)} title="Open the task tracklist"
+                        <Tooltip text="Open the task tracklist"><button type="button" onClick={() => setTracklistProject(project)}
                           className={`${pill} bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100 hover:bg-indigo-600 hover:text-white hover:ring-indigo-600`}>
                           <ListChecks className="h-3.5 w-3.5" /> Tasks
-                        </button>
+                        </button></Tooltip>
                       </td>
                       <td className="px-5 py-4">
-                        <button type="button" onClick={() => handleTeamView(project.projectId, project.title)} title="View team members"
+                        <Tooltip text="View team members"><button type="button" onClick={() => handleTeamView(project.projectId, project.title)}
                           className={`${pill} border border-gray-200 bg-white text-gray-600 hover:border-indigo-200 hover:text-indigo-600`}>
                           <Users2 className="h-3.5 w-3.5" /> Show
-                        </button>
+                        </button></Tooltip>
                       </td>
                     </tr>
                   );

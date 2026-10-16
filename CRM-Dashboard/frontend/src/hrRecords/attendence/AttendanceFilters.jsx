@@ -1,6 +1,7 @@
 // AttendanceFilters.jsx — Toolbar for the HR attendance table: employee picker, quick date ranges,
 // from/to dates and rows per page. Dates are India-time calendar days ("YYYY-MM-DD"), like the records.
 import PersonPicker from "../../components/PersonPicker";
+import Tooltip from "../../components/Tooltip";
 
 const istToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
 const addDays = (key, n) => {
@@ -22,6 +23,7 @@ const inputCls =
 
 const AttendanceFilters = ({ filters, setFilters, people }) => {
   const set = (patch) => setFilters((prev) => ({ ...prev, ...patch, page: 1 }));
+  const badRange = !!filters.startDate && !!filters.endDate && filters.startDate > filters.endDate;
   const today = istToday();
   const activePreset = PRESETS.find((p) => {
     const [s, e] = p.range(today);
@@ -52,11 +54,15 @@ const AttendanceFilters = ({ filters, setFilters, people }) => {
 
       {/* Custom range */}
       <div className="flex items-center gap-1.5">
-        <input type="date" aria-label="From date" value={filters.startDate} max={filters.endDate || undefined}
-          onChange={(e) => set({ startDate: e.target.value })} className={inputCls} />
+        <Tooltip text={badRange ? "The From date can't be after the To date" : "Show attendance from this day"}>
+          <input type="date" aria-label="From date" value={filters.startDate} max={filters.endDate || undefined}
+            onChange={(e) => set({ startDate: e.target.value })} className={inputCls} />
+        </Tooltip>
         <span className="text-xs text-gray-400">to</span>
-        <input type="date" aria-label="To date" value={filters.endDate} min={filters.startDate || undefined}
-          onChange={(e) => set({ endDate: e.target.value })} className={inputCls} />
+        <Tooltip text={badRange ? "The To date can't be before the From date" : "…up to and including this day"}>
+          <input type="date" aria-label="To date" value={filters.endDate} min={filters.startDate || undefined}
+            onChange={(e) => set({ endDate: e.target.value })} className={inputCls} />
+        </Tooltip>
       </div>
 
       {/* Rows per page */}

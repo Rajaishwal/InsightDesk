@@ -12,6 +12,7 @@ import { useConfirm } from "../context/ConfirmContext";
 import { useAutoRefresh } from "../hooks/useAutoRefresh";
 import StatTile from "../components/StatTile";
 import PersonAvatar from "../components/PersonAvatar";
+import Tooltip from "../components/Tooltip";
 
 const STATUS = {
   Pending:  { chip: "bg-amber-50 text-amber-700 ring-amber-200",       Icon: Hourglass },
@@ -92,10 +93,10 @@ function HistoryList({ history, busyId, onDecide }) {
             <span className="text-xs font-medium text-gray-800">{fmtRange(l.startDate, l.endDate)}</span>
             <span><TypeChip type={l.leaveType} small /></span>
             <span className="text-xs font-semibold tabular-nums text-gray-700">{dayLabel(l.totalDays)}</span>
-            <span className="truncate text-[11px] text-gray-500" title={l.reason || undefined}>{l.reason || "—"}</span>
-            <span className="text-[10px] text-gray-400" title={new Date(l.appliedAt).toLocaleString("en-GB", { timeZone: "Asia/Kolkata" })}>
+            <Tooltip text={l.reason || undefined}><span className="truncate text-[11px] text-gray-500">{l.reason || "—"}</span></Tooltip>
+            <Tooltip text={new Date(l.appliedAt).toLocaleString("en-GB", { timeZone: "Asia/Kolkata" })}><span className="text-[10px] text-gray-400">
               applied {ago(l.appliedAt)}
-            </span>
+            </span></Tooltip>
             <span className="flex items-center gap-1.5 md:justify-end">
               {pending ? (
                 <>
@@ -134,15 +135,14 @@ function EmployeeCard({ emp, open, onToggle, history, busyId, onDecide }) {
             <span className="flex items-center gap-2">
               <span className="truncate text-[13px] font-semibold text-gray-900">{emp.name}</span>
               {c.pending > 0 && (
-                <span className="inline-flex flex-shrink-0 items-center gap-1 rounded-full bg-amber-100 px-1.5 py-px text-[9.5px] font-bold text-amber-700"
-                  title="Waiting for a decision — earliest applied is shown first">
+                <Tooltip text="Waiting for a decision — earliest applied is shown first"><span className="inline-flex flex-shrink-0 items-center gap-1 rounded-full bg-amber-100 px-1.5 py-px text-[9.5px] font-bold text-amber-700">
                   <Hourglass className="h-2.5 w-2.5" /> {c.pending} pending
                   {emp.pendingSince && (
                     <span className="font-semibold text-amber-600/90">
                       · applied {new Date(emp.pendingSince).toLocaleDateString("en-GB", { timeZone: "Asia/Kolkata", day: "numeric", month: "short" })}
                     </span>
                   )}
-                </span>
+                </span></Tooltip>
               )}
             </span>
             <span className="block truncate text-[10.5px] text-gray-400">
@@ -329,9 +329,9 @@ export default function LeaveTab() {
           <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Find an employee by name, ID or email…"
             className="w-full min-w-0 bg-transparent text-sm text-gray-700 outline-none placeholder:text-gray-400" />
           {search && (
-            <button type="button" onClick={() => setSearch("")} aria-label="Clear search" className="rounded-full p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+            <Tooltip text="Clear search"><button type="button" onClick={() => setSearch("")} aria-label="Clear search" className="rounded-full p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
               <X className="h-3.5 w-3.5" />
-            </button>
+            </button></Tooltip>
           )}
         </div>
         <div className="inline-flex rounded-full bg-gray-100 p-0.5">

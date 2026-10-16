@@ -1,5 +1,6 @@
 // LocationFilters.jsx — Search (name, email, employee ID) and sort for the HR locations view.
 import { Search, X } from "lucide-react";
+import Tooltip from "../../components/Tooltip";
 
 const SORTS = [
   { id: "lastUpdated", label: "Latest" },
@@ -18,10 +19,10 @@ const LocationFilters = ({ filters, setFilters }) => (
         className="w-full min-w-0 bg-transparent text-sm text-gray-700 outline-none placeholder:text-gray-400"
       />
       {filters.searchTerm && (
-        <button type="button" onClick={() => setFilters((prev) => ({ ...prev, searchTerm: "" }))} aria-label="Clear search"
+        <Tooltip text="Clear search"><button type="button" onClick={() => setFilters((prev) => ({ ...prev, searchTerm: "" }))} aria-label="Clear search"
           className="rounded-full p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
           <X className="h-3.5 w-3.5" />
-        </button>
+        </button></Tooltip>
       )}
     </div>
 

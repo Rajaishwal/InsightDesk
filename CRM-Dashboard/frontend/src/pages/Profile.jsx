@@ -10,6 +10,7 @@ import { useState, useEffect, useRef } from "react";
 import { useToast } from "../context/ToastContext";
 import { useAuth } from "../context/AuthContext";
 import axios from "../services/axios";
+import Tooltip from "../components/Tooltip";
 
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 const EXPERIENCE_OPTS = ["0-1 years (Fresher)", "1-3 years (Junior)", "3-5 years (Mid-Level)", "5-8 years (Senior)", "8+ years (Lead/Expert)"];
@@ -187,12 +188,11 @@ export default function Profile() {
                     {initials(form.name)}
                   </div>
                 )}
-                <button type="button" onClick={() => photoInputRef.current?.click()}
+                <Tooltip text="Change photo"><button type="button" onClick={() => photoInputRef.current?.click()}
                   disabled={loading}
-                  className="absolute bottom-1 right-1 w-7 h-7 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full flex items-center justify-center shadow-md transition disabled:opacity-60"
-                  title="Change photo">
+                  className="absolute bottom-1 right-1 w-7 h-7 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full flex items-center justify-center shadow-md transition disabled:opacity-60">
                   <FontAwesomeIcon icon={faCamera} className="text-xs" />
-                </button>
+                </button></Tooltip>
                 <input ref={photoInputRef} type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
               </div>
               <div>
@@ -403,8 +403,10 @@ export default function Profile() {
                       disabled={!editing} placeholder="+91 98765 43210" className={inputCls(!editing)} />
                   </Field>
                   <Field label="Date of Birth" icon={faBirthdayCake}>
-                    <input type="date" name="dateOfBirth" value={form.dateOfBirth} onChange={handleChange}
-                      disabled={!editing} className={inputCls(!editing)} />
+                    <Tooltip text={editing ? "Your date of birth" : "Click “Edit Profile” to change your date of birth"} align="start" full>
+                      <input type="date" name="dateOfBirth" value={form.dateOfBirth} onChange={handleChange}
+                        disabled={!editing} className={inputCls(!editing)} />
+                    </Tooltip>
                   </Field>
                   <Field label="Blood Group" icon={faTint}>
                     <select name="bloodGroup" value={form.bloodGroup} onChange={handleChange}

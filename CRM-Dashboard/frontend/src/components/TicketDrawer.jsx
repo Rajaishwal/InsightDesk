@@ -9,6 +9,8 @@ import api from "../services/axios";
 import FileUploader from "./FileUploader";
 import PersonAvatar from "./PersonAvatar";
 import { STATUS, STATUSES, PRIORITY, CATEGORY_ICON, fmtStamp } from "./ticketMeta";
+import Tooltip from "./Tooltip";
+import HoverTip from "./Tooltip";
 
 const attachIcon = (type = "") => {
   if (type.startsWith("image/")) return <FileImage className="h-3.5 w-3.5 flex-shrink-0" />;
@@ -137,7 +139,7 @@ export default function TicketDrawer({ ticket: initialTicket, onClose, onUpdate,
               <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${st.chip}`}><st.Icon className="h-3 w-3" />{st.label}</span>
               <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${pr.chip}`}><span className={`h-1.5 w-1.5 rounded-full ${pr.dot}`} />{ticket.priority} priority</span>
             </div>
-            <button type="button" onClick={onClose} aria-label="Close" className="-mr-2 -mt-1 rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"><X className="h-5 w-5" /></button>
+            <HoverTip text="Close"><button type="button" onClick={onClose} aria-label="Close" className="-mr-2 -mt-1 rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"><X className="h-5 w-5" /></button></HoverTip>
           </div>
           <h2 className="mt-2.5 text-lg font-bold leading-snug text-gray-900">{ticket.problem || ticket.category}</h2>
           <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-gray-500">
@@ -155,14 +157,13 @@ export default function TicketDrawer({ ticket: initialTicket, onClose, onUpdate,
                 const clickable = isAdmin && !closed && !current && !moving;
                 const meta = STATUS[s];
                 return (
-                  <button key={s} type="button" onClick={() => move(s)} disabled={!clickable}
-                    title={clickable ? `Mark as ${meta.label.toLowerCase()}` : undefined}
+                  <Tooltip key={s} text={clickable ? `Mark as ${meta.label.toLowerCase()}` : undefined}><button type="button" onClick={() => move(s)} disabled={!clickable}
                     className={`group text-left focus:outline-none ${clickable ? "cursor-pointer" : "cursor-default"}`}>
                     <span className={`block h-1.5 rounded-full transition ${reached ? meta.dot : "bg-gray-100"} ${clickable ? "group-hover:opacity-70" : ""}`} />
                     <span className={`mt-1.5 flex items-center gap-1 text-[11px] font-semibold ${current ? "text-gray-900" : reached ? "text-gray-500" : "text-gray-300"} ${clickable ? "group-hover:text-indigo-600 group-focus-visible:text-indigo-600" : ""}`}>
                       {current && moving ? <Loader2 className="h-3 w-3 animate-spin" /> : null}{meta.label}
                     </span>
-                  </button>
+                  </button></Tooltip>
                 );
               })}
             </div>

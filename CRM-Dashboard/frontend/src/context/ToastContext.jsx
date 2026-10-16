@@ -1,6 +1,7 @@
 // ToastContext.jsx — App-wide toast notifications (top-right, white card, tone icon tile, countdown bar)
 import { createContext, useContext, useState, useCallback } from "react";
 import { CheckCircle2, XCircle, AlertTriangle, Info, X } from "lucide-react";
+import Tooltip from "../components/Tooltip";
 
 const ToastContext = createContext(null);
 
@@ -61,10 +62,10 @@ export function ToastProvider({ children }) {
                   <p className={`text-[10px] font-bold uppercase tracking-widest ${tone.text}`}>{tone.label}</p>
                   <p className="mt-0.5 text-[13px] font-medium leading-snug text-gray-700 break-words">{t.message}</p>
                 </div>
-                <button onClick={() => dismiss(t.id)} aria-label="Dismiss"
+                <Tooltip text="Dismiss"><button onClick={() => dismiss(t.id)} aria-label="Dismiss"
                   className="-mr-1 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-gray-300 transition hover:bg-gray-100 hover:text-gray-500">
                   <X className="w-3.5 h-3.5" />
-                </button>
+                </button></Tooltip>
               </div>
 
               {/* Countdown bar — pauses on hover; the toast closes when it runs out */}
