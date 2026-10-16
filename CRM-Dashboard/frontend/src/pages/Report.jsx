@@ -2,7 +2,10 @@
 // Status tiles filter the list; admins also filter by priority / category and see who's waiting on a reply.
 // Clicking a ticket opens the conversation drawer. Live updates arrive over the socket.
 import { useCallback, useEffect, useState } from "react";
-import { RefreshCw, Plus, Search, X, MessageSquare, ChevronDown, AlertCircle, LifeBuoy, Reply, Paperclip } from "lucide-react";
+import {
+  RefreshCw, Plus, Search, X, MessageSquare, ChevronDown, AlertCircle, LifeBuoy, Reply, Paperclip,
+  CalendarDays, ReceiptIndianRupee, IndianRupee, Clock, KeyRound, Timer,
+} from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useSocket } from "../context/SocketContext";
 import { useToast } from "../context/ToastContext";
@@ -11,15 +14,16 @@ import StatTile from "../components/StatTile";
 import PersonAvatar from "../components/PersonAvatar";
 import RaiseTicket from "../components/RaiseTicket";
 import TicketDrawer from "../components/TicketDrawer";
+import { useCapToFirstN, capClass, capStyle } from "../hooks/useCapToFirstN";
 import { STATUS, STATUSES, PRIORITY, PRIORITIES, CATEGORIES, CATEGORY_ICON, lastFrom, fmtDate } from "../components/ticketMeta";
 
 const FAQS = [
-  { q: "How do I apply for leave?", a: "Open Leave Management and click “Request leave”. Pick the type and dates (weekends aren't counted) and send it — HR approves or rejects it and you're notified." },
-  { q: "Where is my payslip?", a: "Payslips & Salary lists every month. Pick a month and click “Download PDF”, then choose “Save as PDF” in the print dialog." },
-  { q: "My salary or a deduction looks wrong", a: "Raise a ticket under Payroll → “Wrong Deduction” (or “Salary Not Received”) and mention the month in the description." },
-  { q: "How do I check in and take breaks?", a: "Use “Check In” in the top bar when you start — it runs your work timer. “Break” pauses it, and “Check Out” ends your day." },
-  { q: "I can't log in / forgot my password", a: "Ask a colleague to raise a ticket for you under IT Support → “Login / Access Issue”, or contact an admin directly." },
-  { q: "How fast are tickets answered?", a: "Most tickets are resolved within 1–2 working days; High priority ones are picked up within 4 hours. Replying to a resolved ticket reopens it — closed tickets are final." },
+  { Icon: CalendarDays, q: "How do I apply for leave?", a: "Open Leave Management and click “Request leave”. Pick the type and dates (weekends aren't counted) and send it — HR approves or rejects it and you're notified." },
+  { Icon: ReceiptIndianRupee, q: "Where is my payslip?", a: "Payslips & Salary lists every month. Pick a month and click “Download PDF”, then choose “Save as PDF” in the print dialog." },
+  { Icon: IndianRupee, q: "My salary or a deduction looks wrong", a: "Raise a ticket under Payroll → “Wrong Deduction” (or “Salary Not Received”) and mention the month in the description." },
+  { Icon: Clock, q: "How do I check in and take breaks?", a: "Use “Check In” in the top bar when you start — it runs your work timer. “Break” pauses it, and “Check Out” ends your day." },
+  { Icon: KeyRound, q: "I can't log in / forgot my password", a: "Ask a colleague to raise a ticket for you under IT Support → “Login / Access Issue”, or contact an admin directly." },
+  { Icon: Timer, q: "How fast are tickets answered?", a: "Most tickets are resolved within 1–2 working days; High priority ones are picked up within 4 hours. Replying to a resolved ticket reopens it — closed tickets are final." },
 ];
 
 export default function Report() {
@@ -98,6 +102,10 @@ export default function Report() {
     .sort((a, b) => (waiting(b) - waiting(a)) || (PRIORITIES.indexOf(b.priority) - PRIORITIES.indexOf(a.priority)) || (new Date(b.createdAt) - new Date(a.createdAt)));
 
   const active = tickets.find((t) => t._id === activeId);
+
+  // The list shows the first few tickets; the rest scroll inside the card (re-measured when the list changes)
+  const SHOW = 4;
+  const [listRef, listMaxH] = useCapToFirstN(SHOW, [visible.map((t) => t._id).join(","), loading]);
   const toggle = (s) => setStatus((cur) => (cur === s ? "all" : s));
   const filtered = status !== "all" || priority !== "all" || category !== "all" || q;
   const clearFilters = () => { setStatus("all"); setPriority("all"); setCategory("all"); setSearch(""); };
@@ -165,7 +173,7 @@ export default function Report() {
         </button>
       )}
 
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
+      <div className={`grid items-start gap-5 ${isAdmin && byCategory.length > 0 ? "lg:grid-cols-[minmax(0,1fr)_300px]" : ""}`}>
         {/* Tickets */}
         <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
           <div className="flex flex-col gap-3 border-b border-gray-100 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between">
@@ -221,7 +229,7 @@ export default function Report() {
               ) : null}
             </div>
           ) : (
-            <ul className="divide-y divide-gray-50">
+            <ul ref={listRef} className={`divide-y divide-gray-50 ${capClass(listMaxH)}`} style={capStyle(listMaxH)}>
               {visible.map((t) => {
                 const st = STATUS[t.status] || STATUS.Open;
                 const pr = PRIORITY[t.priority] || PRIORITY.Low;
@@ -269,53 +277,62 @@ export default function Report() {
               })}
             </ul>
           )}
+          {!loading && !error && listMaxH && (
+            <p className="border-t border-gray-100 py-2 text-center text-[10px] font-semibold text-gray-400">
+              Scroll for {visible.length - SHOW} more
+            </p>
+          )}
         </div>
 
-        {/* Side column */}
-        <div className="space-y-5">
-          {isAdmin && byCategory.length > 0 && (
-            <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-              <h2 className="text-sm font-bold text-gray-900">By category</h2>
-              <p className="text-[11px] text-gray-400">All tickets · click to filter</p>
-              <div className="mt-3 space-y-1">
-                {byCategory.map(([c, n]) => {
-                  const Icon = CATEGORY_ICON[c];
-                  const max = Math.max(...byCategory.map(([, v]) => v));
-                  return (
-                    <button key={c} type="button" onClick={() => setCategory((cur) => (cur === c ? "all" : c))} aria-pressed={category === c}
-                      className={`w-full rounded-lg px-2 py-1.5 text-left transition ${category === c ? "bg-indigo-50" : "hover:bg-gray-50"}`}>
-                      <span className="flex items-center gap-2 text-xs font-semibold text-gray-700">
-                        {Icon && <Icon className="h-3.5 w-3.5 text-gray-400" />}{c}<span className="ml-auto tabular-nums text-gray-500">{n}</span>
-                      </span>
-                      <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-gray-100">
-                        <span className="block h-full rounded-full bg-indigo-400" style={{ width: `${(n / max) * 100}%` }} />
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
+        {/* Side column (admins): tickets per category */}
+        {isAdmin && byCategory.length > 0 && (
           <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-            <h2 className="text-sm font-bold text-gray-900">Quick answers</h2>
-            <p className="text-[11px] text-gray-400">Check here before raising a ticket</p>
-            <div className="mt-3 divide-y divide-gray-100">
-              {FAQS.map((f, i) => {
-                const open = openFaq === i;
+            <h2 className="text-sm font-bold text-gray-900">By category</h2>
+            <p className="text-[11px] text-gray-400">All tickets · click to filter</p>
+            <div className="mt-3 space-y-1">
+              {byCategory.map(([c, n]) => {
+                const Icon = CATEGORY_ICON[c];
+                const max = Math.max(...byCategory.map(([, v]) => v));
                 return (
-                  <div key={f.q}>
-                    <button type="button" onClick={() => setOpenFaq(open ? null : i)} aria-expanded={open}
-                      className="flex w-full items-center justify-between gap-2 py-2.5 text-left text-[13px] font-semibold text-gray-700 transition hover:text-indigo-600">
-                      {f.q}
-                      <ChevronDown className={`h-4 w-4 flex-shrink-0 text-gray-400 transition ${open ? "rotate-180" : ""}`} />
-                    </button>
-                    {open && <p className="pb-3 text-xs leading-relaxed text-gray-500">{f.a}</p>}
-                  </div>
+                  <button key={c} type="button" onClick={() => setCategory((cur) => (cur === c ? "all" : c))} aria-pressed={category === c}
+                    className={`w-full rounded-lg px-2 py-1.5 text-left transition ${category === c ? "bg-indigo-50" : "hover:bg-gray-50"}`}>
+                    <span className="flex items-center gap-2 text-xs font-semibold text-gray-700">
+                      {Icon && <Icon className="h-3.5 w-3.5 text-gray-400" />}{c}<span className="ml-auto tabular-nums text-gray-500">{n}</span>
+                    </span>
+                    <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-gray-100">
+                      <span className="block h-full rounded-full bg-indigo-400" style={{ width: `${(n / max) * 100}%` }} />
+                    </span>
+                  </button>
                 );
               })}
             </div>
           </div>
+        )}
+      </div>
+
+      {/* Quick answers — a row of cards under the tickets; each opens on its own */}
+      <div className="mt-5 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+        <div className="mb-4">
+          <h2 className="text-sm font-bold text-gray-900">Quick answers</h2>
+          <p className="text-[11px] text-gray-400">Check here before raising a ticket</p>
+        </div>
+        <div className="grid items-start gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {FAQS.map((f, i) => {
+            const open = openFaq === i;
+            return (
+              <div key={f.q} className={`rounded-xl ring-1 transition ${open ? "bg-indigo-50/40 ring-indigo-100" : "bg-gray-50/60 ring-gray-100 hover:ring-gray-200"}`}>
+                <button type="button" onClick={() => setOpenFaq(open ? null : i)} aria-expanded={open}
+                  className="flex w-full items-center gap-3 px-3.5 py-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 rounded-xl">
+                  <span className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg ${open ? "bg-indigo-600 text-white" : "bg-white text-gray-500 ring-1 ring-gray-100"}`}>
+                    <f.Icon className="h-4 w-4" />
+                  </span>
+                  <span className={`min-w-0 flex-1 text-[13px] font-semibold ${open ? "text-indigo-900" : "text-gray-700"}`}>{f.q}</span>
+                  <ChevronDown className={`h-4 w-4 flex-shrink-0 text-gray-400 transition ${open ? "rotate-180" : ""}`} />
+                </button>
+                {open && <p className="px-3.5 pb-3.5 pl-[3.75rem] text-xs leading-relaxed text-gray-600">{f.a}</p>}
+              </div>
+            );
+          })}
         </div>
       </div>
 

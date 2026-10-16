@@ -6,7 +6,7 @@
 // another admin. The server enforces all of this too.
 import { useEffect, useMemo, useState } from "react";
 import {
-  IndianRupee, Plus, Search, X, XCircle, Trash2, Lock, Wallet, Hourglass, AlertTriangle,
+  IndianRupee, Plus, Search, X, XCircle, Trash2, Wallet, Hourglass, AlertTriangle,
   Loader2, AlertCircle, ReceiptIndianRupee, CheckCheck, Clock, Send,
 } from "lucide-react";
 import { useToast } from "../context/ToastContext";
@@ -463,13 +463,16 @@ const Salary = () => {
                         <StageDetail s={s} stage={stage} />
                       </td>
                       <td className="px-5 py-3.5">
-                        {mine ? (
-                          <span className="flex items-center justify-end gap-1 text-[11px] text-gray-400" title="Your own salary is managed by another admin">
-                            <Lock className="h-3.5 w-3.5" /> Managed by another admin
-                          </span>
-                        ) : locked ? (
-                          <span className="flex items-center justify-end gap-1 text-[11px] text-gray-400" title={`${s.userName} confirmed receiving it — the record can't be changed or deleted`}>
-                            <Lock className="h-3.5 w-3.5" /> Confirmed · locked
+                        {locked ? (
+                          <div className="flex justify-end">
+                            <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200"
+                              title={`${mine ? "You" : s.userName} confirmed receiving it — the record can't be changed or deleted`}>
+                              Confirmed
+                            </span>
+                          </div>
+                        ) : mine ? (
+                          <span className="block text-right text-[11px] text-gray-400" title="Your own salary is managed by another admin">
+                            Managed by another admin
                           </span>
                         ) : (
                           <div className="flex items-center justify-end gap-0.5">
