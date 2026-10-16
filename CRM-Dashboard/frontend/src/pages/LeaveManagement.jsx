@@ -14,6 +14,7 @@ import api from "../services/axios";
 import { useToast } from "../context/ToastContext";
 import { useConfirm } from "../context/ConfirmContext";
 import Tooltip from "../components/Tooltip";
+import { useCapToFirstN, capClass, capStyle } from "../hooks/useCapToFirstN";
 
 const TYPE = Object.fromEntries(LEAVE_TYPES.map((t) => [t.key, t]));
 const HALF_DAY_TYPES = ["Planned Leave", "Wellness Leave", "Unplanned Leave (LOP)"]; // not Polling Leave
@@ -267,7 +268,7 @@ function RequestForm({ balances, monthLeft, onClose, onDone }) {
   );
 }
 
-const PAGE = 8;
+const SHOW = 8; // requests visible before the list scrolls
 
 export default function LeaveManagement() {
   const { user } = useAuth();
@@ -280,7 +281,6 @@ export default function LeaveManagement() {
   const [refreshing, setRefreshing] = useState(false);
   const [showForm, setShowForm]     = useState(false);
   const [filter, setFilter]         = useState("all");
-  const [shown, setShown]           = useState(PAGE);
   const [cancellingId, setCancellingId] = useState(null);
 
   const fetchLeaves = async () => {
@@ -320,6 +320,8 @@ export default function LeaveManagement() {
     return c;
   }, [leaves]);
   const visible = sorted.filter((l) => filter === "all" || l.status === filter);
+  // The first 8 requests show; the rest scroll inside the card (re-measured when the list changes)
+  const [listRef, listMaxH] = useCapToFirstN(SHOW, [visible.map((l) => l._id).join(","), loading]);
 
   // The next leave that hasn't ended yet (approved or still waiting)
   const today = new Date().toLocaleDateString("en-CA");
@@ -396,7 +398,7 @@ export default function LeaveManagement() {
           <h2 className="text-sm font-bold text-gray-900">My requests</h2>
           <div className="flex flex-wrap gap-1.5">
             {[["all", "All"], ["Pending", "Pending"], ["Approved", "Approved"], ["Rejected", "Rejected"]].map(([k, label]) => (
-              <button key={k} type="button" onClick={() => { setFilter(k); setShown(PAGE); }} aria-pressed={filter === k}
+              <button key={k} type="button" onClick={() => setFilter(k)} aria-pressed={filter === k}
                 className={`rounded-full px-3 py-1 text-xs font-semibold transition ${filter === k ? "bg-gray-800 text-white" : "bg-gray-50 text-gray-500 ring-1 ring-gray-200 hover:text-gray-700"}`}>
                 {label} <span className={filter === k ? "text-gray-300" : "text-gray-400"}>{counts[k] || 0}</span>
               </button>
@@ -426,8 +428,8 @@ export default function LeaveManagement() {
             {!leaves.length && <button type="button" onClick={() => setShowForm(true)} className="mt-2 text-xs font-semibold text-indigo-600 hover:underline">Request your first leave</button>}
           </div>
         ) : (
-          <ul className="divide-y divide-gray-50">
-            {visible.slice(0, shown).map((l) => {
+          <ul ref={listRef} className={`divide-y divide-gray-50 ${capClass(listMaxH)}`} style={capStyle(listMaxH)}>
+            {visible.map((l) => {
               const t = TYPE[normalizeType(l.leaveType)] || { color: "#9ca3af" };
               const start = new Date(l.startDate);
               const note = l.status === "Rejected" ? l.rejectionReason || l.hrComments : l.hrComments;
@@ -467,12 +469,10 @@ export default function LeaveManagement() {
           </ul>
         )}
 
-        {!loading && !error && visible.length > shown && (
-          <div className="border-t border-gray-100 px-5 py-3 text-center">
-            <button type="button" onClick={() => setShown((n) => n + PAGE)} className="text-xs font-semibold text-indigo-600 hover:underline">
-              Show {Math.min(PAGE, visible.length - shown)} more
-            </button>
-          </div>
+        {!loading && !error && listMaxH && (
+          <p className="border-t border-gray-100 py-2 text-center text-[10px] font-semibold text-gray-400">
+            Scroll for {visible.length - SHOW} more
+          </p>
         )}
         {!loading && !error && counts.Rejected > 0 && filter === "all" && (
           <div className="flex items-center gap-1.5 border-t border-gray-100 px-5 py-2.5 text-[11px] text-gray-400">
