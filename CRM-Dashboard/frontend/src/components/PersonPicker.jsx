@@ -23,7 +23,9 @@ export default function PersonPicker({ people, value, onChange, allowAll = true,
   }, [open]);
 
   const pick = (id) => { onChange(id); setOpen(false); setQ(""); };
-  const shown = people.filter((p) => p.name?.toLowerCase().includes(q.trim().toLowerCase()));
+  // Match the name, Employee ID or designation
+  const term = q.trim().toLowerCase();
+  const shown = people.filter((p) => [p.name, p.employeeId, p.designation].some((v) => v?.toLowerCase().includes(term)));
 
   // ↓ / ↑ / Enter / Esc from the search box. Rows: "All employees" (when not searching), then the people.
   const showAll = allowAll && !q;
@@ -67,7 +69,7 @@ export default function PersonPicker({ people, value, onChange, allowAll = true,
               value={q}
               onChange={(e) => setQ(e.target.value)}
               onKeyDown={nav.onKeyDown}
-              placeholder="Find an employee…"
+              placeholder="Find by name or ID…"
               className="w-full bg-transparent text-sm text-gray-700 outline-none placeholder:text-gray-400"
             />
           </div>
@@ -91,7 +93,9 @@ export default function PersonPicker({ people, value, onChange, allowAll = true,
                 {p._id === value && <Check className="h-3.5 w-3.5 text-indigo-600" />}
               </button>
             ))}
-            {shown.length === 0 && <p className="px-3 py-3 text-center text-xs text-gray-400">No one matches “{q}”</p>}
+            {shown.length === 0 && (
+              <p className="px-3 py-3 text-center text-xs text-gray-400">{people.length ? `No one matches “${q}”` : "No employees to choose from"}</p>
+            )}
           </div>
         </div>
       )}

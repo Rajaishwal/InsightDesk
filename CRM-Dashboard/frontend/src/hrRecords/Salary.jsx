@@ -49,7 +49,7 @@ const STATUS = {
 const EMPTY_FORM = { employee: "", month: MONTHS[new Date().getMonth()], year: String(new Date().getFullYear()), basicPay: "" };
 
 // Add / edit a salary
-function SalaryForm({ editing, people, salaries, selfId, onClose, onSaved }) {
+function SalaryForm({ editing, people, peopleState, onRetryPeople, salaries, selfId, onClose, onSaved }) {
   const toast = useToast();
   const [form, setForm] = useState(() =>
     editing
@@ -61,7 +61,8 @@ function SalaryForm({ editing, people, salaries, selfId, onClose, onSaved }) {
 
   // You can't choose yourself (your own salary is set by another admin)
   const choices = people.filter((p) => p.employeeId && p.employeeId !== selfId);
-  const person = people.find((p) => p._id === form.employee);
+  // When editing, the employee is fixed — find them even if the list arrived after the form opened
+  const person = people.find((p) => p._id === form.employee) || (editing ? people.find((p) => p.employeeId === editing.userId) : undefined);
   const calc = breakdown(form.basicPay);
 
   // Months this person already has a salary for (except the one being edited)
@@ -116,8 +117,15 @@ function SalaryForm({ editing, people, salaries, selfId, onClose, onSaved }) {
           <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto]">
             <div>
               <p className="mb-1.5 text-[11px] font-bold uppercase tracking-widest text-gray-400">Employee</p>
-              <PersonPicker people={choices} value={form.employee} onChange={(id) => set({ employee: id })}
-                allowAll={false} placeholder="Choose an employee" disabled={!!editing} full />
+              <PersonPicker people={choices} value={person?._id || ""} onChange={(id) => set({ employee: id })}
+                allowAll={false} placeholder={peopleState === "loading" && !people.length ? "Loading employees…" : "Choose an employee"}
+                disabled={!!editing || (peopleState !== "ok" && !people.length)} full />
+              {peopleState === "error" && !people.length && (
+                <p className="mt-1.5 flex items-center gap-1.5 text-xs text-red-600">
+                  <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" /> Couldn't load the employee list.
+                  <button type="button" onClick={onRetryPeople} className="font-semibold text-indigo-600 hover:underline">Retry</button>
+                </p>
+              )}
             </div>
             <div>
               <p className="mb-1.5 text-[11px] font-bold uppercase tracking-widest text-gray-400">Month</p>
@@ -203,6 +211,7 @@ const Salary = () => {
 
   const [salaries, setSalaries] = useState(getCache("salaries") || []);
   const [people, setPeople]     = useState([]);
+  const [peopleState, setPeopleState] = useState("loading"); // loading | ok | error — the employee list for the form
   const [loading, setLoading]   = useState(!getCache("salaries"));
   const [error, setError]       = useState(null);
   const [search, setSearch]     = useState("");
@@ -224,10 +233,23 @@ const Salary = () => {
     }
   };
 
+  const loadPeople = () => {
+    setPeopleState("loading");
+    return api.get("/users")
+      .then((r) => { setPeople(Array.isArray(r.data) ? r.data : []); setPeopleState("ok"); })
+      .catch(() => setPeopleState("error"));
+  };
+
   useEffect(() => {
     fetchSalaries();
-    api.get("/users").then((r) => setPeople(Array.isArray(r.data) ? r.data : [])).catch(() => setPeople([]));
+    loadPeople();
   }, []);
+
+  // Open the add / edit form — and try the employee list again if it didn't load (e.g. the server was down)
+  const openForm = (editing) => {
+    if (peopleState === "error" || (peopleState === "ok" && !people.length)) loadPeople();
+    setForm({ editing });
+  };
 
   const byEmpId = useMemo(() => Object.fromEntries(people.map((p) => [p.employeeId, p])), [people]);
 
@@ -300,7 +322,7 @@ const Salary = () => {
               className="w-full min-w-0 bg-transparent text-sm text-gray-700 outline-none placeholder:text-gray-400" />
             {search && <button type="button" onClick={() => setSearch("")} aria-label="Clear search" className="rounded-full p-0.5 text-gray-400 hover:bg-gray-100"><X className="h-3.5 w-3.5" /></button>}
           </div>
-          <button type="button" onClick={() => setForm({ editing: null })}
+          <button type="button" onClick={() => openForm(null)}
             className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-full bg-gray-800 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-gray-900">
             <Plus className="h-4 w-4" /> Add salary
           </button>
@@ -370,7 +392,7 @@ const Salary = () => {
                   {salaries.length > 0 ? (
                     <button type="button" onClick={() => { setSearch(""); setStatus("all"); setPeriod("all"); }} className="mt-2 text-xs font-semibold text-indigo-600 hover:underline">Clear filters</button>
                   ) : (
-                    <button type="button" onClick={() => setForm({ editing: null })} className="mt-2 text-xs font-semibold text-indigo-600 hover:underline">Add the first salary</button>
+                    <button type="button" onClick={() => openForm(null)} className="mt-2 text-xs font-semibold text-indigo-600 hover:underline">Add the first salary</button>
                   )}
                 </td></tr>
               ) : (
@@ -410,7 +432,7 @@ const Salary = () => {
                           </span>
                         ) : (
                           <div className="flex items-center justify-end gap-0.5">
-                            <button type="button" onClick={() => setForm({ editing: s })} disabled={busy} title="Edit" aria-label="Edit"
+                            <button type="button" onClick={() => openForm(s)} disabled={busy} title="Edit" aria-label="Edit"
                               className="rounded-full p-1.5 text-gray-400 transition hover:bg-indigo-50 hover:text-indigo-600 disabled:opacity-40"><Pencil className="h-4 w-4" /></button>
                             {s.status !== "Paid" && (
                               <button type="button" onClick={() => setStatusOf(s, "Paid")} disabled={busy} title="Mark as paid" aria-label="Mark as paid"
@@ -443,6 +465,8 @@ const Salary = () => {
         <SalaryForm
           editing={form.editing}
           people={people}
+          peopleState={peopleState}
+          onRetryPeople={loadPeople}
           salaries={salaries}
           selfId={selfId}
           onClose={() => setForm(null)}
