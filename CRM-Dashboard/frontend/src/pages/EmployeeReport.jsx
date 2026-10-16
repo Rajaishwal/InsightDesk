@@ -63,13 +63,13 @@ const periodRange = (id) => {
   return { from: toKey(new Date(now.getFullYear(), now.getMonth(), 1)), to: toKey(now) };
 };
 
-/* ── Status vocab (validated palette: CVD-safe across all pairs) ───────── */
+/* ── Status vocab (same -400 shades as the Employee Dashboard calendar) ─── */
 const DAY_STATUS = {
-  present: { label: "Present", color: "#10b981" },
-  late: { label: "Late", color: "#f59e0b" },
-  leave: { label: "On leave", color: "#3b82f6" },
-  "half-leave": { label: "Half-day leave", color: "linear-gradient(135deg, #10b981 50%, #3b82f6 50%)" },
-  absent: { label: "Absent", color: "#ef4444" },
+  present: { label: "Present", color: "#34d399" },
+  late: { label: "Late", color: "#fbbf24" },
+  leave: { label: "On leave", color: "#60a5fa" },
+  "half-leave": { label: "Half-day leave", color: "linear-gradient(135deg, #34d399 50%, #60a5fa 50%)" },
+  absent: { label: "Absent", color: "#f87171" },
   weekend: { label: "Weekend", color: "#f1f5f9" },
   today: { label: "Today · not checked in yet", color: "#ffffff" },
   future: { label: "Upcoming", color: "#ffffff" },
@@ -139,88 +139,130 @@ function LiveStatus({ live }) {
   );
 }
 
-/* ── Attendance grid (weeks as columns, Mon–Sun as rows) ───────────────── */
+/* ── Attendance calendar: one month is a full calendar, longer periods get a small calendar per month ── */
+const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const SOLID = new Set(["present", "late", "leave", "half-leave", "absent"]);
+const leaveAbbr = (lt) => LEAVE_TYPES.find(t => t.key === normalizeType(lt))?.abbr || "L";
+
+// Every month the period touches, padded to whole Mon–Sun weeks; days outside the period show faded
+const calendarMonths = (days) => {
+  const byDate = new Map(days.map(d => [d.date, d]));
+  return [...new Set(days.map(d => d.date.slice(0, 7)))].map(ym => {
+    const [y, m] = ym.split("-").map(Number);
+    const lead = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() + 6) % 7;
+    const total = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    const cells = Array(lead).fill(null);
+    for (let i = 1; i <= total; i++) {
+      const date = `${ym}-${pad(i)}`;
+      cells.push(byDate.get(date) || { date, status: "future", outside: true });
+    }
+    while (cells.length % 7) cells.push(null);
+    return { ym, label: fmtDay(`${ym}-01`, { month: "long", year: "numeric" }), cells };
+  });
+};
+
+// Same look as the Employee Dashboard calendar: soft solid fills with white text, Sat & Sun grey
+const cellLook = (d, col) => {
+  if (SOLID.has(d.status)) return { cls: "text-white hover:brightness-95", style: { background: DAY_STATUS[d.status].color } };
+  if (d.status === "today") return { cls: "border border-indigo-300 bg-white text-indigo-500" };
+  if (d.status === "weekend" || col >= 5) return { cls: "bg-gray-100 text-gray-400" };
+  return { cls: "bg-gray-50 text-gray-300" };
+};
+
+const cellNote = (d) => {
+  if (d.status === "leave") return leaveAbbr(d.leaveType);
+  if (d.status === "half-leave") return "HD";
+  if ((d.status === "present" || d.status === "late") && d.hours > 0) return `${Math.round(d.hours * 10) / 10}h`;
+  return null;
+};
+
 function AttendanceGrid({ days }) {
   const [focused, setFocused] = useState(null);
-  const weeks = useMemo(() => {
-    if (!days.length) return [];
-    const lead = (days[0].dow + 6) % 7; // Monday-first offset
-    const cells = [...Array(lead).fill(null), ...days];
-    const cols = [];
-    for (let i = 0; i < cells.length; i += 7) cols.push(cells.slice(i, i + 7));
-    return cols;
-  }, [days]);
+  const months = useMemo(() => calendarMonths(days), [days]);
+  const big = months.length === 1;
+  const todayKey = toKey(new Date());
 
   const counts = days.reduce((m, d) => { m[d.status] = (m[d.status] || 0) + 1; return m; }, {});
   const legend = ["present", "late", "leave", "half-leave", "absent"].filter(k => counts[k]);
-  // One month fits big cells with the date inside; longer periods shrink to a compact heat-strip
-  const roomy = weeks.length <= 6;
-  const cell = roomy ? 34 : 18;
-  const gap = roomy ? 4 : 3;
-  const darkFill = (s) => s === "present" || s === "absent" || s === "leave" || s === "half-leave";
+
+  const renderCell = (d, col, key) => {
+    const look = cellLook(d, col);
+    const shape = `rounded-[6px] ${big ? "relative h-[38px]" : "flex h-6 items-center justify-center text-[9px] font-semibold"}
+      ${look.cls} ${d.date === todayKey ? `ring-indigo-500 ring-offset-1 ${big ? "ring-2" : "ring-1"}` : ""}`;
+    const day = Number(d.date.slice(8));
+    const note = big && cellNote(d);
+    const inner = big ? (
+      <>
+        <span className="absolute left-1.5 top-1 text-[11px] font-bold leading-none">{day}</span>
+        {note && <span className="absolute bottom-1 right-1.5 text-[9px] font-semibold leading-none opacity-90">{note}</span>}
+      </>
+    ) : day;
+
+    if (d.outside || d.status === "future") return <span key={key} className={shape} style={look.style}>{inner}</span>;
+    return (
+      <button
+        key={key}
+        type="button"
+        onMouseEnter={() => setFocused(d)}
+        onMouseLeave={() => setFocused(null)}
+        onFocus={() => setFocused(d)}
+        onBlur={() => setFocused(null)}
+        aria-label={`${fmtDay(d.date)}: ${DAY_STATUS[d.status].label}`}
+        className={`${shape} outline-none transition focus-visible:ring-2 focus-visible:ring-indigo-400`}
+        style={look.style}
+      >
+        {inner}
+      </button>
+    );
+  };
 
   return (
     <div>
-      <div className="overflow-x-auto pb-1">
-        <div className="inline-flex" style={{ gap }}>
-          <div className="mr-1 grid grid-rows-7 text-[9px] font-semibold text-gray-400" style={{ gap }}>
-            {(roomy ? ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] : ["Mon", "", "Wed", "", "Fri", "", ""])
-              .map((d, i) => <span key={i} className="flex items-center" style={{ height: cell }}>{d}</span>)}
-          </div>
-          {weeks.map((col, wi) => (
-            <div key={wi} className="grid grid-rows-7" style={{ gap }}>
-              {Array.from({ length: 7 }).map((_, di) => {
-                const d = col[di];
-                if (!d) return <span key={di} style={{ height: cell, width: cell }} />;
-                const st = DAY_STATUS[d.status];
-                return (
-                  <button
-                    key={di}
-                    type="button"
-                    onMouseEnter={() => setFocused(d)}
-                    onMouseLeave={() => setFocused(null)}
-                    onFocus={() => setFocused(d)}
-                    onBlur={() => setFocused(null)}
-                    aria-label={`${fmtDay(d.date)}: ${st.label}`}
-                    className={`flex items-center justify-center rounded-[5px] text-[11px] font-bold outline-none transition hover:scale-105 focus-visible:ring-2 focus-visible:ring-indigo-400
-                      ${darkFill(d.status) ? "text-white" : "text-gray-500"}
-                      ${d.status === "future" ? "border border-gray-100 text-gray-300" : ""} ${d.status === "today" ? "border border-indigo-300" : ""}
-                      ${focused?.date === d.date ? "ring-2 ring-indigo-300" : ""}`}
-                    style={{ background: st.color, height: cell, width: cell }}
-                  >
-                    {roomy && Number(d.date.slice(8))}
-                  </button>
-                );
-              })}
+      <div className={big ? "" : "grid gap-5"} style={big ? undefined : { gridTemplateColumns: `repeat(${months.length}, minmax(0, 1fr))` }}>
+        {months.map(mo => (
+          <div key={mo.ym}>
+            <p className={`font-bold text-gray-600 ${big ? "mb-2 text-xs" : "mb-1.5 text-[11px]"}`}>{mo.label}</p>
+            <div className={`grid grid-cols-7 ${big ? "gap-1" : "gap-0.5"}`}>
+              {WEEKDAYS.map((w, i) => (
+                <span key={w} className={`rounded-[6px] text-center font-bold tracking-wide ${i >= 5 ? "text-gray-400" : "text-gray-500"}
+                  ${big ? `py-1 text-[10px] ${i >= 5 ? "bg-gray-100" : "bg-gray-50"}` : "pb-0.5 text-[9px]"}`}>
+                  {big ? w : w[0]}
+                </span>
+              ))}
+              {mo.cells.map((d, idx) => d ? renderCell(d, idx % 7, d.date) : <span key={`pad-${idx}`} />)}
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
       </div>
 
-      {/* Hover / focus readout */}
-      <div className="mt-3 min-h-[40px] rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-[11px]">
+      {/* The legend sits in the readout box until a day is hovered or focused */}
+      <div className="mt-3 flex min-h-[40px] items-center rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-[11px]">
         {focused ? (
           <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5">
             <span className="font-bold text-gray-700">{fmtDay(focused.date, { weekday: "long", day: "numeric", month: "long" })}</span>
-            <span className="text-gray-500">{DAY_STATUS[focused.status].label}{focused.leaveType ? ` · ${focused.leaveType}` : ""}</span>
+            <span className="flex items-center gap-1.5 text-gray-500">
+              <span className="h-2.5 w-2.5 rounded-[2px] border border-black/5" style={{ background: DAY_STATUS[focused.status].color }} />
+              {DAY_STATUS[focused.status].label}{focused.leaveType ? ` · ${focused.leaveType}` : ""}
+              {(focused.dow === 0 || focused.dow === 6) && SOLID.has(focused.status) ? " · worked on a week off" : ""}
+            </span>
             {focused.checkIn && <span className="text-gray-500">In {fmtTime(focused.checkIn)} · Out {fmtTime(focused.checkOut)}</span>}
             {focused.hours > 0 && <span className="text-gray-500">{focused.hours}h at work</span>}
             {focused.focusSec > 0 && <span className="text-gray-500">{fmtHM(focused.focusSec)} focus</span>}
             {focused.breakSec > 0 && <span className="text-gray-500">{fmtHM(focused.breakSec)} break</span>}
           </div>
         ) : (
-          <span className="text-gray-400">Hover or tab through a day to see its details.</span>
+          <div className="flex w-full flex-wrap items-center gap-x-4 gap-y-1">
+            {legend.map(k => (
+              <span key={k} className="flex items-center gap-1.5 text-gray-500">
+                <span className="h-2.5 w-2.5 rounded-[2px]" style={{ background: DAY_STATUS[k].color }} />
+                {DAY_STATUS[k].label} <span className="font-bold text-gray-700">{counts[k]}</span>
+              </span>
+            ))}
+            <span className="flex items-center gap-1.5 text-gray-500">
+              <span className="h-2.5 w-2.5 rounded-[2px] bg-gray-200" /> Week off
+            </span>
+          </div>
         )}
-      </div>
-
-      {/* Legend — text in ink, swatch carries the colour */}
-      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
-        {legend.map(k => (
-          <span key={k} className="flex items-center gap-1.5 text-[11px] text-gray-500">
-            <span className="h-2.5 w-2.5 rounded-[3px]" style={{ background: DAY_STATUS[k].color }} />
-            {DAY_STATUS[k].label} <span className="font-bold text-gray-700">{counts[k]}</span>
-          </span>
-        ))}
       </div>
     </div>
   );
